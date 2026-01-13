@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  bestsocialbot:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.33'
+          memory: '256M'
+    build: .
+    container_name: bestsocialbot
+    restart: unless-stopped
+    environment:
+      - BOT_NAME=bestsocialbot
+      - BOT_TOKEN=${WOND_TOKEN}
+    volumes:
+      - wond_data:/data
+      - .:/app
+
+volumes:
+  wond_data:
