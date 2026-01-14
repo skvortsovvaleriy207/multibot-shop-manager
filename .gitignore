@@ -1,0 +1,14 @@
+
+venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+bot_database.db
+*.session
+*.session-journal
+debug.log
+logs/
+credentials.json
+*_credentials.json
+bestsocialbot_1/credentials.json_old

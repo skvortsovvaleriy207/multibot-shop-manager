@@ -216,6 +216,10 @@ async def sync_with_google_sheets():
 
 async def sync_db_to_google_sheets():
     try:
+        # Сначала агрегируем статистику
+        from data_aggregator import aggregate_user_statistics
+        await aggregate_user_statistics()
+
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
         sheet = spreadsheet.worksheet(SHEET_MAIN)
@@ -246,8 +250,8 @@ async def sync_db_to_google_sheets():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
-                    u.referral_count,
-                    u.referral_payment,
+                    COALESCE(u.total_referrals, u.referral_count, 0) as referral_count,
+                    COALESCE(u.referral_earnings, u.referral_payment, 0) as referral_payment,
                     u.subscription_date,
                     u.subscription_payment_date,
                     u.purchases,

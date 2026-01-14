@@ -9,7 +9,7 @@ import asyncio
 from integration import *
 from datetime import datetime
 from db import check_channel_subscription
-from config import CHANNEL_ID, ADMIN_ID
+from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
 from bot_instance import bot
 from filters import is_valid_email, is_valid_phone
@@ -102,7 +102,12 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
 
     is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
     if not is_subscribed:
-        await callback.answer("Для прохождения опроса необходимо подписаться на наш канал.", show_alert=True)
+    #    builder = InlineKeyboardBuilder()
+    #    builder.add(types.InlineKeyboardButton(text="Подписаться", url=CHANNEL_URL))
+    #    builder.add(types.InlineKeyboardButton(text="Я подписался", callback_data="start_survey"))
+    #    builder.adjust(1)
+    #    await callback.message.answer("Для прохождения опроса необходимо подписаться на наш канал.", reply_markup=builder.as_markup())
+    #    await callback.answer()
         return
 
     async with aiosqlite.connect("bot_database.db") as db:
@@ -512,20 +517,13 @@ async def process_q16(message: Message, state: FSMContext):
         url="https://t.me/+vz7-Ko4rDy03Yjhi"
     ))
 
-    builder.add(types.InlineKeyboardButton(
-        text="назад",
-        callback_data="back_to_showcase"
-    ))
-    builder.add(types.InlineKeyboardButton(
-        text="выход из чат-бота",
-        url="https://t.me/+-Vb_fN2PDl1jYmMy"
-    ))
+
     builder.adjust(1, 1, 1)
 
 
 
     await message.answer(
-        text="полезные кнопки:",
+        text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
         reply_markup=builder.as_markup()
     )
 
@@ -611,26 +609,19 @@ async def end_surrey(callback: CallbackQuery):
         text="выход из чат-бота",
         url="https://t.me/+vz7-Ko4rDy03Yjhi"
     ))
-    builder.add(types.InlineKeyboardButton(
-        text="назад",
-        callback_data="back_to_showcase"
-    ))
-    builder.add(types.InlineKeyboardButton(
-        text="выход из чат-бота",
-        url="https://t.me/+-Vb_fN2PDl1jYmMy "
-    ))
+
     builder.adjust(1, 1, 1)
 
     if callback.message.caption is not None:
 
         await callback.message.edit_caption(
-            caption="полезные кнопки:",
+            caption="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
             reply_markup=builder.as_markup()
         )
     else:
 
         await callback.message.edit_text(
-            text="полезные кнопки:",
+            text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
             reply_markup=builder.as_markup()
         )
     await callback.answer()

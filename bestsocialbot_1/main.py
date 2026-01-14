@@ -408,10 +408,16 @@ async def send_showcase(chat_id: int):
         await db.execute("DELETE FROM showcase_messages WHERE chat_id = ?", (chat_id,))
         await db.commit()
     
-    photo_url = "https://i.postimg.cc/PqVqxV9g/photo-2025-09-06-16-03-35.jpg"
+
+    
+    # Получаем информацию о боте для формирования динамической ссылки
+    bot_info = await bot.get_me()
+    bot_username = bot_info.username
+
+    photo_url = "https://i.postimg.cc/d3DLXMwT/social.jpg"
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Опрос", url="https://t.me/OurWonderfulBot"))
-    builder.add(types.InlineKeyboardButton(text="Магазин", url="https://t.me/OurWonderfulBot"))
+    builder.add(types.InlineKeyboardButton(text="Опрос", url=f"https://t.me/{bot_username}?start=survey"))
+    builder.add(types.InlineKeyboardButton(text="Магазин", url=f"https://t.me/{bot_username}?start=shop"))
     builder.adjust(2)
     
     message = await bot.send_photo(
@@ -584,9 +590,16 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
         except Exception as callback_answer_error:
             print(f"Ошибка при ответе на callback после исключения: {callback_answer_error}")
 async def periodic_showcase():
+    from aiogram.exceptions import TelegramBadRequest
     while True:
         try:
+            logging.info(f"Sending showcase to channel ID: {CHANNEL_ID}")
             await send_showcase(CHANNEL_ID)
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower():
+                 logging.error(f"CRITICAL ERROR: Channel {CHANNEL_ID} not found. Please check if the bot is added to the channel and is an admin.")
+            else:
+                 logging.error(f"Telegram error in periodic_showcase: {e}")
         except Exception as e:
             logging.error(f"Error in periodic_showcase: {e}")
         await asyncio.sleep(SHOWCASE_INTERVAL)
