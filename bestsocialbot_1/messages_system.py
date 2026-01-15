@@ -523,8 +523,26 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
             """, (user_id, ADMIN_ID, subject, message_text, datetime.now().isoformat()))
             await db.commit()
 
-        # Отправляем через существующий функционал
-        await send_system_message(ADMIN_ID, subject, message_text)
+        # Формируем клавиатуру для админа
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(
+            text="✅ Одобрить",
+            callback_data=f"approve_req_{item_type}_{request_id}"
+        ))
+        builder.add(types.InlineKeyboardButton(
+            text="❌ Отклонить",
+            callback_data=f"reject_req_{item_type}_{request_id}"
+        ))
+        builder.adjust(2)
+
+        # Отправляем через существующий функционал, но подменяем на прямую отправку для кнопок
+        # Так как send_system_message не поддерживает кнопки, отправляем напрямую ботом
+        from dispatcher import bot
+        await bot.send_message(
+            ADMIN_ID,
+            f"📧 **Новое сообщение**\n\n📋 **{subject}**\n\n{message_text}",
+            reply_markup=builder.as_markup()
+        )
 
         print(f"✅ Полная заявка #{request_id} отправлена админу для одобрения")
         return True

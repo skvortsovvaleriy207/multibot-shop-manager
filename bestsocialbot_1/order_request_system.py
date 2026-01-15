@@ -31,6 +31,8 @@ class ProductCardStates(StatesGroup):
     waiting_advantages = State()
     waiting_additional_info = State()
     waiting_images = State()
+    waiting_main_photo = State()
+    waiting_additional_photos = State()
     waiting_price = State()
     waiting_availability = State()
     waiting_detailed_specs = State()
@@ -60,7 +62,8 @@ class ServiceCardStates(StatesGroup):
     waiting_title = State()
     waiting_works = State()
     waiting_materials = State()
-    waiting_images = State()
+    waiting_main_photo = State()
+    waiting_additional_photos = State()
     waiting_price = State()
     waiting_pricing = State()
     waiting_guarantees = State()
@@ -96,6 +99,8 @@ class OfferCardStates(StatesGroup):
     waiting_advantages = State()
     waiting_additional_info = State()
     waiting_images = State()
+    waiting_main_photo = State()
+    waiting_additional_photos = State()
     waiting_price = State()
     waiting_availability = State()
     waiting_detailed_specs = State()
@@ -150,7 +155,7 @@ async def check_daily_limit(user_id: int) -> bool:
 
 # ========== КАРТОЧКА ТОВАРА ==========
 
-@dp.callback_query(F.data == "product_card_form")
+@dp.callback_query(F.data.startswith("product_card_form"))
 async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     """Начало заполнения карточки товара"""
     if await check_blocked_user(callback):
@@ -161,6 +166,25 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     if not await check_daily_limit(user_id):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
+
+    from utils import has_active_process
+    if await has_active_process(user_id):
+        await callback.message.answer(
+            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            "Пожалуйста, дождитесь выполнения текущей задачи."
+        )
+        await callback.answer("❌ Есть активная заявка", show_alert=True)
+        return
+
+    # Проверяем, передана ли категория
+    preset_category = None
+    if "|" in callback.data:
+        try:
+            preset_category = callback.data.split("|")[1]
+            await state.update_data(preset_category=preset_category)
+        except IndexError:
+            pass
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="💰 Продать", callback_data="product_sell"))
@@ -182,7 +206,17 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
 async def product_select_sell(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Продать"""
     await state.update_data(operation="sell")
-    await show_product_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        # Пропускаем выбор категории, переходим к выбору класса/спецификации
+        await show_product_class_selection(callback.message, state)
+    else:
+        await show_product_category_selection(callback.message, state)
+    
     await callback.answer()
 
 
@@ -190,7 +224,16 @@ async def product_select_sell(callback: CallbackQuery, state: FSMContext):
 async def product_select_buy(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Купить"""
     await state.update_data(operation="buy")
-    await show_product_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        await show_product_class_selection(callback.message, state)
+    else:
+        await show_product_category_selection(callback.message, state)
+    
     await callback.answer()
 
 
@@ -408,6 +451,10 @@ async def process_product_class_input(message: Message, state: FSMContext):
         await message.answer("❌ Название класса не может быть пустым. Введите название:")
         return
 
+    if len(item_class) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_class=item_class)
 
     user_id = message.from_user.id
@@ -537,6 +584,10 @@ async def process_product_type_input(message: Message, state: FSMContext):
     item_type = message.text.strip()
     if not item_type:
         await message.answer("❌ Название типа не может быть пустым. Введите название:")
+        return
+
+    if len(item_type) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
         return
 
     await state.update_data(item_type=item_type)
@@ -753,6 +804,9 @@ async def back_to_product_view(callback: CallbackQuery, state: FSMContext):
 async def product_process_catalog_id(message: Message, state: FSMContext):
     """Обработка ID в каталоге"""
     catalog_id = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(catalog_id=catalog_id)
 
     builder = InlineKeyboardBuilder()
@@ -785,6 +839,10 @@ async def product_process_title(message: Message, state: FSMContext):
         await message.answer("❌ Название товара не может быть пустым. Пожалуйста, введите название:")
         return
 
+    if len(title) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(title=title)
 
     builder = InlineKeyboardBuilder()
@@ -814,6 +872,9 @@ async def back_to_product_title(callback: CallbackQuery, state: FSMContext):
 async def product_process_purpose(message: Message, state: FSMContext):
     """Обработка назначения товара"""
     purpose = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(purpose=purpose)
 
     builder = InlineKeyboardBuilder()
@@ -836,6 +897,9 @@ async def product_process_purpose(message: Message, state: FSMContext):
 async def product_process_name(message: Message, state: FSMContext):
     """Обработка наименования товара"""
     name = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(name=name)
 
     builder = InlineKeyboardBuilder()
@@ -858,6 +922,9 @@ async def product_process_name(message: Message, state: FSMContext):
 async def product_process_creation_date(message: Message, state: FSMContext):
     """Обработка даты создания"""
     creation_date = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(creation_date=creation_date)
 
     builder = InlineKeyboardBuilder()
@@ -880,6 +947,9 @@ async def product_process_creation_date(message: Message, state: FSMContext):
 async def product_process_condition(message: Message, state: FSMContext):
     """Обработка состояния товара"""
     condition = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(condition=condition)
 
     builder = InlineKeyboardBuilder()
@@ -902,6 +972,9 @@ async def product_process_condition(message: Message, state: FSMContext):
 async def product_process_specifications(message: Message, state: FSMContext):
     """Обработка характеристик товара"""
     specifications = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(specifications=specifications)
 
     builder = InlineKeyboardBuilder()
@@ -924,6 +997,9 @@ async def product_process_specifications(message: Message, state: FSMContext):
 async def product_process_advantages(message: Message, state: FSMContext):
     """Обработка преимуществ товара"""
     advantages = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(advantages=advantages)
 
     builder = InlineKeyboardBuilder()
@@ -946,6 +1022,9 @@ async def product_process_advantages(message: Message, state: FSMContext):
 async def product_process_additional_info(message: Message, state: FSMContext):
     """Обработка дополнительной информации"""
     additional_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(additional_info=additional_info)
 
     builder = InlineKeyboardBuilder()
@@ -956,47 +1035,144 @@ async def product_process_additional_info(message: Message, state: FSMContext):
     builder.adjust(1)
 
     await message.answer(
-        "📋 **14. Изображения и/или видео**\n\n"
-        "Отправьте качественные фото, баннеры, визуальные материалы (необязательно):\n"
-        "Или напишите 'пропустить':",
+        "📸 **14. Изображения и/или видео**\n\n"
+        "Отправьте **основное фото или видео** товара (обязательно).\n"
+        "Оно будет отображаться на обложке.",
         reply_markup=builder.as_markup()
     )
-    await state.set_state(ProductCardStates.waiting_images)
+    await state.set_state(ProductCardStates.waiting_main_photo)
 
 
-@dp.message(ProductCardStates.waiting_images)
-async def product_process_images(message: Message, state: FSMContext):
-    """Обработка изображений"""
-    images = ""
-    if message.text and message.text.lower() == "пропустить":
-        images = ""
-    elif message.photo:
-        images = message.photo[-1].file_id
-    else:
-        images = message.text if message.text else ""
+@dp.message(ProductCardStates.waiting_main_photo)
+async def product_process_main_photo(message: Message, state: FSMContext):
+    """Обработка основного фото"""
+    if not (message.photo or message.video or message.document):
+        await message.answer("❌ Пожалуйста, отправьте фото или видео.")
+        return
 
-    await state.update_data(images=images)
+    # Определяем тип и file_id
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
 
+    if not file_id:
+         await message.answer("❌ Не удалось распознать медиа.")
+         return
+
+    main_photo_data = {"type": file_type, "file_id": file_id, "unique_id": unique_id}
+    await state.update_data(main_photo=main_photo_data, additional_photos=[])
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Пропустить дополнительные", callback_data="skip_prod_add_photos"))
+    
+    await message.answer(
+        "✅ Основное фото сохранено!\n\n"
+        "Теперь отправьте **до 3-х дополнительных фото/видео** (по одному или альбомом).\n"
+        "Или нажмите кнопку «Пропустить».",
+        reply_markup=builder.as_markup()
+    )
+    await state.set_state(ProductCardStates.waiting_additional_photos)
+
+@dp.callback_query(F.data == "skip_prod_add_photos", ProductCardStates.waiting_additional_photos)
+async def skip_product_additional_photos(callback: CallbackQuery, state: FSMContext):
+    """Пропуск дополнительных фото"""
+    await callback.message.edit_text("Дополнительные фото пропущены.")
+    
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="◀️ Назад",
-        callback_data="back_to_product_images"
-    ))
+        callback_data="back_to_product_additional_photos"
+    )) # Need to handle this back button? Or reuse exiting logic? 
+       # "back_to_product_images" was the old one. I should probably rename or reuse.
+       # Reuse logic: if I use "back_to_product_images" I must insure it points to restart media upload.
     builder.adjust(1)
-
-    await message.answer(
+    
+    await callback.message.answer(
         "📋 **15. Цена**\n\n"
         "Актуальная стоимость с учетом текущих скидок и акций (необязательно):\n"
         "Или напишите 'пропустить':",
         reply_markup=builder.as_markup()
     )
     await state.set_state(ProductCardStates.waiting_price)
+    await callback.answer()
+
+@dp.message(ProductCardStates.waiting_additional_photos)
+async def product_process_additional_photos(message: Message, state: FSMContext):
+    """Обработка дополнительных фото"""
+    if message.text and message.text.lower() in ['готово', 'done', 'skip', '-', 'пропустить']:
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_product_additional_photos"))
+        builder.adjust(1)
+
+        await message.answer("Ввод фото завершен.", reply_markup=builder.as_markup())
+        await message.answer("📋 **15. Цена**\n\nАктуальная стоимость с учетом текущих скидок и акций (необязательно):\nИли напишите 'пропустить':")
+        await state.set_state(ProductCardStates.waiting_price)
+        return
+
+    if not (message.photo or message.video or message.document):
+        return
+
+    data = await state.get_data()
+    additional_photos = data.get("additional_photos", [])
+    
+    if len(additional_photos) >= 3:
+        await message.answer("⚠️ Вы уже загрузили 3 дополнительных фото. Введите цену или нажмите 'Пропустить дополнительные'.")
+        return
+
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
+
+    if file_id:
+        additional_photos.append({"type": file_type, "file_id": file_id, "unique_id": unique_id})
+        await state.update_data(additional_photos=additional_photos)
+        
+        remaining = 3 - len(additional_photos)
+        if remaining > 0:
+            await message.answer(f"✅ Фото добавлено! Можно добавить еще {remaining}.\nНапишите 'Готово', если хотите закончить.")
+        else:
+             builder = InlineKeyboardBuilder()
+             builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_product_additional_photos")) 
+             builder.adjust(1)
+             
+             await message.answer("✅ Загружено 3 фото.", reply_markup=builder.as_markup())
+             await message.answer("📋 **15. Цена**\n\nАктуальная стоимость с учетом текущих скидок и акций (необязательно):\nИли напишите 'пропустить':")
+             await state.set_state(ProductCardStates.waiting_price)
 
 
 @dp.message(ProductCardStates.waiting_price)
 async def product_process_price(message: Message, state: FSMContext):
     """Обработка цены"""
     price = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(price=price)
 
     builder = InlineKeyboardBuilder()
@@ -1019,6 +1195,9 @@ async def product_process_price(message: Message, state: FSMContext):
 async def product_process_availability(message: Message, state: FSMContext):
     """Обработка информации о наличии"""
     availability = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(availability=availability)
 
     builder = InlineKeyboardBuilder()
@@ -1041,6 +1220,9 @@ async def product_process_availability(message: Message, state: FSMContext):
 async def product_process_detailed_specs(message: Message, state: FSMContext):
     """Обработка подробных характеристик"""
     detailed_specs = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(detailed_specs=detailed_specs)
 
     builder = InlineKeyboardBuilder()
@@ -1063,6 +1245,9 @@ async def product_process_detailed_specs(message: Message, state: FSMContext):
 async def product_process_reviews(message: Message, state: FSMContext):
     """Обработка отзывов"""
     reviews = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(reviews=reviews)
 
     builder = InlineKeyboardBuilder()
@@ -1085,6 +1270,9 @@ async def product_process_reviews(message: Message, state: FSMContext):
 async def product_process_rating(message: Message, state: FSMContext):
     """Обработка рейтинга"""
     rating = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(rating=rating)
 
     builder = InlineKeyboardBuilder()
@@ -1107,6 +1295,9 @@ async def product_process_rating(message: Message, state: FSMContext):
 async def product_process_delivery_info(message: Message, state: FSMContext):
     """Обработка информации о доставке"""
     delivery_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(delivery_info=delivery_info)
 
     builder = InlineKeyboardBuilder()
@@ -1129,6 +1320,9 @@ async def product_process_delivery_info(message: Message, state: FSMContext):
 async def product_process_supplier_info(message: Message, state: FSMContext):
     """Обработка информации о поставщике"""
     supplier_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(supplier_info=supplier_info)
 
     builder = InlineKeyboardBuilder()
@@ -1151,6 +1345,9 @@ async def product_process_supplier_info(message: Message, state: FSMContext):
 async def product_process_statistics(message: Message, state: FSMContext):
     """Обработка статистики"""
     statistics = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(statistics=statistics)
 
     builder = InlineKeyboardBuilder()
@@ -1173,6 +1370,9 @@ async def product_process_statistics(message: Message, state: FSMContext):
 async def product_process_deadline(message: Message, state: FSMContext):
     """Обработка сроков"""
     deadline = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(deadline=deadline)
 
     builder = InlineKeyboardBuilder()
@@ -1195,6 +1395,9 @@ async def product_process_deadline(message: Message, state: FSMContext):
 async def product_process_tags(message: Message, state: FSMContext):
     """Обработка тегов"""
     tags = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(tags=tags)
 
     builder = InlineKeyboardBuilder()
@@ -1220,10 +1423,22 @@ async def product_process_contact(message: Message, state: FSMContext):
         await message.answer("❌ Контактная информация не может быть пустой. Пожалуйста, введите контакты:")
         return
 
+    if len(contact) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(contact=contact)
 
     # Получаем все данные
     data = await state.get_data()
+
+    # Формируем JSON с изображениями
+    images_data = {
+        "main": data.get("main_photo"),
+        "additional": data.get("additional_photos", [])
+    }
+    import json
+    images_json = json.dumps(images_data, ensure_ascii=False)
 
     # Сохраняем заявку в базу данных
     try:
@@ -1252,7 +1467,7 @@ async def product_process_contact(message: Message, state: FSMContext):
                 data.get('specifications', ''),
                 data.get('advantages', ''),
                 data.get('additional_info', ''),
-                data.get('images', ''),
+                images_json,
                 data.get('price', ''),
                 data.get('availability', ''),
                 data.get('detailed_specs', ''),
@@ -1327,7 +1542,7 @@ async def product_process_contact(message: Message, state: FSMContext):
 
 # ========== КАРТОЧКА УСЛУГИ ==========
 
-@dp.callback_query(F.data == "service_card_form")
+@dp.callback_query(F.data.startswith("service_card_form"))
 async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
     """Начало заполнения карточки услуги"""
     if await check_blocked_user(callback):
@@ -1338,6 +1553,25 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
     if not await check_daily_limit(user_id):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
+
+    from utils import has_active_process
+    if await has_active_process(user_id):
+        await callback.message.answer(
+            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            "Пожалуйста, дождитесь выполнения текущей задачи."
+        )
+        await callback.answer("❌ Есть активная заявка", show_alert=True)
+        return
+
+    # Проверяем, передана ли категория
+    preset_category = None
+    if "|" in callback.data:
+        try:
+            preset_category = callback.data.split("|")[1]
+            await state.update_data(preset_category=preset_category)
+        except IndexError:
+            pass
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="🛠 Предложить услугу", callback_data="service_offer"))
@@ -1359,7 +1593,16 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
 async def service_select_offer(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Предложить услугу"""
     await state.update_data(operation="sell")
-    await show_service_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        await show_service_class_selection(callback.message, state)
+    else:
+        await show_service_category_selection(callback.message, state)
+        
     await callback.answer()
 
 
@@ -1367,7 +1610,16 @@ async def service_select_offer(callback: CallbackQuery, state: FSMContext):
 async def service_select_order(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Заказать услугу"""
     await state.update_data(operation="buy")
-    await show_service_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        await show_service_class_selection(callback.message, state)
+    else:
+        await show_service_category_selection(callback.message, state)
+    
     await callback.answer()
 
 
@@ -1710,6 +1962,10 @@ async def process_service_type_input(message: Message, state: FSMContext):
         await message.answer("❌ Название типа не может быть пустым. Введите название:")
         return
 
+    if len(item_type) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_type=item_type)
 
     user_id = message.from_user.id
@@ -1841,6 +2097,10 @@ async def process_service_view_input(message: Message, state: FSMContext):
         await message.answer("❌ Название вида не может быть пустым. Введите название:")
         return
 
+    if len(item_kind) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_kind=item_kind)
 
     user_id = message.from_user.id
@@ -1924,6 +2184,9 @@ async def back_to_service_view(callback: CallbackQuery, state: FSMContext):
 async def service_process_catalog_id(message: Message, state: FSMContext):
     """Обработка ID в каталоге услуг"""
     catalog_id = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(catalog_id=catalog_id)
 
     builder = InlineKeyboardBuilder()
@@ -1953,6 +2216,9 @@ async def back_to_service_catalog_id(callback: CallbackQuery, state: FSMContext)
 async def service_process_service_date(message: Message, state: FSMContext):
     """Обработка даты услуги"""
     service_date = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(service_date=service_date)
 
     builder = InlineKeyboardBuilder()
@@ -1985,6 +2251,10 @@ async def service_process_title(message: Message, state: FSMContext):
         await message.answer("❌ Наименование услуги не может быть пустым. Пожалуйста, введите наименование:")
         return
 
+    if len(title) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(title=title)
 
     builder = InlineKeyboardBuilder()
@@ -2014,6 +2284,9 @@ async def back_to_service_title(callback: CallbackQuery, state: FSMContext):
 async def service_process_works(message: Message, state: FSMContext):
     """Обработка перечня работ"""
     works = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(works=works)
 
     builder = InlineKeyboardBuilder()
@@ -2036,6 +2309,9 @@ async def service_process_works(message: Message, state: FSMContext):
 async def service_process_materials(message: Message, state: FSMContext):
     """Обработка информации о материалах"""
     materials = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(materials=materials)
 
     builder = InlineKeyboardBuilder()
@@ -2046,47 +2322,142 @@ async def service_process_materials(message: Message, state: FSMContext):
     builder.adjust(1)
 
     await message.answer(
-        "📋 **10. Информационные фото/видео услуги**\n\n"
-        "Отправьте фото/видео материалы (необязательно):\n"
-        "Или напишите 'пропустить':",
+        "📸 **10. Информационные фото/видео услуги**\n\n"
+        "Отправьте **основное фото или видео** услуги (обязательно).\n"
+        "Оно будет отображаться на обложке.",
         reply_markup=builder.as_markup()
     )
-    await state.set_state(ServiceCardStates.waiting_images)
+    await state.set_state(ServiceCardStates.waiting_main_photo)
 
 
-@dp.message(ServiceCardStates.waiting_images)
-async def service_process_images(message: Message, state: FSMContext):
-    """Обработка изображений услуги"""
-    images = ""
-    if message.text and message.text.lower() == "пропустить":
-        images = ""
-    elif message.photo:
-        images = message.photo[-1].file_id
-    else:
-        images = message.text if message.text else ""
+@dp.message(ServiceCardStates.waiting_main_photo)
+async def service_process_main_photo(message: Message, state: FSMContext):
+    """Обработка основного фото услуги"""
+    if not (message.photo or message.video or message.document):
+        await message.answer("❌ Пожалуйста, отправьте фото или видео.")
+        return
 
-    await state.update_data(images=images)
+    # Определяем тип и file_id
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
 
+    if not file_id:
+         await message.answer("❌ Не удалось распознать медиа.")
+         return
+
+    main_photo_data = {"type": file_type, "file_id": file_id, "unique_id": unique_id}
+    await state.update_data(main_photo=main_photo_data, additional_photos=[])
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Пропустить дополнительные", callback_data="skip_svc_add_photos"))
+    
+    await message.answer(
+        "✅ Основное фото сохранено!\n\n"
+        "Теперь отправьте **до 3-х дополнительных фото/видео** (по одному или альбомом).\n"
+        "Или нажмите кнопку «Пропустить».",
+        reply_markup=builder.as_markup()
+    )
+    await state.set_state(ServiceCardStates.waiting_additional_photos)
+
+@dp.callback_query(F.data == "skip_svc_add_photos", ServiceCardStates.waiting_additional_photos)
+async def skip_service_additional_photos(callback: CallbackQuery, state: FSMContext):
+    """Пропуск дополнительных фото услуги"""
+    await callback.message.edit_text("Дополнительные фото пропущены.")
+    
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="◀️ Назад",
-        callback_data="back_to_service_images"
+        callback_data="back_to_service_additional_photos"
     ))
     builder.adjust(1)
-
-    await message.answer(
+    
+    await callback.message.answer(
         "📋 **11. Стоимость и срок выполнения услуги**\n\n"
         "Введите стоимость и сроки (необязательно):\n"
         "Или напишите 'пропустить':",
         reply_markup=builder.as_markup()
     )
     await state.set_state(ServiceCardStates.waiting_price)
+    await callback.answer()
+
+@dp.message(ServiceCardStates.waiting_additional_photos)
+async def service_process_additional_photos(message: Message, state: FSMContext):
+    """Обработка дополнительных фото услуги"""
+    if message.text and message.text.lower() in ['готово', 'done', 'skip', '-', 'пропустить']:
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_service_additional_photos"))
+        builder.adjust(1)
+
+        await message.answer("Ввод фото завершен.", reply_markup=builder.as_markup())
+        await message.answer("📋 **11. Стоимость и срок выполнения услуги**\n\nВведите стоимость и сроки (необязательно):\nИли напишите 'пропустить':")
+        await state.set_state(ServiceCardStates.waiting_price)
+        return
+
+    if not (message.photo or message.video or message.document):
+        return
+
+    data = await state.get_data()
+    additional_photos = data.get("additional_photos", [])
+    
+    if len(additional_photos) >= 3:
+        await message.answer("⚠️ Вы уже загрузили 3 дополнительных фото. Введите стоимость или нажмите 'Пропустить дополнительные'.")
+        return
+
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
+
+    if file_id:
+        additional_photos.append({"type": file_type, "file_id": file_id, "unique_id": unique_id})
+        await state.update_data(additional_photos=additional_photos)
+        
+        remaining = 3 - len(additional_photos)
+        if remaining > 0:
+            await message.answer(f"✅ Фото добавлено! Можно добавить еще {remaining}.\nНапишите 'Готово', если хотите закончить.")
+        else:
+             builder = InlineKeyboardBuilder()
+             builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_service_additional_photos")) 
+             builder.adjust(1)
+             
+             await message.answer("✅ Загружено 3 фото.", reply_markup=builder.as_markup())
+             await message.answer("📋 **11. Стоимость и срок выполнения услуги**\n\nВведите стоимость и сроки (необязательно):\nИли напишите 'пропустить':")
+             await state.set_state(ServiceCardStates.waiting_price)
 
 
 @dp.message(ServiceCardStates.waiting_price)
 async def service_process_price(message: Message, state: FSMContext):
     """Обработка стоимости и сроков"""
     price = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(price=price)
 
     builder = InlineKeyboardBuilder()
@@ -2109,6 +2480,9 @@ async def service_process_price(message: Message, state: FSMContext):
 async def service_process_pricing(message: Message, state: FSMContext):
     """Обработка прайса"""
     pricing = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(pricing=pricing)
 
     builder = InlineKeyboardBuilder()
@@ -2131,6 +2505,9 @@ async def service_process_pricing(message: Message, state: FSMContext):
 async def service_process_guarantees(message: Message, state: FSMContext):
     """Обработка гарантий и скидок"""
     guarantees = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(guarantees=guarantees)
 
     builder = InlineKeyboardBuilder()
@@ -2153,6 +2530,9 @@ async def service_process_guarantees(message: Message, state: FSMContext):
 async def service_process_conditions(message: Message, state: FSMContext):
     """Обработка условий"""
     conditions = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(conditions=conditions)
 
     builder = InlineKeyboardBuilder()
@@ -2175,6 +2555,9 @@ async def service_process_conditions(message: Message, state: FSMContext):
 async def service_process_supplier_info(message: Message, state: FSMContext):
     """Обработка информации о поставщике"""
     supplier_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(supplier_info=supplier_info)
 
     builder = InlineKeyboardBuilder()
@@ -2197,6 +2580,9 @@ async def service_process_supplier_info(message: Message, state: FSMContext):
 async def service_process_reviews(message: Message, state: FSMContext):
     """Обработка отзывов и рейтинга"""
     reviews = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(reviews=reviews)
 
     builder = InlineKeyboardBuilder()
@@ -2219,6 +2605,9 @@ async def service_process_reviews(message: Message, state: FSMContext):
 async def service_process_rating(message: Message, state: FSMContext):
     """Обработка рейтинга"""
     rating = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(rating=rating)
 
     builder = InlineKeyboardBuilder()
@@ -2241,6 +2630,9 @@ async def service_process_rating(message: Message, state: FSMContext):
 async def service_process_statistics(message: Message, state: FSMContext):
     """Обработка статистики"""
     statistics = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(statistics=statistics)
 
     builder = InlineKeyboardBuilder()
@@ -2263,6 +2655,9 @@ async def service_process_statistics(message: Message, state: FSMContext):
 async def service_process_additional_info(message: Message, state: FSMContext):
     """Обработка дополнительной информации"""
     additional_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(additional_info=additional_info)
 
     builder = InlineKeyboardBuilder()
@@ -2285,6 +2680,9 @@ async def service_process_additional_info(message: Message, state: FSMContext):
 async def service_process_deadline(message: Message, state: FSMContext):
     """Обработка сроков"""
     deadline = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(deadline=deadline)
 
     builder = InlineKeyboardBuilder()
@@ -2307,6 +2705,9 @@ async def service_process_deadline(message: Message, state: FSMContext):
 async def service_process_tags(message: Message, state: FSMContext):
     """Обработка тегов"""
     tags = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(tags=tags)
 
     builder = InlineKeyboardBuilder()
@@ -2332,10 +2733,22 @@ async def service_process_contact(message: Message, state: FSMContext):
         await message.answer("❌ Контактная информация не может быть пустой. Пожалуйста, введите контакты:")
         return
 
+    if len(contact) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(contact=contact)
 
     # Получаем все данные
     data = await state.get_data()
+
+    # Формируем JSON с изображениями
+    images_data = {
+        "main": data.get("main_photo"),
+        "additional": data.get("additional_photos", [])
+    }
+    import json
+    images_json = json.dumps(images_data, ensure_ascii=False)
 
     # Сохраняем заявку в базу данных
     try:
@@ -2359,7 +2772,7 @@ async def service_process_contact(message: Message, state: FSMContext):
                             data.get('title', ''),
                             data.get('works', ''),
                             data.get('materials', ''),
-                            data.get('images', ''),
+                            images_json,
                             data.get('price', ''),
                             data.get('pricing', ''),
                             data.get('guarantees', ''),
@@ -2438,7 +2851,7 @@ async def service_process_contact(message: Message, state: FSMContext):
 
 # ========== КАРТОЧКА ПРЕДЛОЖЕНИЯ/АКТИВА ==========
 
-@dp.callback_query(F.data == "offer_card_form")
+@dp.callback_query(F.data.startswith("offer_card_form"))
 async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
     """Начало заполнения карточки предложения/актива"""
     if await check_blocked_user(callback):
@@ -2450,6 +2863,25 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
 
+    from utils import has_active_process
+    if await has_active_process(user_id):
+        await callback.message.answer(
+            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            "Пожалуйста, дождитесь выполнения текущей задачи."
+        )
+        await callback.answer("❌ Есть активная заявка", show_alert=True)
+        return
+
+    # Проверяем, передана ли категория
+    preset_category = None
+    if "|" in callback.data:
+        try:
+            preset_category = callback.data.split("|")[1]
+            await state.update_data(preset_category=preset_category)
+        except IndexError:
+            pass
+
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="💰 Продать", callback_data="offer_sell"))
     builder.add(types.InlineKeyboardButton(text="🛒 Купить", callback_data="offer_buy"))
@@ -2457,7 +2889,7 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
     builder.adjust(1)
 
     await callback.message.edit_text(
-        "📋 **Карточка предложения/актива**\n\n"
+        "📋 **Карточка предложения (Property)**\n\n"
         "Выберите цель:",
         reply_markup=builder.as_markup()
     )
@@ -2470,7 +2902,16 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
 async def offer_select_sell(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Продать для предложения"""
     await state.update_data(operation="sell")
-    await show_offer_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        await show_offer_class_selection(callback.message, state)
+    else:
+        await show_offer_category_selection(callback.message, state)
+    
     await callback.answer()
 
 
@@ -2478,7 +2919,16 @@ async def offer_select_sell(callback: CallbackQuery, state: FSMContext):
 async def offer_select_buy(callback: CallbackQuery, state: FSMContext):
     """Выбор операции Купить для предложения"""
     await state.update_data(operation="buy")
-    await show_offer_category_selection(callback.message, state)
+    
+    data = await state.get_data()
+    preset_category = data.get("preset_category")
+    
+    if preset_category:
+        await state.update_data(category=preset_category)
+        await show_offer_class_selection(callback.message, state)
+    else:
+        await show_offer_category_selection(callback.message, state)
+    
     await callback.answer()
 
 
@@ -2681,6 +3131,10 @@ async def process_offer_class_input(message: Message, state: FSMContext):
         await message.answer("❌ Название класса не может быть пустым. Введите название:")
         return
 
+    if len(item_class) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_class=item_class)
 
     user_id = message.from_user.id
@@ -2819,6 +3273,10 @@ async def process_offer_type_input(message: Message, state: FSMContext):
         await message.answer("❌ Название типа не может быть пустым. Введите название:")
         return
 
+    if len(item_type) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_type=item_type)
 
     user_id = message.from_user.id
@@ -2950,6 +3408,10 @@ async def process_offer_view_input(message: Message, state: FSMContext):
         await message.answer("❌ Название вида не может быть пустым. Введите название:")
         return
 
+    if len(item_kind) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(item_kind=item_kind)
 
     user_id = message.from_user.id
@@ -3037,6 +3499,9 @@ async def back_to_offer_view(callback: CallbackQuery, state: FSMContext):
 async def offer_process_catalog_id(message: Message, state: FSMContext):
     """Обработка ID в каталоге предложения (аналогично товару)"""
     catalog_id = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(catalog_id=catalog_id)
 
     builder = InlineKeyboardBuilder()
@@ -3076,6 +3541,10 @@ async def offer_process_title(message: Message, state: FSMContext):
         await message.answer("❌ Название предложения не может быть пустым. Пожалуйста, введите название:")
         return
 
+    if len(title) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(title=title)
 
     builder = InlineKeyboardBuilder()
@@ -3112,10 +3581,22 @@ async def offer_process_contact(message: Message, state: FSMContext):
         await message.answer("❌ Контактная информация не может быть пустой. Пожалуйста, введите контакты:")
         return
 
+    if len(contact) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
+
     await state.update_data(contact=contact)
 
     # Получаем все данные
     data = await state.get_data()
+
+    # Формируем JSON с изображениями
+    images_data = {
+        "main": data.get("main_photo"),
+        "additional": data.get("additional_photos", [])
+    }
+    import json
+    images_json = json.dumps(images_data, ensure_ascii=False)
 
     # Сохраняем заявку в базу данных (аналогично товару)
     try:
@@ -3144,7 +3625,7 @@ async def offer_process_contact(message: Message, state: FSMContext):
                 data.get('specifications', ''),
                 data.get('advantages', ''),
                 data.get('additional_info', ''),
-                data.get('images', ''),
+                images_json,
                 data.get('price', ''),
                 data.get('availability', ''),
                 data.get('detailed_specs', ''),
@@ -3222,6 +3703,9 @@ async def offer_process_contact(message: Message, state: FSMContext):
 async def offer_process_purpose(message: Message, state: FSMContext):
     """Обработка назначения предложения"""
     purpose = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(purpose=purpose)
 
     builder = InlineKeyboardBuilder()
@@ -3251,6 +3735,9 @@ async def back_to_offer_purpose(callback: CallbackQuery, state: FSMContext):
 async def offer_process_name(message: Message, state: FSMContext):
     """Обработка наименования предложения"""
     name = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(name=name)
 
     builder = InlineKeyboardBuilder()
@@ -3280,6 +3767,9 @@ async def back_to_offer_name(callback: CallbackQuery, state: FSMContext):
 async def offer_process_creation_date(message: Message, state: FSMContext):
     """Обработка даты создания предложения"""
     creation_date = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(creation_date=creation_date)
 
     builder = InlineKeyboardBuilder()
@@ -3309,6 +3799,9 @@ async def back_to_offer_creation_date(callback: CallbackQuery, state: FSMContext
 async def offer_process_condition(message: Message, state: FSMContext):
     """Обработка состояния предложения"""
     condition = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(condition=condition)
 
     builder = InlineKeyboardBuilder()
@@ -3338,6 +3831,9 @@ async def back_to_offer_condition(callback: CallbackQuery, state: FSMContext):
 async def offer_process_specifications(message: Message, state: FSMContext):
     """Обработка характеристик предложения"""
     specifications = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(specifications=specifications)
 
     builder = InlineKeyboardBuilder()
@@ -3367,6 +3863,9 @@ async def back_to_offer_specifications(callback: CallbackQuery, state: FSMContex
 async def offer_process_advantages(message: Message, state: FSMContext):
     """Обработка преимуществ предложения"""
     advantages = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(advantages=advantages)
 
     builder = InlineKeyboardBuilder()
@@ -3396,6 +3895,9 @@ async def back_to_offer_advantages(callback: CallbackQuery, state: FSMContext):
 async def offer_process_additional_info(message: Message, state: FSMContext):
     """Обработка дополнительной информации предложения"""
     additional_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(additional_info=additional_info)
 
     builder = InlineKeyboardBuilder()
@@ -3406,12 +3908,12 @@ async def offer_process_additional_info(message: Message, state: FSMContext):
     builder.adjust(1)
 
     await message.answer(
-        "📋 **14. Изображения и/или видео**\n\n"
-        "Отправьте качественные фото, баннеры, визуальные материалы (необязательно):\n"
-        "Или напишите 'пропустить':",
+        "📸 **14. Изображения и/или видео**\n\n"
+        "Отправьте **основное фото или видео** предложения (обязательно).\n"
+        "Оно будет отображаться на обложке.",
         reply_markup=builder.as_markup()
     )
-    await state.set_state(OfferCardStates.waiting_images)
+    await state.set_state(OfferCardStates.waiting_main_photo)
 
 
 @dp.callback_query(F.data == "back_to_offer_additional_info")
@@ -3421,33 +3923,125 @@ async def back_to_offer_additional_info(callback: CallbackQuery, state: FSMConte
     await callback.answer()
 
 
-@dp.message(OfferCardStates.waiting_images)
-async def offer_process_images(message: Message, state: FSMContext):
-    """Обработка изображений предложения"""
-    images = ""
-    if message.text and message.text.lower() == "пропустить":
-        images = ""
-    elif message.photo:
-        images = message.photo[-1].file_id
-    else:
-        images = message.text if message.text else ""
+@dp.message(OfferCardStates.waiting_main_photo)
+async def offer_process_main_photo(message: Message, state: FSMContext):
+    """Обработка основного фото предложения"""
+    if not (message.photo or message.video or message.document):
+        await message.answer("❌ Пожалуйста, отправьте фото или видео.")
+        return
 
-    await state.update_data(images=images)
+    # Определяем тип и file_id
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
 
+    if not file_id:
+         await message.answer("❌ Не удалось распознать медиа.")
+         return
+
+    main_photo_data = {"type": file_type, "file_id": file_id, "unique_id": unique_id}
+    await state.update_data(main_photo=main_photo_data, additional_photos=[])
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Пропустить дополнительные", callback_data="skip_offer_add_photos"))
+    
+    await message.answer(
+        "✅ Основное фото сохранено!\n\n"
+        "Теперь отправьте **до 3-х дополнительных фото/видео** (по одному или альбомом).\n"
+        "Или нажмите кнопку «Пропустить».",
+        reply_markup=builder.as_markup()
+    )
+    await state.set_state(OfferCardStates.waiting_additional_photos)
+
+@dp.callback_query(F.data == "skip_offer_add_photos", OfferCardStates.waiting_additional_photos)
+async def skip_offer_additional_photos(callback: CallbackQuery, state: FSMContext):
+    """Пропуск дополнительных фото предложения"""
+    await callback.message.edit_text("Дополнительные фото пропущены.")
+    
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="◀️ Назад",
-        callback_data="back_to_offer_images"
+        callback_data="back_to_offer_additional_photos"
     ))
     builder.adjust(1)
-
-    await message.answer(
+    
+    await callback.message.answer(
         "📋 **15. Цена**\n\n"
         "Актуальная стоимость с учетом текущих скидок и акций (необязательно):\n"
         "Или напишите 'пропустить':",
         reply_markup=builder.as_markup()
     )
     await state.set_state(OfferCardStates.waiting_price)
+    await callback.answer()
+
+@dp.message(OfferCardStates.waiting_additional_photos)
+async def offer_process_additional_photos(message: Message, state: FSMContext):
+    """Обработка дополнительных фото предложения"""
+    if message.text and message.text.lower() in ['готово', 'done', 'skip', '-', 'пропустить']:
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_offer_additional_photos"))
+        builder.adjust(1)
+
+        await message.answer("Ввод фото завершен.", reply_markup=builder.as_markup())
+        await message.answer("📋 **15. Цена**\n\nАктуальная стоимость с учетом текущих скидок и акций (необязательно):\nИли напишите 'пропустить':")
+        await state.set_state(OfferCardStates.waiting_price)
+        return
+
+    if not (message.photo or message.video or message.document):
+        return
+
+    data = await state.get_data()
+    additional_photos = data.get("additional_photos", [])
+    
+    if len(additional_photos) >= 3:
+        await message.answer("⚠️ Вы уже загрузили 3 дополнительных фото. Введите стоимость или нажмите 'Пропустить дополнительные'.")
+        return
+
+    file_id = None
+    file_type = "photo"
+    unique_id = None
+    
+    if message.photo:
+        file_id = message.photo[-1].file_id
+        unique_id = message.photo[-1].file_unique_id
+        file_type = "photo"
+    elif message.video:
+        file_id = message.video.file_id
+        unique_id = message.video.file_unique_id
+        file_type = "video"
+    elif message.document and message.document.mime_type.startswith('image'):
+         file_id = message.document.file_id
+         unique_id = message.document.file_unique_id
+         file_type = "photo"
+
+    if file_id:
+        additional_photos.append({"type": file_type, "file_id": file_id, "unique_id": unique_id})
+        await state.update_data(additional_photos=additional_photos)
+        
+        remaining = 3 - len(additional_photos)
+        if remaining > 0:
+            await message.answer(f"✅ Фото добавлено! Можно добавить еще {remaining}.\nНапишите 'Готово', если хотите закончить.")
+        else:
+             builder = InlineKeyboardBuilder()
+             builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_offer_additional_photos")) 
+             builder.adjust(1)
+             
+             await message.answer("✅ Загружено 3 фото.", reply_markup=builder.as_markup())
+             await message.answer("📋 **15. Цена**\n\nАктуальная стоимость с учетом текущих скидок и акций (необязательно):\nИли напишите 'пропустить':")
+             await state.set_state(OfferCardStates.waiting_price)
 
 
 @dp.callback_query(F.data == "back_to_offer_images")
@@ -3461,6 +4055,9 @@ async def back_to_offer_images(callback: CallbackQuery, state: FSMContext):
 async def offer_process_price(message: Message, state: FSMContext):
     """Обработка цены предложения"""
     price = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(price=price)
 
     builder = InlineKeyboardBuilder()
@@ -3490,6 +4087,9 @@ async def back_to_offer_price(callback: CallbackQuery, state: FSMContext):
 async def offer_process_availability(message: Message, state: FSMContext):
     """Обработка информации о наличии предложения"""
     availability = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(availability=availability)
 
     builder = InlineKeyboardBuilder()
@@ -3519,6 +4119,9 @@ async def back_to_offer_availability(callback: CallbackQuery, state: FSMContext)
 async def offer_process_detailed_specs(message: Message, state: FSMContext):
     """Обработка подробных характеристик предложения"""
     detailed_specs = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(detailed_specs=detailed_specs)
 
     builder = InlineKeyboardBuilder()
@@ -3548,6 +4151,9 @@ async def back_to_offer_detailed_specs(callback: CallbackQuery, state: FSMContex
 async def offer_process_reviews(message: Message, state: FSMContext):
     """Обработка отзывов предложения"""
     reviews = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(reviews=reviews)
 
     builder = InlineKeyboardBuilder()
@@ -3577,6 +4183,9 @@ async def back_to_offer_reviews(callback: CallbackQuery, state: FSMContext):
 async def offer_process_rating(message: Message, state: FSMContext):
     """Обработка рейтинга предложения"""
     rating = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(rating=rating)
 
     builder = InlineKeyboardBuilder()
@@ -3606,6 +4215,9 @@ async def back_to_offer_rating(callback: CallbackQuery, state: FSMContext):
 async def offer_process_delivery_info(message: Message, state: FSMContext):
     """Обработка информации о доставке предложения"""
     delivery_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(delivery_info=delivery_info)
 
     builder = InlineKeyboardBuilder()
@@ -3635,6 +4247,9 @@ async def back_to_offer_delivery_info(callback: CallbackQuery, state: FSMContext
 async def offer_process_supplier_info(message: Message, state: FSMContext):
     """Обработка информации о поставщике предложения"""
     supplier_info = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(supplier_info=supplier_info)
 
     builder = InlineKeyboardBuilder()
@@ -3664,6 +4279,9 @@ async def back_to_offer_supplier_info(callback: CallbackQuery, state: FSMContext
 async def offer_process_statistics(message: Message, state: FSMContext):
     """Обработка статистики предложения"""
     statistics = "" if message.text.lower() == "пропустить" else message.text
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(statistics=statistics)
 
     builder = InlineKeyboardBuilder()
@@ -3693,6 +4311,9 @@ async def back_to_offer_statistics(callback: CallbackQuery, state: FSMContext):
 async def offer_process_deadline(message: Message, state: FSMContext):
     """Обработка сроков предложения"""
     deadline = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(deadline=deadline)
 
     builder = InlineKeyboardBuilder()
@@ -3722,6 +4343,9 @@ async def back_to_offer_deadline(callback: CallbackQuery, state: FSMContext):
 async def offer_process_tags(message: Message, state: FSMContext):
     """Обработка тегов предложения"""
     tags = "" if message.text.lower() == "пропустить" else message.text.strip()
+    if message.text.lower() != "пропустить" and len(message.text) > 200:
+        await message.answer("⚠️ Текст слишком длинный (более 200 символов). Пожалуйста, сократите его.")
+        return
     await state.update_data(tags=tags)
 
     builder = InlineKeyboardBuilder()

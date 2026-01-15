@@ -1,11 +1,154 @@
-from aiogram import F, types
-from aiogram.types import CallbackQuery
+import json
+from aiogram import types, F
+from aiogram.types import CallbackQuery, InputMediaPhoto, InputMediaVideo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
 from dispatcher import dp
 from utils import check_blocked_user
 
-print("[CATALOG.PY] Module loaded and handlers registering...")
+@dp.callback_query(F.data.startswith("item_tech_"))
+async def show_product_details(callback: CallbackQuery):
+    if await check_blocked_user(callback):
+        return
+    item_id = int(callback.data.split("_")[-1])
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT ap.title, ap.description, ap.price, ap.category_id, ap.user_id, ap.contact_info, u.username, c.name, ap.images FROM auto_products ap LEFT JOIN users u ON ap.user_id = u.user_id LEFT JOIN categories c ON ap.category_id = c.id WHERE ap.id = ?", (item_id,))
+        item = await cursor.fetchone()
+    if not item:
+        await callback.answer("Предложение не найдено", show_alert=True)
+        return
+    title, description, price, cat_id, user_id, contact_info, username, cat_name, images_json = item
+    
+    # Парсинг изображений
+    images = {}
+    if images_json:
+        try:
+            images = json.loads(images_json)
+        except:
+            pass
+            
+    text = f"📦 **{title}**\n\nКатегория: {cat_name or 'Не указана'}\n"
+    text += f"Цена: {price}₽\n" if price else "Цена: Не указана\n"
+    text += f"\n{description}\n" if description else "\n"
+    text += f"\n👤 Продавец: @{username}" if username else f"\n👤 Продавец: ID {user_id}"
+    if contact_info:
+        text += f"\n📞 Контакты: {contact_info}"
+        
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_tech"))
+    
+    # Удаляем предыдущее сообщение с меню
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    # Отправка основного фото
+    sent_main = False
+    if images.get("main"):
+        main_photo = images["main"]
+        try:
+            if main_photo["type"] == "photo":
+                await callback.message.answer_photo(photo=main_photo["file_id"], caption=text, reply_markup=builder.as_markup())
+            elif main_photo["type"] == "video":
+                await callback.message.answer_video(video=main_photo["file_id"], caption=text, reply_markup=builder.as_markup())
+            sent_main = True
+        except Exception as e:
+            print(f"Error sending main media: {e}")
+    
+    if not sent_main:
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+        
+    # Отправка дополнительных фото
+    if images.get("additional"):
+        media_group = []
+        for img in images["additional"]:
+            try:
+                if img["type"] == "photo":
+                    media_group.append(types.InputMediaPhoto(media=img["file_id"]))
+                elif img["type"] == "video":
+                    media_group.append(types.InputMediaVideo(media=img["file_id"]))
+            except:
+                pass
+        
+        if media_group:
+            # Отправляем альбомом
+            # Ограничение телеграм - 10 файлов, у нас макс 3
+            try:
+                await callback.message.answer_media_group(media=media_group)
+            except Exception as e:
+                print(f"Error sending media group: {e}")
+
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("item_service_"))
+async def show_service_details(callback: CallbackQuery):
+    if await check_blocked_user(callback):
+        return
+    item_id = int(callback.data.split("_")[-1])
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT as_.title, as_.description, as_.price, as_.category_id, as_.user_id, as_.contact_info, u.username, c.name, as_.images FROM auto_services as_ LEFT JOIN users u ON as_.user_id = u.user_id LEFT JOIN categories c ON as_.category_id = c.id WHERE as_.id = ?", (item_id,))
+        item = await cursor.fetchone()
+    if not item:
+        await callback.answer("Предложение не найдено", show_alert=True)
+        return
+    title, description, price, cat_id, user_id, contact_info, username, cat_name, images_json = item
+    
+    images = {}
+    if images_json:
+        try:
+            images = json.loads(images_json)
+        except:
+            pass
+
+    text = f"🛠 **{title}**\n\nКатегория: {cat_name or 'Не указана'}\n"
+    text += f"Цена: {price}₽\n" if price else "Цена: Не указана\n"
+    text += f"\n{description}\n" if description else "\n"
+    text += f"\n👤 Исполнитель: @{username}" if username else f"\n👤 Исполнитель: ID {user_id}"
+    if contact_info:
+        text += f"\n📞 Контакты: {contact_info}"
+        
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_services"))
+    
+    try:
+        await callback.message.delete()
+    except:
+        pass
+
+    sent_main = False
+    if images.get("main"):
+        main_photo = images["main"]
+        try:
+            if main_photo["type"] == "photo":
+                await callback.message.answer_photo(photo=main_photo["file_id"], caption=text, reply_markup=builder.as_markup())
+            elif main_photo["type"] == "video":
+                await callback.message.answer_video(video=main_photo["file_id"], caption=text, reply_markup=builder.as_markup())
+            sent_main = True
+        except Exception as e:
+            print(f"Error sending main media: {e}")
+            
+    if not sent_main:
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+        
+    if images.get("additional"):
+        media_group = []
+        for img in images["additional"]:
+            try:
+                if img["type"] == "photo":
+                    media_group.append(types.InputMediaPhoto(media=img["file_id"]))
+                elif img["type"] == "video":
+                    media_group.append(types.InputMediaVideo(media=img["file_id"]))
+            except:
+                pass
+        
+        if media_group:
+            try:
+                await callback.message.answer_media_group(media=media_group)
+            except Exception as e:
+                print(f"Error sending media group: {e}")
+
+    await callback.answer()
 
 @dp.callback_query(F.data == "catalog_tech")
 async def catalog_tech(callback: CallbackQuery):

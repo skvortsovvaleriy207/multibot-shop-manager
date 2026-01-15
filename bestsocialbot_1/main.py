@@ -20,8 +20,13 @@ from referral_system import start_referral_system
 from activity_system import start_activity_system
 from initiatives_system import scheduled_initiatives_sync
 from user_interface import *
+try:
+    from table_links import *
+except ImportError as e:
+    logging.error(f"Error importing table_links: {e}")
 from order_request_system import *
 from admin_catalog_manager import *
+from admin_order_processing import *
 # Категории объединены в category_manager.py
 
 # Основные модули согласно ТЗ
@@ -529,6 +534,7 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
             attempt_count += 1
             print(f"DEBUG: Успешная попытка #{attempt_count}")
             if attempt_count < 3:
+                await callback.message.answer("✅ Вы выбрали правильный цвет!")
                 await state.update_data(captcha_attempt_count=attempt_count)
                 await send_captcha(callback.message, state)
             else:

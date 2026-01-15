@@ -120,8 +120,21 @@ class GoogleSheetsIntegrator:
             dict: Данные пользователя или пустой словарь если не найден
         """
         try:
-            # Открываем таблицу besthome
-            spreadsheet = self.client.open_by_url(BESTHOME_SURVEY_SHEET_URL)
+            # Определяем URL исходной таблицы
+            source_url = None
+            if self.source_bot == "wond":
+                source_url = WOND_SURVEY_SHEET_URL
+            elif self.source_bot == "besthome":
+                source_url = BESTHOME_SURVEY_SHEET_URL
+            elif self.source_bot == "autoavia":
+                source_url = AUTO_SURVEY_SHEET_URL
+            
+            if not source_url:
+                logging.error(f"Неизвестный исходный бот или URL: {self.source_bot}")
+                return {}
+
+            # Открываем исходную таблицу
+            spreadsheet = self.client.open_by_url(source_url)
             worksheet = spreadsheet.worksheet("Основная таблица")
 
             # Получаем все данные

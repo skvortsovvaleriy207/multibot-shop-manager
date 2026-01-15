@@ -15,6 +15,15 @@ from google_sheets import sync_from_sheets_to_db
 
 SHOWCASE_TEXT = "ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕСТВА!"
 
+HOUSING_CATEGORIES = [
+    "Односемейный жилой дом",
+    "Таунхаус",
+    "Таунхаус и Дуплекс",
+    "Кондоминиум",
+    "Квартира",
+    "Комната"
+]
+
 
 async def check_survey_completed(user_id: int) -> bool:
     """Проверка, прошел ли пользователь опрос"""
@@ -149,6 +158,7 @@ async def personal_account(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🔗 Рефералы", callback_data="referral_system"))
     builder.add(types.InlineKeyboardButton(text="💳 Оплата", callback_data="payment"))
     builder.add(types.InlineKeyboardButton(text="💬 Сообщения", callback_data="messages"))
+
 
     if is_admin:
         builder.add(types.InlineKeyboardButton(text="🔧 Админ-панель", callback_data="admin_panel"))
@@ -320,6 +330,8 @@ async def product_catalog(callback: CallbackQuery):
 
     if categories:
         for cat_name in categories:
+            if cat_name[0] in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=f"📦 {cat_name[0]}",
                 callback_data=f"product_cat_{cat_name[0]}"
@@ -367,6 +379,8 @@ async def service_catalog(callback: CallbackQuery):
 
     if categories:
         for cat_name in categories:
+            if cat_name[0] in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=f"🛠 {cat_name[0]}",
                 callback_data=f"service_cat_{cat_name[0]}"
@@ -408,13 +422,18 @@ async def property_catalog(callback: CallbackQuery):
 
     # Получаем категории предложений из таблицы property_purposes
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("""
-            SELECT name FROM property_purposes
-        """)
-        categories = await cursor.fetchall()
+        try:
+            cursor = await db.execute("""
+                SELECT name FROM property_purposes
+            """)
+            categories = await cursor.fetchall()
+        except aiosqlite.OperationalError:
+            categories = []
 
     if categories:
         for cat_name in categories:
+            if cat_name[0] in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=f"🤝 {cat_name[0]}",
                 callback_data=f"property_cat_{cat_name[0]}"
@@ -490,7 +509,7 @@ async def show_product_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет товаров.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на товар",
-            callback_data="product_card_form"
+            callback_data=f"product_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="product_catalog"))
@@ -551,7 +570,7 @@ async def show_service_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет услуг.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на услугу",
-            callback_data="service_card_form"
+            callback_data=f"service_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="service_catalog"))
@@ -611,8 +630,8 @@ async def show_property_category_items(callback: CallbackQuery):
         response = f"🤝 **Предложения в категории: {category_name}**\n\n"
         response += "В этой категории пока нет предложений.\n"
         builder.add(types.InlineKeyboardButton(
-            text="📋 Создать заявку на предложение",
-            callback_data="offer_card_form"
+            text="📋 Создать карточку предложения",
+            callback_data=f"offer_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="property_catalog"))
