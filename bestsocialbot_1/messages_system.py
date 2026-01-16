@@ -339,8 +339,8 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
                 table_name = "product_views"
 
         message_text += f"   - Таблица: `{table_name}`\n\n"
-        message_text += f"**💬 SQL запрос для добавления:**\n"
-        message_text += f"```sql\nINSERT INTO {table_name} (name) VALUES ('{value}');\n```"
+        message_text += f"**⚙️ Управление:**\n"
+        message_text += f"Используйте **Админ Панель** -> **Магазин** -> **Каталог товаров** -> **{category_names.get(category_type, category_type).capitalize()}** для добавления.\n"
 
         # Сохраняем уведомление в БД для админа
         try:
@@ -372,7 +372,7 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
             print(f"❌ Ошибка отправки сообщения: {send_error}")
             # Отправляем напрямую
             try:
-                from dispatcher import bot
+                from bot_instance import bot
                 await bot.send_message(ADMIN_ID, message_text)
             except Exception as bot_error:
                 print(f"❌ Ошибка прямой отправки: {bot_error}")
@@ -537,7 +537,7 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
 
         # Отправляем через существующий функционал, но подменяем на прямую отправку для кнопок
         # Так как send_system_message не поддерживает кнопки, отправляем напрямую ботом
-        from dispatcher import bot
+        from bot_instance import bot
         await bot.send_message(
             ADMIN_ID,
             f"📧 **Новое сообщение**\n\n📋 **{subject}**\n\n{message_text}",

@@ -2,7 +2,7 @@ from aiogram import F, types
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
-from config import ADMIN_ID
+from config import ADMIN_ID, HOUSING_CATEGORIES
 from db import check_channel_subscription
 from dispatcher import dp
 from datetime import *
@@ -14,15 +14,6 @@ from cart import cart_order_start
 from google_sheets import sync_from_sheets_to_db
 
 SHOWCASE_TEXT = "ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕСТВА!"
-
-HOUSING_CATEGORIES = [
-    "Односемейный жилой дом",
-    "Таунхаус",
-    "Таунхаус и Дуплекс",
-    "Кондоминиум",
-    "Квартира",
-    "Комната"
-]
 
 
 async def check_survey_completed(user_id: int) -> bool:
@@ -420,45 +411,16 @@ async def property_catalog(callback: CallbackQuery):
 
     builder = InlineKeyboardBuilder()
 
-    # Получаем категории предложений из таблицы property_purposes
-    async with aiosqlite.connect("bot_database.db") as db:
-        try:
-            cursor = await db.execute("""
-                SELECT name FROM property_purposes
-            """)
-            categories = await cursor.fetchall()
-        except aiosqlite.OperationalError:
-            categories = []
+    # Новое меню согласно ТЗ: 3 кнопки
+    builder.add(types.InlineKeyboardButton(text="🔍 Поиск в Каталоге предложений", callback_data="search_in_offers"))
+    builder.add(types.InlineKeyboardButton(text="📋 Карточка предложений/Заявка", callback_data="offer_card_form"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="all_catalogs"))
 
-    if categories:
-        for cat_name in categories:
-            if cat_name[0] in HOUSING_CATEGORIES:
-                continue
-            builder.add(types.InlineKeyboardButton(
-                text=f"🤝 {cat_name[0]}",
-                callback_data=f"property_cat_{cat_name[0]}"
-            ))
-    else:
-        builder.add(types.InlineKeyboardButton(
-            text="🤝 Пока нет категорий",
-            callback_data="empty"
-        ))
-
-    builder.add(types.InlineKeyboardButton(text="📋 Карточка предложения", callback_data="offer_card_form"))
-    builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_offers"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="📋 Изменить каталог предложений/активов", callback_data="property_catalog_change"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
-
-    # Оптимальное расположение
-    if categories:
-        builder.adjust(2, 2, 2, 1, 1)  # Категории по 2, затем 2 одиночные кнопки
-    else:
-        builder.adjust(1, 1, 1)  # Все кнопки по одной
+    builder.adjust(1)
 
     await callback.message.edit_text(
         "🤝 **Каталог предложений/активов**\n\n"
-        "Выберите категорию:",
+        "Выберите действие:",
         reply_markup=builder.as_markup()
     )
     await callback.answer()

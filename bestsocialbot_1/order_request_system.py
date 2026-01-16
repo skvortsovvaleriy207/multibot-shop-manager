@@ -8,6 +8,7 @@ from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
 from messages_system import notify_admin_new_category, send_order_request_to_admin
+from config import HOUSING_CATEGORIES
 
 
 class ProductCardStates(StatesGroup):
@@ -143,6 +144,10 @@ async def create_order_start(callback: CallbackQuery, state: FSMContext):
 
 async def check_daily_limit(user_id: int) -> bool:
     """Проверка лимита 3 заявки в сутки"""
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        return True
+
     async with aiosqlite.connect("bot_database.db") as db:
         today = datetime.now().date()
         cursor = await db.execute("""
@@ -239,6 +244,7 @@ async def product_select_buy(callback: CallbackQuery, state: FSMContext):
 
 async def show_product_category_selection(message: Message, state: FSMContext):
     """Показать выбор категории товара"""
+    await state.set_state(ProductCardStates.waiting_category)
     builder = InlineKeyboardBuilder()
 
     # Получаем категории из базы данных
@@ -248,6 +254,8 @@ async def show_product_category_selection(message: Message, state: FSMContext):
 
         for i in items:
             category_name = i[0]
+            if category_name in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=category_name,
                 callback_data=f"prod_cat_select:{category_name}"
@@ -325,7 +333,29 @@ async def process_product_category_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("category", category, user_id, username, "product")
+    
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM product_purposes WHERE name = ?", (category,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO product_purposes (name) VALUES (?)", (category,))
+                    await db.commit()
+                    await message.answer(f"✅ Категория '{category}' автоматически добавлена (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Категория '{category}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран по просьбе: админу не нужно отправлять самому себе уведомление при ошибке
+            # Просто просим повторить
+    else:
+        await notify_admin_new_category("category", category, user_id, username, "product")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -338,12 +368,19 @@ async def process_product_category_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит её в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит её в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        # Для админа просто показываем кнопки продолжения
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_category")
@@ -376,6 +413,7 @@ async def back_to_product_category_list(callback: CallbackQuery, state: FSMConte
 
 async def show_product_class_selection(message: Message, state: FSMContext):
     """Показать выбор класса товара"""
+    await state.set_state(ProductCardStates.waiting_class)
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
@@ -459,7 +497,28 @@ async def process_product_class_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("класса товара", item_class, user_id, username)
+    
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM product_classes WHERE name = ?", (item_class,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO product_classes (name) VALUES (?)", (item_class,))
+                    await db.commit()
+                    await message.answer(f"✅ Класс '{item_class}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Класс '{item_class}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран
+    else:
+        await notify_admin_new_category("class", item_class, user_id, username, "product")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -472,12 +531,18 @@ async def process_product_class_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_class")
@@ -511,6 +576,7 @@ async def back_to_product_class_list(callback: CallbackQuery, state: FSMContext)
 
 async def show_product_type_selection(message: Message, state: FSMContext):
     """Показать выбор типа товара"""
+    await state.set_state(ProductCardStates.waiting_item_type)
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
@@ -594,7 +660,28 @@ async def process_product_type_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("типа товара", item_type, user_id, username)
+    
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM product_types WHERE name = ?", (item_type,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO product_types (name) VALUES (?)", (item_type,))
+                    await db.commit()
+                    await message.answer(f"✅ Тип '{item_type}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Тип '{item_type}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран
+    else:
+        await notify_admin_new_category("type", item_type, user_id, username, "product")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -607,12 +694,18 @@ async def process_product_type_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_type")
@@ -646,6 +739,7 @@ async def back_to_product_type_list(callback: CallbackQuery, state: FSMContext):
 
 async def show_product_view_selection(message: Message, state: FSMContext):
     """Показать выбор вида товара"""
+    await state.set_state(ProductCardStates.waiting_item_kind)
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
@@ -725,7 +819,28 @@ async def process_product_view_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("вида товара", item_kind, user_id, username)
+    
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM product_views WHERE name = ?", (item_kind,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO product_views (name) VALUES (?)", (item_kind,))
+                    await db.commit()
+                    await message.answer(f"✅ Вид '{item_kind}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Вид '{item_kind}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран
+    else:
+        await notify_admin_new_category("kind", item_kind, user_id, username, "product")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -738,12 +853,18 @@ async def process_product_view_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_view")
@@ -1633,6 +1754,8 @@ async def show_service_category_selection(message: Message, state: FSMContext):
 
         for i in items:
             category_name = i[0]
+            if category_name in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=category_name,
                 callback_data=f"serv_cat_select:{category_name}"
@@ -1657,6 +1780,7 @@ async def show_service_category_selection(message: Message, state: FSMContext):
         "Выберите категорию из списка или добавьте новую:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(ServiceCardStates.waiting_category)
 
 
 @dp.callback_query(F.data.startswith("serv_cat_select:"))
@@ -1721,6 +1845,7 @@ async def show_service_class_selection(message: Message, state: FSMContext):
         "Выберите класс из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(ServiceCardStates.waiting_class)
 
 # ... существующий код до обработки предложения ...
 
@@ -1743,6 +1868,15 @@ async def add_service_category(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ServiceCardStates.waiting_category)
+async def service_category_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода категории, если пользователь написал текст вместо кнопки"""
+    # Если это текстовое сообщение, считаем что пользователь хочет добавить новую категорию
+    if message.text:
+        await state.set_state(ServiceCardStates.waiting_category_input)
+        await process_service_category_input(message, state)
+
+
 @dp.message(ServiceCardStates.waiting_category_input)
 async def process_service_category_input(message: Message, state: FSMContext):
     """Обработка ввода новой категории услуги"""
@@ -1755,7 +1889,27 @@ async def process_service_category_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("услуги", category, user_id, username, "service")
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM service_purposes WHERE name = ?", (category,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO service_purposes (name) VALUES (?)", (category,))
+                    await db.commit()
+                    await message.answer(f"✅ Категория '{category}' автоматически добавлена (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Категория '{category}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран
+    else:
+        await notify_admin_new_category("услуги", category, user_id, username, "service")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -1768,12 +1922,18 @@ async def process_service_category_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит её в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит её в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_service_category")
@@ -1816,6 +1976,14 @@ async def add_service_class(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ServiceCardStates.waiting_class)
+async def service_class_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода класса, если пользователь написал текст вместо кнопки"""
+    if message.text:
+        await state.set_state(ServiceCardStates.waiting_class_input)
+        await process_service_class_input(message, state)
+
+
 @dp.message(ServiceCardStates.waiting_class_input)
 async def process_service_class_input(message: Message, state: FSMContext):
     """Обработка ввода нового класса услуги"""
@@ -1828,7 +1996,27 @@ async def process_service_class_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("класса услуги", item_class, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM service_classes WHERE name = ?", (item_class,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO service_classes (name) VALUES (?)", (item_class,))
+                    await db.commit()
+                    await message.answer(f"✅ Класс '{item_class}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Класс '{item_class}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+            # Fallback убран
+    else:
+        await notify_admin_new_category("class", item_class, user_id, username, "service")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -1841,12 +2029,18 @@ async def process_service_class_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_service_class")
@@ -1919,6 +2113,7 @@ async def show_service_type_selection(message: Message, state: FSMContext):
         "Выберите тип из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(ServiceCardStates.waiting_item_type)
 
 
 @dp.callback_query(F.data.startswith("serv_typ_select:"))
@@ -1954,6 +2149,14 @@ async def add_service_type(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ServiceCardStates.waiting_item_type)
+async def service_type_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода типа, если пользователь написал текст вместо кнопки"""
+    if message.text:
+        await state.set_state(ServiceCardStates.waiting_item_type_input)
+        await process_service_type_input(message, state)
+
+
 @dp.message(ServiceCardStates.waiting_item_type_input)
 async def process_service_type_input(message: Message, state: FSMContext):
     """Обработка ввода нового типа услуги"""
@@ -1970,7 +2173,26 @@ async def process_service_type_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("типа услуги", item_type, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM service_types WHERE name = ?", (item_type,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO service_types (name) VALUES (?)", (item_type,))
+                    await db.commit()
+                    await message.answer(f"✅ Тип '{item_type}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Тип '{item_type}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("type", item_type, user_id, username, "service")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -1983,12 +2205,18 @@ async def process_service_type_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_service_type")
@@ -2054,6 +2282,7 @@ async def show_service_view_selection(message: Message, state: FSMContext):
         "Выберите вид из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(ServiceCardStates.waiting_item_kind)
 
 
 @dp.callback_query(F.data.startswith("serv_vw_select:"))
@@ -2089,6 +2318,14 @@ async def add_service_view(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ServiceCardStates.waiting_item_kind)
+async def service_view_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода вида, если пользователь написал текст вместо кнопки"""
+    if message.text:
+        await state.set_state(ServiceCardStates.waiting_item_kind_input)
+        await process_service_view_input(message, state)
+    
+
 @dp.message(ServiceCardStates.waiting_item_kind_input)
 async def process_service_view_input(message: Message, state: FSMContext):
     """Обработка ввода нового вида услуги"""
@@ -2105,7 +2342,26 @@ async def process_service_view_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("вида услуги", item_kind, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        # Автоматическое добавление для администратора
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                # Проверяем существование
+                cursor = await db.execute("SELECT 1 FROM service_views WHERE name = ?", (item_kind,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO service_views (name) VALUES (?)", (item_kind,))
+                    await db.commit()
+                    await message.answer(f"✅ Вид '{item_kind}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Вид '{item_kind}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("kind", item_kind, user_id, username, "service")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -2118,12 +2374,18 @@ async def process_service_view_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_service_view")
@@ -2754,18 +3016,18 @@ async def service_process_contact(message: Message, state: FSMContext):
     try:
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
-            INSERT INTO service_orders 
+            INSERT INTO order_requests 
                 (user_id, operation, category, item_class, item_type, item_kind,
                          catalog_id, service_date, title, works, materials, images, price, pricing,
                          guarantees, conditions, supplier_info, reviews, rating, statistics, 
-                         additional_info, deadline, tags, contact, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         additional_info, deadline, tags, contact, status, created_at, item_type_detail)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             message.from_user.id,
                             data.get('operation', ''),
                             data.get('category', ''),
                             data.get('item_class', ''),
-                            data.get('item_type', ''),
+                            'service', # item_type fixed as 'service'
                             data.get('item_kind', ''),
                             data.get('catalog_id', ''),
                             data.get('service_date', ''),
@@ -2786,7 +3048,8 @@ async def service_process_contact(message: Message, state: FSMContext):
                             data.get('tags', ''),
                             data.get('contact', ''),
                             'active',
-                            datetime.now().isoformat()
+                            datetime.now().isoformat(),
+                            data.get('item_type', '') # item_type_detail stores the user input type
                         ))
 
             # Получаем ID созданной заявки
@@ -2807,7 +3070,7 @@ async def service_process_contact(message: Message, state: FSMContext):
                 1,
                 data.get('price', '0'),
                 datetime.now().isoformat(),
-                'service_orders'
+                'order_requests'
             ))
             await db.commit()
             print(f"✅ Заявка услуги {new_request_id} добавлена в корзину пользователя {message.from_user.id}")
@@ -2937,7 +3200,7 @@ async def show_offer_category_selection(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT name FROM product_purposes ORDER BY name")
+        cursor = await db.execute("SELECT name FROM categories WHERE catalog_type = 'offer' ORDER BY name")
         items = await cursor.fetchall()
 
         for i in items:
@@ -2966,6 +3229,7 @@ async def show_offer_category_selection(message: Message, state: FSMContext):
         "Выберите категорию из списка или добавьте новую:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(OfferCardStates.waiting_category)
 
 
 @dp.callback_query(F.data.startswith("off_cat_select:"))
@@ -2980,6 +3244,14 @@ async def select_offer_category(callback: CallbackQuery, state: FSMContext):
         print(f"❌ Ошибка при выборе категории предложения: {e}")
         await callback.answer("❌ Ошибка при выборе категории", show_alert=True)
     await callback.answer()
+
+
+@dp.message(OfferCardStates.waiting_category)
+async def offer_category_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода категории предложения"""
+    if message.text:
+        await state.set_state(OfferCardStates.waiting_category_input)
+        await process_offer_category_input(message, state)
 
 
 @dp.callback_query(F.data == "off_cat_skip")
@@ -3001,7 +3273,7 @@ async def show_offer_class_selection(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT name FROM product_classes ORDER BY name")
+        cursor = await db.execute("SELECT name FROM offer_classes ORDER BY name")
         items = await cursor.fetchall()
 
         for i in items:
@@ -3030,6 +3302,7 @@ async def show_offer_class_selection(message: Message, state: FSMContext):
         "Выберите класс из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(OfferCardStates.waiting_class)
 
 @dp.callback_query(F.data == "off_cat_add")
 async def add_offer_category(callback: CallbackQuery, state: FSMContext):
@@ -3062,7 +3335,24 @@ async def process_offer_category_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("предложения", category, user_id, username, "offer")
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                cursor = await db.execute("SELECT 1 FROM categories WHERE name = ? AND catalog_type = 'offer'", (category,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO categories (catalog_type, name) VALUES ('offer', ?)", (category,))
+                    await db.commit()
+                    await message.answer(f"✅ Категория '{category}' автоматически добавлена (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Категория '{category}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("предложения", category, user_id, username, "offer")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -3075,12 +3365,18 @@ async def process_offer_category_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит её в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Категория '{category}' отправлена на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит её в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_offer_category")
@@ -3102,6 +3398,14 @@ async def select_offer_class(callback: CallbackQuery, state: FSMContext):
         print(f"❌ Ошибка при выборе класса предложения: {e}")
         await callback.answer("❌ Ошибка при выборе класса", show_alert=True)
     await callback.answer()
+
+
+@dp.message(OfferCardStates.waiting_class)
+async def offer_class_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода класса предложения"""
+    if message.text:
+        await state.set_state(OfferCardStates.waiting_class_input)
+        await process_offer_class_input(message, state)
 
 
 @dp.callback_query(F.data == "off_cls_add")
@@ -3139,7 +3443,24 @@ async def process_offer_class_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("класса предложения", item_class, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                cursor = await db.execute("SELECT 1 FROM offer_classes WHERE name = ?", (item_class,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO offer_classes (name) VALUES (?)", (item_class,))
+                    await db.commit()
+                    await message.answer(f"✅ Класс '{item_class}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Класс '{item_class}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("class", item_class, user_id, username, "offer")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -3152,12 +3473,18 @@ async def process_offer_class_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Класс '{item_class}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_offer_class")
@@ -3201,7 +3528,7 @@ async def show_offer_type_selection(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT name FROM product_types ORDER BY name")
+        cursor = await db.execute("SELECT name FROM offer_types ORDER BY name")
         items = await cursor.fetchall()
 
         for i in items:
@@ -3230,6 +3557,7 @@ async def show_offer_type_selection(message: Message, state: FSMContext):
         "Выберите тип из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(OfferCardStates.waiting_item_type)
 
 
 @dp.callback_query(F.data.startswith("off_typ_select:"))
@@ -3244,6 +3572,14 @@ async def select_offer_type(callback: CallbackQuery, state: FSMContext):
         print(f"❌ Ошибка при выборе типа предложения: {e}")
         await callback.answer("❌ Ошибка при выборе типа", show_alert=True)
     await callback.answer()
+
+
+@dp.message(OfferCardStates.waiting_item_type)
+async def offer_type_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода типа предложения"""
+    if message.text:
+        await state.set_state(OfferCardStates.waiting_item_type_input)
+        await process_offer_type_input(message, state)
 
 
 @dp.callback_query(F.data == "off_typ_add")
@@ -3281,7 +3617,24 @@ async def process_offer_type_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("типа предложения", item_type, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                cursor = await db.execute("SELECT 1 FROM offer_types WHERE name = ?", (item_type,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO offer_types (name) VALUES (?)", (item_type,))
+                    await db.commit()
+                    await message.answer(f"✅ Тип '{item_type}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Тип '{item_type}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("type", item_type, user_id, username, "offer")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -3294,12 +3647,18 @@ async def process_offer_type_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Тип '{item_type}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_offer_type")
@@ -3336,7 +3695,7 @@ async def show_offer_view_selection(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
 
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT name FROM product_views ORDER BY name")
+        cursor = await db.execute("SELECT name FROM offer_views ORDER BY name")
         items = await cursor.fetchall()
 
         for i in items:
@@ -3365,6 +3724,7 @@ async def show_offer_view_selection(message: Message, state: FSMContext):
         "Выберите вид из списка или добавьте новый:",
         reply_markup=builder.as_markup()
     )
+    await state.set_state(OfferCardStates.waiting_item_kind)
 
 
 @dp.callback_query(F.data.startswith("off_vw_select:"))
@@ -3379,6 +3739,14 @@ async def select_offer_view(callback: CallbackQuery, state: FSMContext):
         print(f"❌ Ошибка при выборе вида предложения: {e}")
         await callback.answer("❌ Ошибка при выборе вида", show_alert=True)
     await callback.answer()
+
+
+@dp.message(OfferCardStates.waiting_item_kind)
+async def offer_view_redirect(message: Message, state: FSMContext):
+    """Перенаправление ввода вида предложения"""
+    if message.text:
+        await state.set_state(OfferCardStates.waiting_item_kind_input)
+        await process_offer_view_input(message, state)
 
 
 @dp.callback_query(F.data == "off_vw_add")
@@ -3416,7 +3784,24 @@ async def process_offer_view_input(message: Message, state: FSMContext):
 
     user_id = message.from_user.id
     username = message.from_user.username
-    await notify_admin_new_category("вида предложения", item_kind, user_id, username)
+    is_admin = False
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID:
+        is_admin = True
+        try:
+             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+                cursor = await db.execute("SELECT 1 FROM offer_views WHERE name = ?", (item_kind,))
+                exists = await cursor.fetchone()
+                if not exists:
+                    await db.execute("INSERT INTO offer_views (name) VALUES (?)", (item_kind,))
+                    await db.commit()
+                    await message.answer(f"✅ Вид '{item_kind}' автоматически добавлен (права администратора).")
+                else:
+                    await message.answer(f"⚠️ Вид '{item_kind}' уже существует.")
+        except Exception as e:
+            await message.answer(f"❌ Ошибка автоматического добавления: {e}")
+    else:
+        await notify_admin_new_category("kind", item_kind, user_id, username, "offer")
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
@@ -3429,12 +3814,18 @@ async def process_offer_view_input(message: Message, state: FSMContext):
     ))
     builder.adjust(1)
 
-    await message.answer(
-        f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
-        "Администратор проверит и добавит его в систему.\n"
-        "Вы можете продолжить создание заявки.",
-        reply_markup=builder.as_markup()
-    )
+    if not is_admin:
+        await message.answer(
+            f"✅ **Вид '{item_kind}' отправлен на рассмотрение администратору.**\n\n"
+            "Администратор проверит и добавит его в систему.\n"
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await message.answer(
+            "Вы можете продолжить создание заявки.",
+            reply_markup=builder.as_markup()
+        )
 
 
 @dp.callback_query(F.data == "continue_after_offer_view")

@@ -1,9 +1,10 @@
 from aiogram import F, types
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, Message, InputMediaPhoto
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import aiosqlite
+import json
 from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
@@ -1814,6 +1815,22 @@ async def view_search_result_item(callback: CallbackQuery):
         await callback.answer("❌ Товар не найден", show_alert=True)
         return
 
+    # Парсим изображения
+    images_data = {}
+    main_photo_id = None
+    has_additional_photos = False
+    
+    if item[16]:
+        try:
+            images_data = json.loads(item[16])
+            if images_data.get("main") and images_data["main"].get("file_id"):
+                main_photo_id = images_data["main"]["file_id"]
+            
+            if images_data.get("additional") and len(images_data["additional"]) > 0:
+                has_additional_photos = True
+        except json.JSONDecodeError:
+            pass
+
     # Формируем карточку
     response = ""
 
@@ -1840,24 +1857,36 @@ async def view_search_result_item(callback: CallbackQuery):
         response += f"🎯 Операция: {item[2]}\n"
 
     # Цена
-    if item[16]:  # price
-        response += f"💰 Цена: {item[16]}\n"
+    if item[16]:  # price (BUG: index 16 is images, price is 17! Waiting, let me check SQL query)
+                  # SQL: ..., images, price, ... 
+                  # images is index 16. price is index 17.
+        # FIXING INDEXES BASED ON SQL QUERY:
+        # 0: id, 1: user_id, 2: operation, 3: item_type, 4: category, 5: item_class, 6: item_kind
+        # 7: catalog_id, 8: title, 9: purpose, 10: name, 11: creation_date, 12: condition
+        # 13: specifications, 14: advantages, 15: additional_info, 16: images, 17: price
+        # 18: availability, 19: detailed_specs, 20: reviews, 21: rating, 22: delivery_info
+        # 23: supplier_info, 24: statistics, 25: deadline, 26: tags, 27: contact, 28: status, 29: created_at
+        pass
 
-    # Наличие
-    if item[17]:  # availability
-        response += f"📦 Наличие: {item[17]}\n"
+    # Цена (index 17)
+    if item[17]:
+        response += f"💰 Цена: {item[17]}\n"
 
-    # Срок
-    if item[24]:  # deadline
-        response += f"⏰ Желательный срок: {item[24]}\n"
+    # Наличие (index 18)
+    if item[18]:
+        response += f"📦 Наличие: {item[18]}\n"
 
-    # Теги
-    if item[25]:  # tags
-        response += f"🏷 Теги: {item[25]}\n"
+    # Срок (index 25)
+    if item[25]:
+        response += f"⏰ Желательный срок: {item[25]}\n"
 
-    # Контакты
-    if item[26]:  # contact
-        response += f"📞 Контакты: {item[26]}\n"
+    # Теги (index 26)
+    if item[26]:
+        response += f"🏷 Теги: {item[26]}\n"
+
+    # Контакты (index 27)
+    if item[27]:
+        response += f"📞 Контакты: {item[27]}\n"
 
     response += "\n──────\n\n"
 
@@ -1874,8 +1903,8 @@ async def view_search_result_item(callback: CallbackQuery):
     if item[12]:  # condition
         response += f"🔄 **Состояние:**\n{item[12]}\n\n"
 
-    if item[18]:  # detailed_specs
-        response += f"📋 **Детальные характеристики:**\n{item[18]}\n\n"
+    if item[19]:  # detailed_specs (index 19)
+        response += f"📋 **Детальные характеристики:**\n{item[19]}\n\n"
 
     if item[20]:  # reviews
         response += f"💬 **Отзывы:**\n{item[20]}\n\n"
@@ -1892,13 +1921,13 @@ async def view_search_result_item(callback: CallbackQuery):
     if item[15]:  # additional_info
         response += f"📄 **Дополнительная информация:**\n{item[15]}\n\n"
 
-    # Статус
-    status_icon = "🆕" if item[27] == "new" else "📊" if item[27] == "processing" else "✅"
-    response += f"{status_icon} **Статус:** {item[27]}\n"
+    # Статус (index 28)
+    status_icon = "🆕" if item[28] == "new" else "📊" if item[28] == "processing" else "✅"
+    response += f"{status_icon} **Статус:** {item[28]}\n"
 
-    # Дата создания
+    # Дата создания (index 29)
     try:
-        date_str = datetime.fromisoformat(item[28]).strftime("%d.%m.%Y %H:%M")
+        date_str = datetime.fromisoformat(item[29]).strftime("%d.%m.%Y %H:%M")
         response += f"📅 **Дата создания:** {date_str}\n"
     except:
         pass
@@ -1918,6 +1947,9 @@ async def view_search_result_item(callback: CallbackQuery):
     builder.adjust(2)
 
     # Дополнительные кнопки
+    if has_additional_photos:
+        builder.row(types.InlineKeyboardButton(text="📸 Галерея фото", callback_data=f"view_gallery_{item_type}_{item_id}"))
+
     builder.row(types.InlineKeyboardButton(text="📋 Подробнее", callback_data=f"item_details_{item_type}_{item_id}"))
     builder.row(types.InlineKeyboardButton(text="⭐ Оценить", callback_data=f"rate_item_{item_type}_{item_id}"))
 
@@ -1929,8 +1961,84 @@ async def view_search_result_item(callback: CallbackQuery):
     else:
         builder.row(types.InlineKeyboardButton(text="◀️ Назад к поиску", callback_data="search_in_offers"))
 
-    await callback.message.edit_text(response, reply_markup=builder.as_markup())
+    # Отправка сообщения
+    if main_photo_id:
+        try:
+            # Удаляем предыдущее сообщение (текстовое меню)
+            await callback.message.delete()
+            
+            # Проверяем длину подписи
+            if len(response) <= 1000:
+                await callback.message.answer_photo(
+                    photo=main_photo_id,
+                    caption=response,
+                    reply_markup=builder.as_markup()
+                )
+            else:
+                # Если текст слишком длинный для подписи
+                short_caption = f"🏷 **{item[8]}**\n💰 Цена: {item[17] or 'Не указана'}\n\n👇 Подробное описание ниже"
+                await callback.message.answer_photo(
+                    photo=main_photo_id,
+                    caption=short_caption
+                )
+                await callback.message.answer(
+                    text=response,
+                    reply_markup=builder.as_markup()
+                )
+        except Exception as e:
+            print(f"Error sending photo: {e}")
+            # Fallback to text if photo fails
+            await callback.message.answer(
+                text=response,
+                reply_markup=builder.as_markup()
+            )
+    else:
+        # Если нет фото, редактируем текст (как было раньше)
+        await callback.message.edit_text(response, reply_markup=builder.as_markup())
+        
     await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("view_gallery_"))
+async def view_item_gallery(callback: CallbackQuery):
+    """Просмотр галереи изображений"""
+    if await check_blocked_user(callback):
+        return
+
+    data_parts = callback.data.split("_")
+    if len(data_parts) < 4:
+        await callback.answer("❌ Ошибка", show_alert=True)
+        return
+
+    item_type = data_parts[2]
+    item_id = data_parts[3]
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT images FROM order_requests WHERE id = ? AND item_type = ?", (item_id, item_type))
+        row = await cursor.fetchone()
+
+    if not row or not row[0]:
+        await callback.answer("❌ Фото не найдены", show_alert=True)
+        return
+
+    try:
+        images_data = json.loads(row[0])
+        additional_photos = images_data.get("additional", [])
+        
+        if not additional_photos:
+            await callback.answer("❌ Дополнительных фото нет", show_alert=True)
+            return
+
+        media = []
+        for photo in additional_photos:
+            media.append(InputMediaPhoto(media=photo["file_id"]))
+
+        await callback.message.answer_media_group(media=media)
+        await callback.answer()
+        
+    except Exception as e:
+        print(f"Error viewing gallery: {e}")
+        await callback.answer("❌ Ошибка при открытии галереи", show_alert=True)
 
 
 @dp.callback_query(F.data.startswith("add_to_cart_"))

@@ -29,6 +29,10 @@ async def has_active_process(user_id: int) -> bool:
     2. Заказы (orders) в статусе 'new', 'processing', 'confirmed' (не 'completed', 'cancelled')
     """
     try:
+        from config import ADMIN_ID
+        if user_id == ADMIN_ID:
+            return False
+
         async with aiosqlite.connect("bot_database.db") as db:
             # Проверка заявок
             cursor = await db.execute("""

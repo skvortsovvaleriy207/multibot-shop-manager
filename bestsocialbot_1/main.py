@@ -353,7 +353,7 @@ async def cmd_start_shop(message: types.Message, ):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop_back_to_showcase"))
     builder.adjust(2, 1, 1, 1, 2, 1, 1)
 
-    await message.edit_text(
+    await message.answer(
         "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
         reply_markup=builder.as_markup()
     )
@@ -571,17 +571,47 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
                             message=callback.message,
                             data="main_shop_page"
                         )
+                        # Fix identifying: Mount the fake callback to the bot instance
+                        if callback.bot:
+                            fake_callback.as_(callback.bot)
+                        
                         await main_shop_page(fake_callback)
                     else:
                         # Только теперь формируем клавиатуру
                         keyboard = await get_showcase_keyboard(user_id)
-                        await bot.send_message(callback.message.chat.id, "✅ Капча пройдена! Добро пожаловать!",
-                                               reply_markup=keyboard)
+                        
+                        try:
+                            # Попытка 1: через message.answer (самый стандартный способ)
+                            if callback.message:
+                                await callback.message.answer("✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
+                            else:
+                                raise Exception("Message object is missing")
+                        except Exception as e1:
+                            print(f"Failed to use message.answer: {e1}")
+                            # Попытка 2: через callback.bot (гарантированно привязанный бот)
+                            if callback.bot:
+                                await callback.bot.send_message(
+                                    chat_id=user_id,
+                                    text="✅ Капча пройдена! Добро пожаловать!",
+                                    reply_markup=keyboard
+                                )
+                            else:
+                                print("CRITICAL: callback.bot is None!")
+                                # Попытка 3: глобальный бот (крайний случай)
+                                from bot_instance import bot as global_bot
+                                await global_bot.send_message(user_id, "✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
+
                     print("SYNC CALL")
-                    from google_sheets import sync_db_to_google_sheets
-                    await sync_db_to_google_sheets()
+                    try:
+                        from google_sheets import sync_db_to_google_sheets
+                        await sync_db_to_google_sheets()
+                    except Exception as sync_e:
+                        print(f"⚠️ Warning: Background sync failed: {sync_e}")
+                        # Don't fail the user interaction because of background sync
                 except Exception as send_msg_error:
                     print(f"Ошибка при отправке сообщения: {send_msg_error}")
+                    import traceback
+                    traceback.print_exc()
         else:
             await state.update_data(captcha_attempt_count=0)
             await send_captcha(callback.message, state)
@@ -591,6 +621,8 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
             print(f"Ошибка при ответе на callback: {callback_answer_error}")
     except Exception as e:
         print(f"ОШИБКА в captcha_callback: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             await callback.answer("Произошла ошибка, попробуйте еще раз")
         except Exception as callback_answer_error:

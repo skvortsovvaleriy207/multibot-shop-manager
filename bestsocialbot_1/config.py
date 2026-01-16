@@ -34,3 +34,12 @@ USER_BONUSES_SHEET_URL = MAIN_SURVEY_SHEET_URL
 REVIEWS_SHEET_URL = MAIN_SURVEY_SHEET_URL
 INVESTORS_SHEET_URL = MAIN_SURVEY_SHEET_URL
 PARTNERS_SHEET_URL = MAIN_SURVEY_SHEET_URL
+
+HOUSING_CATEGORIES = [
+    "Односемейный жилой дом",
+    "Таунхаус",
+    "Таунхаус и Дуплекс",
+    "Кондоминиум",
+    "Квартира",
+    "Комната"
+]

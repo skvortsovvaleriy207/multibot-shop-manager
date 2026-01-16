@@ -731,7 +731,7 @@ async def sync_order_requests_to_sheets():
             product_requests = await cursor.fetchall()
             all_requests.extend(product_requests)
 
-            # 2. Получаем заявки на услуги из service_orders
+            # 2. Получаем заявки на услуги из order_requests
             cursor = await db.execute("""
                 SELECT 
                     'S' || s.id as prefixed_id,  -- Добавляем префикс 'S' для услуг
@@ -748,24 +748,23 @@ async def sync_order_requests_to_sheets():
                     COALESCE(s.item_class, ''),
                     COALESCE(s.item_type, ''),
                     COALESCE(s.item_kind, ''),
+                    COALESCE(s.catalog_id, ''),
+                    COALESCE(s.service_date, ''),
                     COALESCE(s.title, 'Без названия'),
-                    COALESCE(s.works, ''), -- Назначение (используем works)
-                    COALESCE(s.materials, ''), -- Имя (используем materials)
-                    COALESCE(s.service_date, ''), -- Дата создания товара
-                    COALESCE(s.conditions, ''), -- Состояние (используем conditions)
-                    COALESCE(s.pricing, ''), -- Спецификации (используем pricing)
-                    COALESCE(s.guarantees, ''), -- Преимущества (используем guarantees)
-                    COALESCE(s.additional_info, ''), -- Доп. информация
-                    COALESCE(s.images, ''),
+                    COALESCE(s.works, ''),
+                    COALESCE(s.materials, ''),
+                    COALESCE(s.main_photo, ''),
+                    COALESCE(s.additional_photos, ''),
                     COALESCE(s.price, '0'),
-                    COALESCE(s.deadline, ''), -- Наличие (используем deadline)
-                    '', -- Подробные характеристики (пусто для услуг)
+                    COALESCE(s.pricing, ''),
+                    COALESCE(s.guarantees, ''),
+                    COALESCE(s.conditions, ''),
+                    COALESCE(s.supplier_info, ''),
                     COALESCE(s.reviews, ''),
                     COALESCE(s.rating, ''),
-                    '', -- Информация о доставке (пусто для услуг)
-                    COALESCE(s.supplier_info, ''),
                     COALESCE(s.statistics, ''),
-                    COALESCE(s.deadline, ''), -- Сроки
+                    COALESCE(s.additional_info, ''),
+                    COALESCE(s.deadline, ''),
                     COALESCE(s.tags, ''),
                     COALESCE(s.contact, ''),
                     CASE 
@@ -774,8 +773,9 @@ async def sync_order_requests_to_sheets():
                         WHEN s.status = 'completed' THEN 'Завершена'
                         ELSE s.status
                     END as status
-                FROM service_orders s
+                FROM order_requests s
                 LEFT JOIN users u ON s.user_id = u.user_id
+                WHERE s.item_type = 'service'
                 ORDER BY s.id ASC
             """)
             service_requests = await cursor.fetchall()
