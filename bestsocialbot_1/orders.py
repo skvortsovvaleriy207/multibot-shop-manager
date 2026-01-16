@@ -51,7 +51,9 @@ async def my_orders(callback: CallbackQuery):
     
     if not orders:
         builder = InlineKeyboardBuilder()
-        builder.add(types.InlineKeyboardButton(text="🛒 В магазин", callback_data="shop"))
+        builder.add(types.InlineKeyboardButton(text="🛒 В магазин", callback_data="main_shop_page"))
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="personal_account"))
+        builder.adjust(1)
         
         await callback.message.edit_text(
             "📋 **Мои заказы**\n\nУ вас пока нет заказов.",

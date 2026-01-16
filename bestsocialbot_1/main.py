@@ -3,6 +3,130 @@ import logging
 from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL
 from db import init_db
 from dispatcher import dp
+from aiogram import types, F
+from aiogram.filters import Command, CommandObject
+from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+import aiosqlite
+from bot_instance import bot
+from captcha import send_captcha, process_captcha_selection, CaptchaStates
+from google_sheets import sync_db_to_google_sheets, sync_db_to_main_survey_sheet, sync_with_google_sheets, sync_requests_from_sheets_to_db #, sync_from_sheets_to_db
+
+async def check_blocked_user(callback):
+    """Проверка заблокированных пользователей"""
+    try:
+        user_id = callback.from_user.id
+        async with aiosqlite.connect("bot_database.db") as db:
+            cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
+            row = await cursor.fetchone()
+            
+            if row and row[0] == 'О':
+                await callback.answer("Ваш аккаунт заблокирован администратором.", show_alert=True)
+                return True
+        return False
+    except Exception as e:
+        print(f"Ошибка при проверке блокировки пользователя: {e}")
+        return False
+
+async def get_showcase_keyboard(user_id: int):
+    from config import ADMIN_ID
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if row and row[0] == 'О':
+            builder = InlineKeyboardBuilder()
+            builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="blocked"))
+            builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="blocked"))
+            builder.adjust(2)
+            return builder.as_markup()
+        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        user_exists = await cursor.fetchone()
+        cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
+        survey_status = await cursor.fetchone()
+    builder = InlineKeyboardBuilder()
+    if user_exists:
+        builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
+        builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="📝 Опрос (недоступно)", callback_data="disabled"))
+        builder.add(types.InlineKeyboardButton(text="🏪 Магазин (недоступно)", callback_data="disabled"))
+    
+    builder.adjust(2)
+    
+    return builder.as_markup()
+
+@dp.message(Command("start_shop"))
+async def cmd_start_shop(message: types.Message ):
+    """Главная страница магазина (первый экран после входа)"""
+
+    user_id = message.chat.id
+
+    # Sync not imported yet, do it in main flow or inside function
+    # await sync_from_sheets_to_db()
+
+    builder = InlineKeyboardBuilder()
+
+    # Основные разделы магазина
+    builder.add(types.InlineKeyboardButton(text="📦 Каталоги", callback_data="all_catalogs"))
+    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="promotions_menu"))
+    builder.add(types.InlineKeyboardButton(text="📰 Новости", callback_data="news_menu"))
+    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="popular_menu"))
+    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="new_items"))
+    builder.add(types.InlineKeyboardButton(text="👤 Личный кабинет", callback_data="personal_account"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="exit_shop_menu"))
+    builder.adjust(2, 2, 2, 1)
+
+    await message.answer(
+        "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
+        reply_markup=builder.as_markup()
+    )
+
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
+    # Ensure state is cleared when /start is used
+    await state.clear() 
+
+    user_id = message.from_user.id
+    print(f"DEBUG: /start command received from user_id={user_id}")
+    
+    param=command.args
+    if param=="shop":
+        await cmd_start_shop(message)
+        return
+    # Проверяем реферальную ссылку
+    referrer_id = None
+    if message.text and len(message.text.split()) > 1:
+        start_param = message.text.split()[1]
+        if start_param.startswith('ref_'):
+            try:
+                referrer_id = int(start_param.replace('ref_', ''))
+                print(f"DEBUG: Referral detected from user_id={referrer_id}")
+            except ValueError:
+                pass
+    
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+        user_exists = await cursor.fetchone()
+        print(f"DEBUG: user_exists query result: {user_exists}")
+    
+    if not user_exists:
+        print("DEBUG: New user detected, sending captcha")
+        try:
+            from admin import update_invite_table_with_bot_joins
+            await update_invite_table_with_bot_joins(user_id)
+        except Exception as e:
+            logging.error(f"Error updating invite table: {e}")
+        
+        # Сохраняем реферера для обработки после капчи
+        if referrer_id:
+            await state.update_data(referrer_id=referrer_id)
+        
+        await send_captcha(message, state)
+    else:
+        print("DEBUG: Existing user detected, sending showcase keyboard")
+        keyboard = await get_showcase_keyboard(user_id)
+        await message.answer("Добро пожаловать! Выберите действие:", reply_markup=keyboard)
+
 from survey import *
 from shop import *
 # Основные модули
@@ -83,35 +207,13 @@ except ImportError:
 # excel_template_filler удален
 async def fill_tables_from_excel():
     pass
-from aiogram import types
-from bot_instance import bot
-import aiosqlite
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
-from aiogram import F
-from google_sheets import sync_db_to_google_sheets, sync_db_to_main_survey_sheet
-from captcha import send_captcha, process_captcha_selection, CaptchaStates
+
 SHOWCASE_TEXT = """
 ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕСТВА!
 """
 from filters import IsBadWord, IsBlockedUser
 
-async def check_blocked_user(callback):
-    """Проверка заблокированных пользователей"""
-    try:
-        user_id = callback.from_user.id
-        async with aiosqlite.connect("bot_database.db") as db:
-            cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
-            row = await cursor.fetchone()
-            
-            if row and row[0] == 'О':
-                await callback.answer("Ваш аккаунт заблокирован администратором.", show_alert=True)
-                return True
-        return False
-    except Exception as e:
-        print(f"Ошибка при проверке блокировки пользователя: {e}")
-        return False
+
 @dp.callback_query(IsBlockedUser())
 async def blocked_user_callback_handler(callback: types.CallbackQuery):
     try:
@@ -129,32 +231,7 @@ async def handle_bad_words(message: types.Message):
     await message.answer("❌ Использование нецензурной лексики запрещено в нашем сообществе!")
     await message.delete()
     print(f"User {message.from_user.id} used bad words: {message.text}")
-async def get_showcase_keyboard(user_id: int):
-    from config import ADMIN_ID
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
-        row = await cursor.fetchone()
-        if row and row[0] == 'О':
-            builder = InlineKeyboardBuilder()
-            builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="blocked"))
-            builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="blocked"))
-            builder.adjust(2)
-            return builder.as_markup()
-        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-        user_exists = await cursor.fetchone()
-        cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
-        survey_status = await cursor.fetchone()
-    builder = InlineKeyboardBuilder()
-    if user_exists:
-        builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
-        builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"))
-    else:
-        builder.add(types.InlineKeyboardButton(text="📝 Опрос (недоступно)", callback_data="disabled"))
-        builder.add(types.InlineKeyboardButton(text="🏪 Магазин (недоступно)", callback_data="disabled"))
-    
-    builder.adjust(2)
-    
-    return builder.as_markup()
+
 from google_sheets import sync_with_google_sheets, sync_requests_from_sheets_to_db
 
 import asyncio
@@ -334,73 +411,8 @@ async def main():
                 raise
 
 
-@dp.message(Command("start_shop"))
-async def cmd_start_shop(message: types.Message, ):
-    """Главная страница магазина (первый экран после входа)"""
 
-    user_id = message.chat.id
 
-    await sync_from_sheets_to_db()
-
-    builder = InlineKeyboardBuilder()
-
-    # Основные разделы магазина
-    builder.add(types.InlineKeyboardButton(text="📦 Каталоги", callback_data="all_catalogs"))
-    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="👤 Личный кабинет", callback_data="personal_account"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop_back_to_showcase"))
-    builder.adjust(2, 1, 1, 1, 2, 1, 1)
-
-    await message.answer(
-        "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
-        reply_markup=builder.as_markup()
-    )
-from aiogram.filters import CommandObject
-
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
-    user_id = message.from_user.id
-    print(f"DEBUG: /start command received from user_id={user_id}")
-
-    param=command.args
-    if param=="shop":
-        await cmd_start_shop(message)
-
-    # Проверяем реферальную ссылку
-    referrer_id = None
-    if message.text and len(message.text.split()) > 1:
-        start_param = message.text.split()[1]
-        if start_param.startswith('ref_'):
-            try:
-                referrer_id = int(start_param.replace('ref_', ''))
-                print(f"DEBUG: Referral detected from user_id={referrer_id}")
-            except ValueError:
-                pass
-    
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-        user_exists = await cursor.fetchone()
-        print(f"DEBUG: user_exists query result: {user_exists}")
-    
-    if not user_exists:
-        print("DEBUG: New user detected, sending captcha")
-        try:
-            from admin import update_invite_table_with_bot_joins
-            await update_invite_table_with_bot_joins(user_id)
-        except Exception as e:
-            logging.error(f"Error updating invite table: {e}")
-        
-        # Сохраняем реферера для обработки после капчи
-        if referrer_id:
-            await state.update_data(referrer_id=referrer_id)
-        
-        await send_captcha(message, state)
-    else:
-        print("DEBUG: Existing user detected, sending showcase keyboard")
-        keyboard = await get_showcase_keyboard(user_id)
-        await message.answer("Добро пожаловать! Выберите действие:", reply_markup=keyboard)
 async def send_showcase(chat_id: int):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT message_id FROM showcase_messages WHERE chat_id = ?", (chat_id,))

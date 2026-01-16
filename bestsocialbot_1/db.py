@@ -239,9 +239,11 @@ async def init_db():
             await db.execute("CREATE TABLE IF NOT EXISTS service_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
 
             # Таблицы для предложений (Offers)
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_purposes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS offer_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS offer_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS offer_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             
             # Инициализация категорий товаров
             # Инициализация категорий товаров
@@ -442,6 +444,39 @@ async def init_db():
                     contact TEXT NOT NULL,
                     status TEXT DEFAULT 'new',
                     created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
+            # Таблица заявок на услуги (восстановлена для синхронизации)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS service_orders (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    operation TEXT,
+                    category TEXT,
+                    item_class TEXT,
+                    item_type TEXT,
+                    item_kind TEXT,
+                    title TEXT,
+                    works TEXT,
+                    materials TEXT,
+                    service_date TEXT,
+                    conditions TEXT,
+                    pricing TEXT,
+                    guarantees TEXT,
+                    additional_info TEXT,
+                    images TEXT,
+                    price TEXT,
+                    deadline TEXT,
+                    reviews TEXT,
+                    rating TEXT,
+                    supplier_info TEXT,
+                    statistics TEXT,
+                    tags TEXT,
+                    contact TEXT,
+                    status TEXT,
+                    created_at TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)

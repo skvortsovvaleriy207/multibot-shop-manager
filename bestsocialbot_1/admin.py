@@ -120,10 +120,11 @@ async def show_admin_panel(message_or_callback):
     builder.adjust(1, 2, 1, 2, 1, 2, 2, 2, 1)
     
     if hasattr(message_or_callback, 'message'):
-        if message_or_callback.message.caption is not None:
-            await message_or_callback.message.edit_caption("Админ-панель:", reply_markup=builder.as_markup())
+        msg = message_or_callback.message
+        if msg.content_type == types.ContentType.PHOTO:
+            await msg.edit_caption(caption="Админ-панель:", reply_markup=builder.as_markup())
         else:
-            await message_or_callback.message.edit_text("Админ-панель:", reply_markup=builder.as_markup())
+            await msg.edit_text(text="Админ-панель:", reply_markup=builder.as_markup())
     else:
         await message_or_callback.answer("Админ-панель:", reply_markup=builder.as_markup())
 
@@ -152,15 +153,21 @@ async def data_table(callback: CallbackQuery):
         url=url
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Назад",
+        text="◀️ Назад",
         callback_data="back_to_admin"
     ))
     builder.adjust(1)
 
-    await callback.message.edit_text(
-        text="Основная таблица подписчиков бота:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="Основная таблица подписчиков бота:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="Основная таблица подписчиков бота:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 from aiogram.fsm.context import FSMContext
@@ -194,7 +201,7 @@ async def catalog_menu(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🔧 Таблица автоуслуг", callback_data="admin_services_table"))
     builder.add(types.InlineKeyboardButton(text="📋 Таблица заказов", callback_data="admin_orders_table"))
     builder.add(types.InlineKeyboardButton(text="🔄 Синхронизация", callback_data="sync_automarket"))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
 
     if callback.message.caption is not None:
@@ -223,7 +230,7 @@ async def admin_services_table(callback: CallbackQuery):
         text="📈 Открыть таблицу автоуслуг",
         url=AUTO_SERVICES_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="catalog"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
     builder.adjust(1)
 
     await callback.message.edit_text(
@@ -246,7 +253,7 @@ async def admin_orders_table(callback: CallbackQuery):
         text="📈 Открыть таблицу заказов",
         url=AUTO_ORDERS_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="catalog"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
     builder.adjust(1)
 
     await callback.message.edit_text(
@@ -276,7 +283,7 @@ async def sync_automarket_manual(callback: CallbackQuery):
         text = f"❌ **Ошибка!**\n\n{str(e)}"
 
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="catalog"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
@@ -551,14 +558,20 @@ async def parsing_menu_handler(callback: CallbackQuery, state: FSMContext):
         callback_data="start_parsing_users"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Назад",
+        text="◀️ Назад",
         callback_data="back_to_admin"
     ))
     builder.adjust(1)
-    await callback.message.edit_text(
-        text="Парсинг чужих пользователей (не подписчики бота):\n\nВыберите действие:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="Парсинг чужих пользователей (не подписчики бота):\n\nВыберите действие:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="Парсинг чужих пользователей (не подписчики бота):\n\nВыберите действие:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 @dp.callback_query(F.data == "start_parsing_users")
@@ -568,7 +581,10 @@ async def start_parsing_users_handler(callback: CallbackQuery, state: FSMContext
         await callback.answer("Доступ запрещен.", show_alert=True)
         return
     await state.set_state(ParsingStates.waiting_for_links)
-    await callback.message.edit_text("Введите ссылку на канал/группу, ID группы или загрузите .txt файл со списками.")
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption="Введите ссылку на канал/группу, ID группы или загрузите .txt файл со списками.")
+    else:
+        await callback.message.edit_text(text="Введите ссылку на канал/группу, ID группы или загрузите .txt файл со списками.")
 
 @dp.callback_query(F.data == "mailing")
 async def mailing_menu_handler(callback: CallbackQuery, state: FSMContext):
@@ -580,12 +596,18 @@ async def mailing_menu_handler(callback: CallbackQuery, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Сделать рассылку", callback_data="do_mailing"))
     builder.add(types.InlineKeyboardButton(text="Таблица рассылки (10 адресатов)", url=MAILING_ADDRESSES_SHEET_URL))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
-    await callback.message.edit_text(
-        text="Рассылка по чужим пользователям (не подписчики бота):\n\nВыберите действие:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="Рассылка по чужим пользователям (не подписчики бота):\n\nВыберите действие:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="Рассылка по чужим пользователям (не подписчики бота):\n\nВыберите действие:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 @dp.callback_query(F.data == "do_mailing")
@@ -679,15 +701,21 @@ async def invite_menu_handler(callback: CallbackQuery, state: FSMContext):
     from config import INVITE_EXPORT_SHEET_URL
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Открыть таблицу инвайта", url=INVITE_EXPORT_SHEET_URL))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
-    await callback.message.edit_text("Инвайт чужих пользователей (не подписчики бота):", reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption="Инвайт чужих пользователей (не подписчики бота):", reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text="Инвайт чужих пользователей (не подписчики бота):", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data == "invite_200")
 async def invite_200_handler(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("Начинаю инвайт первых 200 пользователей...")
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption="Начинаю инвайт первых 200 пользователей...")
+    else:
+        await callback.message.edit_text(text="Начинаю инвайт первых 200 пользователей...")
     import gspread
     from config import PARSING_USERS_GOOGLE_SHEET_URL
     gc = gspread.service_account(filename=CREDENTIALS_FILE)
@@ -815,7 +843,7 @@ async def partners_handler(callback: CallbackQuery):
         text="Открыть Google Таблицу Партнеры",
         url=PARTNERS_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
     await callback.message.edit_text(
         text="Таблица партнеров:",
@@ -834,7 +862,7 @@ async def investors_handler(callback: CallbackQuery):
         text="Открыть Google Таблицу Инвесторы",
         url=INVESTORS_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
     await callback.message.edit_text(
         text="Таблица инвесторов:",
@@ -853,7 +881,7 @@ async def referral_handler(callback: CallbackQuery):
         text="Открыть Google Таблицу Рефералы",
         url=REFERRALS_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
     await callback.message.edit_text(
         text="Таблица рефералов:",
@@ -874,7 +902,7 @@ async def stats_handler(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="📊 Текущая статистика", url=STATISTICS_SHEET_URL))
     builder.add(types.InlineKeyboardButton(text="📈 Накопительная статистика", url=CUMULATIVE_STATS_SHEET_URL))
     builder.add(types.InlineKeyboardButton(text="🔄 Обновить статистику", callback_data="update_stats"))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(2, 1, 1)
     
     await callback.message.edit_text(
@@ -909,7 +937,7 @@ async def update_stats_handler(callback: CallbackQuery):
         text = f"❌ **Ошибка!**\n\n{str(e)}"
     
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="stats"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="stats"))
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
@@ -926,7 +954,7 @@ async def plans_reports_handler(callback: CallbackQuery):
         await show_plans_reports_menu(callback)
     except ImportError:
         builder = InlineKeyboardBuilder()
-        builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
         await callback.message.edit_text(
             text="📊 **Планы и отчеты**\n\nМодуль планов и отчетов не найден.",
             reply_markup=builder.as_markup()
@@ -1151,7 +1179,7 @@ async def mailing_addresses_handler(callback: CallbackQuery):
         text="Открыть лист 10 адресатов рассылки",
         url=MAILING_ADDRESSES_SHEET_URL
     ))
-    builder.add(types.InlineKeyboardButton(text="Назад", callback_data="back_to_admin"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
     await callback.message.edit_text(
         text="Лист с последними 10 адресатами рассылки:",

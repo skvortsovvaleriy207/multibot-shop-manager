@@ -67,11 +67,16 @@ async def search_in_services_start(callback: CallbackQuery, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="service_catalog"))
     builder.adjust(2)
 
-    await callback.message.edit_text(
-        "🔍 **Поиск**\n\n"
-        "Выберите вариант для поиска:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="🔍 **Поиск**\n\nВыберите вариант для поиска:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="🔍 **Поиск**\n\nВыберите вариант для поиска:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -94,11 +99,16 @@ async def search_in_offers_start(callback: CallbackQuery, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="property_catalog"))
     builder.adjust(2)
 
-    await callback.message.edit_text(
-        "🔍 **Поиск в предложениях**\n\n"
-        "Выберите вариант для поиска:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="🔍 **Поиск в предложениях**\n\nВыберите вариант для поиска:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="🔍 **Поиск в предложениях**\n\nВыберите вариант для поиска:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -112,11 +122,16 @@ async def search_offers_by_name_start(callback: CallbackQuery, state: FSMContext
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="search_in_offers"))
     builder.adjust(1)
 
-    await callback.message.edit_text(
-        "🔍 **Поиск предложений по названию или тегам**\n\n"
-        "Введите поисковый запрос:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(
+            caption="🔍 **Поиск предложений по названию или тегам**\n\nВведите поисковый запрос:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="🔍 **Поиск предложений по названию или тегам**\n\nВведите поисковый запрос:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -1317,13 +1332,19 @@ async def all_orders_request_search(callback: CallbackQuery):
 
     if not results:
         builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
+        builder.adjust(1)
 
-        await callback.message.edit_text(
-            f"📊 **Результаты поиска:'**\n\n"
-            "❌ В этом классе ничего не найдено.\n\n"
-            "Попробуйте выбрать другой класс.",
-            reply_markup=builder.as_markup()
-        )
+        if callback.message.content_type == types.ContentType.PHOTO:
+            await callback.message.edit_caption(
+                caption=f"📊 **Результаты поиска:**\n\n❌ Заявок не найдено.\n\nПопробуйте позже.",
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text=f"📊 **Результаты поиска:**\n\n❌ Заявок не найдено.\n\nПопробуйте позже.",
+                reply_markup=builder.as_markup()
+            )
         await callback.answer()
         return
 
@@ -1361,9 +1382,12 @@ async def all_orders_request_search(callback: CallbackQuery):
             text=f"{i}. {title[:15]}...",
             callback_data=f"view_item_service_{item_id}"
         ))
-    builder.row(types.InlineKeyboardButton(text="◀️ В личный кабинет", callback_data="personal_account"))
+    builder.row(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
 
-    await callback.message.edit_text(response, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption=response, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text=response, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -1393,13 +1417,19 @@ async def all_orders_search(callback: CallbackQuery):
 
     if not results:
         builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
+        builder.adjust(1)
 
-        await callback.message.edit_text(
-            f"📊 **Результаты поиска:'**\n\n"
-            "❌ В этом классе ничего не найдено.\n\n"
-            "Попробуйте выбрать другой класс.",
-            reply_markup=builder.as_markup()
-        )
+        if callback.message.content_type == types.ContentType.PHOTO:
+            await callback.message.edit_caption(
+                caption=f"📊 **Результаты поиска:**\n\n❌ Заявок не найдено.\n\nПопробуйте позже.",
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text=f"📊 **Результаты поиска:**\n\n❌ Заявок не найдено.\n\nПопробуйте позже.",
+                reply_markup=builder.as_markup()
+            )
         await callback.answer()
         return
 
@@ -1408,7 +1438,7 @@ async def all_orders_search(callback: CallbackQuery):
     response += f"📊 Найдено: {len(results)} позиций\n\n"
 
     for i, item in enumerate(results[:10], 1):
-        order_type, item_id, seller_id, status, order_date = item
+        order_id, order_type, item_id, seller_id, status, order_date = item
 
         response += f"{i}.  **{order_type}**\n"
         response += f"   🆔 ID: {item_id} | 🏷  ID предмета: {item_id or 'Не указана'}\n"
@@ -1426,9 +1456,12 @@ async def all_orders_search(callback: CallbackQuery):
 
     # Создаем клавиатуру с результатами
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text="◀️ В личный кабинет", callback_data="personal_account"))
+    builder.row(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
 
-    await callback.message.edit_text(response, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption=response, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text=response, reply_markup=builder.as_markup())
     await callback.answer()
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
@@ -2060,7 +2093,7 @@ async def add_search_result_to_cart(callback: CallbackQuery):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price FROM order_requests 
-            WHERE id = ? AND item_type = ? AND status IN ('new', 'active', 'processing')
+            WHERE id = ? AND item_type = ? AND status IN ('new', 'active', 'approved', 'processing')
         """, (item_id, item_type))
 
         item = await cursor.fetchone()

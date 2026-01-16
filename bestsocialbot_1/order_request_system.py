@@ -174,11 +174,11 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
 
     from utils import has_active_process
     if await has_active_process(user_id):
-        await callback.message.answer(
-            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-            "Пожалуйста, дождитесь выполнения текущей задачи."
-        )
+        # await callback.message.answer(
+        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+        #     "Пожалуйста, дождитесь выполнения текущей задачи."
+        # )
         await callback.answer("❌ Есть активная заявка", show_alert=True)
         return
 
@@ -1677,11 +1677,11 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
 
     from utils import has_active_process
     if await has_active_process(user_id):
-        await callback.message.answer(
-            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-            "Пожалуйста, дождитесь выполнения текущей задачи."
-        )
+        # await callback.message.answer(
+        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+        #     "Пожалуйста, дождитесь выполнения текущей задачи."
+        # )
         await callback.answer("❌ Есть активная заявка", show_alert=True)
         return
 
@@ -3128,11 +3128,11 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
 
     from utils import has_active_process
     if await has_active_process(user_id):
-        await callback.message.answer(
-            "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-            "Пожалуйста, дождитесь выполнения текущей задачи."
-        )
+        # await callback.message.answer(
+        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+        #     "Пожалуйста, дождитесь выполнения текущей задачи."
+        # )
         await callback.answer("❌ Есть активная заявка", show_alert=True)
         return
 

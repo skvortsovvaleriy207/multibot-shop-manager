@@ -10,7 +10,10 @@ from utils import check_blocked_user
 async def show_product_details(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
-    item_id = int(callback.data.split("_")[-1])
+    
+    parts = callback.data.split("_")
+    item_id = int(parts[2])
+    is_new = len(parts) > 3 and parts[3] == "new"
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT ap.title, ap.description, ap.price, ap.category_id, ap.user_id, ap.contact_info, u.username, c.name, ap.images FROM auto_products ap LEFT JOIN users u ON ap.user_id = u.user_id LEFT JOIN categories c ON ap.category_id = c.id WHERE ap.id = ?", (item_id,))
         item = await cursor.fetchone()
@@ -35,7 +38,10 @@ async def show_product_details(callback: CallbackQuery):
         text += f"\n📞 Контакты: {contact_info}"
         
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_tech"))
+    if is_new:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к новинкам", callback_data="new_products"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_tech"))
     
     # Удаляем предыдущее сообщение с меню
     try:
@@ -85,7 +91,9 @@ async def show_product_details(callback: CallbackQuery):
 async def show_service_details(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
-    item_id = int(callback.data.split("_")[-1])
+    parts = callback.data.split("_")
+    item_id = int(parts[2])
+    is_new = len(parts) > 3 and parts[3] == "new"
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT as_.title, as_.description, as_.price, as_.category_id, as_.user_id, as_.contact_info, u.username, c.name, as_.images FROM auto_services as_ LEFT JOIN users u ON as_.user_id = u.user_id LEFT JOIN categories c ON as_.category_id = c.id WHERE as_.id = ?", (item_id,))
         item = await cursor.fetchone()
@@ -109,7 +117,10 @@ async def show_service_details(callback: CallbackQuery):
         text += f"\n📞 Контакты: {contact_info}"
         
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_services"))
+    if is_new:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к новинкам", callback_data="new_services"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="catalog_services"))
     
     try:
         await callback.message.delete()
@@ -165,7 +176,11 @@ async def catalog_tech(callback: CallbackQuery):
     else:
         builder.add(types.InlineKeyboardButton(text="Пока нет категорий", callback_data="empty"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="personal_account"))
-    await callback.message.edit_text("📦 **Каталог товаров**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
+    try:
+        await callback.message.edit_text("📦 **Каталог товаров**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer("📦 **Каталог товаров**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("purpose_tech_"))
@@ -309,7 +324,11 @@ async def catalog_services(callback: CallbackQuery):
     else:
         builder.add(types.InlineKeyboardButton(text="Пока нет категорий", callback_data="empty"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="personal_account"))
-    await callback.message.edit_text("🛠 **Каталог услуг**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
+    try:
+        await callback.message.edit_text("🛠 **Каталог услуг**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer("🛠 **Каталог услуг**\n\nВыберите категорию по назначению:", reply_markup=builder.as_markup())
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("purpose_service_"))

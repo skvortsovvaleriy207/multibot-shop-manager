@@ -100,15 +100,15 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
 
     user_id = callback.from_user.id
 
-    is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
-    if not is_subscribed:
+    # is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
+    # if not is_subscribed:
     #    builder = InlineKeyboardBuilder()
     #    builder.add(types.InlineKeyboardButton(text="Подписаться", url=CHANNEL_URL))
     #    builder.add(types.InlineKeyboardButton(text="Я подписался", callback_data="start_survey"))
     #    builder.adjust(1)
     #    await callback.message.answer("Для прохождения опроса необходимо подписаться на наш канал.", reply_markup=builder.as_markup())
     #    await callback.answer()
-        return
+    #    return
 
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))

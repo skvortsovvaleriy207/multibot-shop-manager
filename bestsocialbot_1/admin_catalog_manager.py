@@ -20,7 +20,8 @@ async def admin_catalog_manager(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="📦 Управление категориями товаров", callback_data="manage_product_cats"))
     builder.add(types.InlineKeyboardButton(text="🛠 Управление категориями услуг", callback_data="manage_service_cats"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="admin_panel"))
+    builder.add(types.InlineKeyboardButton(text="🗂 Управление категориями предложений", callback_data="manage_offer_cats"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(1)
     
     await callback.message.edit_text("🔧 **Управление категориями каталога**\n\nВыберите раздел:", reply_markup=builder.as_markup())
@@ -64,6 +65,25 @@ async def manage_service_cats(callback: CallbackQuery):
     await callback.message.edit_text("🛠 **Категории услуг**\n\nВыберите таблицу для редактирования:", reply_markup=builder.as_markup())
     await callback.answer()
 
+# --- Offer Categories Menu ---
+@dp.callback_query(F.data == "manage_offer_cats")
+async def manage_offer_cats(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("Доступ запрещен", show_alert=True)
+        return
+    
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Категории (Category)", callback_data="manage_offer_categories"))
+    builder.add(types.InlineKeyboardButton(text="Классы (Class)", callback_data="mng_tbl:offer_classes:Классы предложений"))
+    builder.add(types.InlineKeyboardButton(text="Типы (Type)", callback_data="mng_tbl:offer_types:Типы предложений"))
+    builder.add(types.InlineKeyboardButton(text="Виды (View)", callback_data="mng_tbl:offer_views:Виды предложений"))
+    builder.add(types.InlineKeyboardButton(text="Иные (Other)", callback_data="mng_tbl:offer_other_chars:Иные характеристики"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="admin_catalog_manager"))
+    builder.adjust(1)
+    
+    await callback.message.edit_text("🗂 **Категории предложений**\n\nВыберите таблицу для редактирования:", reply_markup=builder.as_markup())
+    await callback.answer()
+
 # --- Generic Taxonomy Manager ---
 
 @dp.callback_query(F.data.startswith("mng_tbl:"))
@@ -101,7 +121,17 @@ async def manage_taxonomy_table(callback: CallbackQuery, state: FSMContext):
         ))
 
     builder.add(types.InlineKeyboardButton(text="➕ Добавить", callback_data="add_itm"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="manage_product_cats" if "product" in table_name else "manage_service_cats"))
+
+    
+    back_cb = "admin_catalog_manager"
+    if "product" in table_name:
+        back_cb = "manage_product_cats"
+    elif "service" in table_name:
+        back_cb = "manage_service_cats"
+    elif "offer" in table_name:
+        back_cb = "manage_offer_cats"
+        
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=back_cb))
     builder.adjust(1) # One col for names
 
     text_list = "\n".join([f"• {name}" for _, name in items]) if items else "Список пуст"
@@ -201,7 +231,17 @@ async def delete_item_confirm(callback: CallbackQuery, state: FSMContext):
     for i_id, i_name in items:
         builder.add(types.InlineKeyboardButton(text=f"{i_name}", callback_data=f"sel_itm:{i_id}"))
     builder.add(types.InlineKeyboardButton(text="➕ Добавить", callback_data="add_itm"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="manage_product_cats" if "product" in table_name else "manage_service_cats"))
+
+    
+    back_cb = "admin_catalog_manager"
+    if "product" in table_name:
+        back_cb = "manage_product_cats"
+    elif "service" in table_name:
+        back_cb = "manage_service_cats"
+    elif "offer" in table_name:
+        back_cb = "manage_offer_cats"
+        
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=back_cb))
     builder.adjust(1)
     
     text_list = "\n".join([f"• {name}" for _, name in items]) if items else "Список пуст"

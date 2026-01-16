@@ -60,8 +60,8 @@ async def products_catalog(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_products"))
     builder.add(types.InlineKeyboardButton(text="💰 Фильтр по цене", callback_data="filter_price_products"))
     builder.add(types.InlineKeyboardButton(text="➕ Добавить товар", callback_data="add_product"))
-    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop"))
+    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart_from_products"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
     builder.adjust(*[1]*len(items[:20]), 2, 1, 2, 1)
     
     text = "📦 **Каталог товаров**\n\n"
@@ -70,7 +70,10 @@ async def products_catalog(callback: CallbackQuery):
     else:
         text += "Пока нет товаров."
     
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text=text, reply_markup=builder.as_markup())
     await callback.answer()
 
 # Каталог услуг
@@ -104,8 +107,8 @@ async def services_catalog(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_services"))
     builder.add(types.InlineKeyboardButton(text="💰 Фильтр по цене", callback_data="filter_price_services"))
     builder.add(types.InlineKeyboardButton(text="➕ Добавить услугу", callback_data="add_service"))
-    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop"))
+    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart_from_services"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
     builder.adjust(*[1]*len(items[:20]), 2, 1, 2, 1)
     
     text = "🛠 **Каталог услуг**\n\n"
@@ -114,7 +117,10 @@ async def services_catalog(callback: CallbackQuery):
     else:
         text += "Пока нет услуг."
     
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text=text, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -235,11 +241,27 @@ async def add_to_cart(callback: CallbackQuery):
     await callback.answer("✅ Добавлено в корзину!")
 
 # Корзина
-@dp.callback_query(F.data == "cart")
+@dp.callback_query(F.data.contains("cart"))
 async def view_cart(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     
+    # Определяем источник перехода для кнопки Назад
+    source = "shop"
+    if "from_products" in callback.data:
+        source = "products"
+    elif "from_services" in callback.data:
+        source = "services" 
+    elif "from_account" in callback.data:
+        source = "account"
+    # Для remove_cart и других действий сохраняем источник
+    elif "_products" in callback.data:
+        source = "products"
+    elif "_services" in callback.data:
+        source = "services"
+    elif "_account" in callback.data:
+        source = "account"
+
     user_id = callback.from_user.id
     
     async with aiosqlite.connect("bot_database.db") as db:
@@ -262,17 +284,32 @@ async def view_cart(callback: CallbackQuery):
         
         cart_items = await cursor.fetchall()
     
+    # Определяем callback для кнопки Назад
+    back_callback = "main_shop_page"
+    if source == "products":
+        back_callback = "products"
+    elif source == "services":
+        back_callback = "services"
+    elif source == "account":
+        back_callback = "personal_account"
+
     if not cart_items:
         builder = InlineKeyboardBuilder()
         builder.add(types.InlineKeyboardButton(text="📦 К товарам", callback_data="products"))
         builder.add(types.InlineKeyboardButton(text="🛠 К услугам", callback_data="services"))
-        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop"))
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=back_callback))
         builder.adjust(2, 1)
         
-        await callback.message.edit_text(
-            "🛒 **Ваша корзина пуста**\n\nДобавьте товары или услуги из каталога.",
-            reply_markup=builder.as_markup()
-        )
+        if callback.message.content_type == types.ContentType.PHOTO:
+            await callback.message.edit_caption(
+                caption="🛒 **Ваша корзина пуста**\n\nДобавьте товары или услуги из каталога.",
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text="🛒 **Ваша корзина пуста**\n\nДобавьте товары или услуги из каталога.",
+                reply_markup=builder.as_markup()
+            )
         await callback.answer()
         return
     
@@ -296,21 +333,27 @@ async def view_cart(callback: CallbackQuery):
         ))
         builder.add(types.InlineKeyboardButton(
             text="🗑", 
-            callback_data=f"remove_cart_{cart_id}"
+            callback_data=f"remove_cart_{cart_id}_{source}"
         ))
     
     text += f"💰 **Общая сумма: {total_price}₽**" if total_price > 0 else ""
     
     # Кнопки управления корзиной
     builder.add(types.InlineKeyboardButton(text="📋 Оформить заказы", callback_data="checkout"))
-    builder.add(types.InlineKeyboardButton(text="🗑 Очистить корзину", callback_data="clear_cart"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop"))
+    builder.add(types.InlineKeyboardButton(text="🗑 Очистить корзину", callback_data=f"clear_cart_{source}"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=back_callback))
     
     builder.adjust(2)  # По 2 кнопки в ряд для товаров
     builder.adjust(*[2] * (len(cart_items)), 1, 2, 1)  # Последние кнопки отдельно
     
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(text=text, reply_markup=builder.as_markup())
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 # Удаление из корзины
 @dp.callback_query(F.data.startswith("remove_cart_"))
@@ -318,30 +361,58 @@ async def remove_from_cart(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     
-    cart_id = int(callback.data.split("_")[2])
+    parts = callback.data.split("_")
+    cart_id = int(parts[2])
+    # Пытаемся получить источник если он есть
+    source = "shop"
+    if len(parts) > 3:
+        source = parts[3]
     
     async with aiosqlite.connect("bot_database.db") as db:
         await db.execute("DELETE FROM cart WHERE id = ?", (cart_id,))
         await db.commit()
     
     await callback.answer("🗑 Удалено из корзины")
-    # Обновляем корзину
+    
+    # Модифицируем callback.data чтобы view_cart распознал источник
+    # Мы не можем изменить callback.data напрямую, но можем вызвать функцию
+    # Создаем фейковый или просто вызываем с нужным контекстом?
+    # Проще просто вызвать view_cart, но view_cart читает callback.data
+    # Поэтому передадим источник через подмену callback.data (это хак, но работает в рамках объекта)
+    
+    original_data = callback.data
+    callback.data = f"cart_from_{source}" # Подменяем для view_cart
     await view_cart(callback)
+    callback.data = original_data # Возвращаем на всякий случай
 
 # Очистка корзины
-@dp.callback_query(F.data == "clear_cart")
+@dp.callback_query(F.data.startswith("clear_cart"))
 async def clear_cart(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     
     user_id = callback.from_user.id
     
+    # Получаем источник
+    source = "shop"
+    if "_products" in callback.data:
+        source = "products"
+    elif "_services" in callback.data:
+        source = "services"
+    elif "_account" in callback.data:
+        source = "account"
+        
     async with aiosqlite.connect("bot_database.db") as db:
         await db.execute("DELETE FROM cart WHERE user_id = ?", (user_id,))
         await db.commit()
     
     await callback.answer("🗑 Корзина очищена")
+    
+    # Подменяем callback.data для правильного возврата
+    original_data = callback.data
+    callback.data = f"cart_from_{source}"
     await view_cart(callback)
+    callback.data = original_data
 
 # Оформление заказов
 @dp.callback_query(F.data == "checkout")
@@ -386,7 +457,7 @@ async def checkout(callback: CallbackQuery):
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders"))
-    builder.add(types.InlineKeyboardButton(text="◀️ В магазин", callback_data="shop"))
+    builder.add(types.InlineKeyboardButton(text="◀️ В магазин", callback_data="main_shop_page"))
     builder.adjust(1)
     
     await callback.message.edit_text(
