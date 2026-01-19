@@ -241,7 +241,8 @@ async def add_to_cart(callback: CallbackQuery):
     await callback.answer("✅ Добавлено в корзину!")
 
 # Корзина
-@dp.callback_query(F.data.contains("cart"))
+@dp.callback_query(F.data == "cart")
+@dp.callback_query(F.data.startswith("cart_"))
 async def view_cart(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return

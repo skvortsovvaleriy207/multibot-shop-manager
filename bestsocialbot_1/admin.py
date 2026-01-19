@@ -101,15 +101,14 @@ async def admin_2fa_check(message: types.Message, state: FSMContext):
 
 async def show_admin_panel(message_or_callback):
     builder = InlineKeyboardBuilder()
+    # builder.add(types.InlineKeyboardButton(text="📢 Управление контентом", callback_data="admin_content")) # New button (Hidden)
     builder.add(types.InlineKeyboardButton(text="📚 Управление каталогом", callback_data="admin_catalog_manager"))
     builder.add(types.InlineKeyboardButton(text="📋 Основная таблица", callback_data="data_table"))
     builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="main_shop_page"))
-    builder.add(types.InlineKeyboardButton(text="👤 пассивные подписчики", callback_data="partners_passive"))
-    builder.add(types.InlineKeyboardButton(text="📊 Партнеры", callback_data="partners"))
-    builder.add(types.InlineKeyboardButton(text="💰 Инвесторы", callback_data="investors"))
-    builder.add(types.InlineKeyboardButton(text="👥 Реферальная система", callback_data="referral"))
-    builder.add(types.InlineKeyboardButton(text="📊 Заявки", callback_data="all_orders_request_search"))
-    builder.add(types.InlineKeyboardButton(text="📊 заказы", callback_data="order_statuses"))
+    # builder.add(types.InlineKeyboardButton(text="👤 пассивные подписчики", callback_data="partners_passive"))
+    # builder.add(types.InlineKeyboardButton(text="📊 Партнеры", callback_data="partners"))
+    # builder.add(types.InlineKeyboardButton(text="💰 Инвесторы", callback_data="investors"))
+    # builder.add(types.InlineKeyboardButton(text="👥 Реферальная система", callback_data="referral"))
     builder.add(types.InlineKeyboardButton(text="📤 Парсинг", callback_data="parsing"))
     builder.add(types.InlineKeyboardButton(text="📬 Рассылка", callback_data="mailing"))
     builder.add(types.InlineKeyboardButton(text="🔗 Инвайт", callback_data="invite"))
@@ -117,7 +116,7 @@ async def show_admin_panel(message_or_callback):
     builder.add(types.InlineKeyboardButton(text="💬 Сообщения", callback_data="messages"))
     builder.add(types.InlineKeyboardButton(text="📈 Статистика", callback_data="stats"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_personal_account"))
-    builder.adjust(1, 2, 1, 2, 1, 2, 2, 2, 1)
+    builder.adjust(1)
     
     if hasattr(message_or_callback, 'message'):
         msg = message_or_callback.message
@@ -188,105 +187,9 @@ async def back_to_admin(callback: CallbackQuery):
     except:
         pass
 
-@dp.callback_query(F.data == "catalog")
-async def catalog_menu(callback: CallbackQuery):
-    user_id = callback.from_user.id
 
-    if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
-        return
 
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="🚗 Таблица автотехники", callback_data="admin_products_table"))
-    builder.add(types.InlineKeyboardButton(text="🔧 Таблица автоуслуг", callback_data="admin_services_table"))
-    builder.add(types.InlineKeyboardButton(text="📋 Таблица заказов", callback_data="admin_orders_table"))
-    builder.add(types.InlineKeyboardButton(text="🔄 Синхронизация", callback_data="sync_automarket"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
-    builder.adjust(1)
 
-    if callback.message.caption is not None:
-        await callback.message.edit_caption(
-            caption="🚗 **Автомагазин**\n\nВыберите раздел:",
-            reply_markup=builder.as_markup()
-        )
-    else:
-        await callback.message.edit_text(
-            text="🚗 **Автомагазин**\n\nВыберите раздел:",
-            reply_markup=builder.as_markup()
-        )
-    await callback.answer()
-
-@dp.callback_query(F.data == "admin_services_table")
-async def admin_services_table(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
-        return
-
-    from automarket_sheets import AUTO_SERVICES_SHEET_URL
-
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(
-        text="📈 Открыть таблицу автоуслуг",
-        url=AUTO_SERVICES_SHEET_URL
-    ))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
-    builder.adjust(1)
-
-    await callback.message.edit_text(
-        text="🔧 **Таблица услуг**\n\nЗдесь отображаются все автоуслуги.",
-        reply_markup=builder.as_markup()
-    )
-    await callback.answer()
-
-@dp.callback_query(F.data == "admin_orders_table")
-async def admin_orders_table(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
-        return
-
-    from automarket_sheets import AUTO_ORDERS_SHEET_URL
-
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(
-        text="📈 Открыть таблицу заказов",
-        url=AUTO_ORDERS_SHEET_URL
-    ))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
-    builder.adjust(1)
-
-    await callback.message.edit_text(
-        text="📋 **Таблица заказов**\n\nЗдесь отображаются все заказы автомагазина.",
-        reply_markup=builder.as_markup()
-    )
-    await callback.answer()
-
-@dp.callback_query(F.data == "sync_automarket")
-async def sync_automarket_manual(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
-        return
-
-    await callback.message.edit_text("🔄 Начинаю синхронизацию данных автомагазина...")
-
-    try:
-        from automarket_sheets import sync_all_automarket_data
-        success = await sync_all_automarket_data()
-
-        if success:
-            text = "✅ **Синхронизация завершена!**\n\nВсе данные автомагазина обновлены в Google Sheets."
-        else:
-            text = "⚠️ **Ошибка синхронизации**\n\nНе все данные удалось обновить. Проверьте логи."
-    except Exception as e:
-        text = f"❌ **Ошибка!**\n\n{str(e)}"
-
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="catalog"))
-
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
 
 @dp.message(F.text, StateFilter(ParsingStates.waiting_for_links))
 async def admin_parsing_links_handler(message: types.Message, state: FSMContext):

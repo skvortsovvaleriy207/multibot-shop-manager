@@ -149,7 +149,9 @@ try:
 except ImportError as e:
     logging.error(f"Error importing table_links: {e}")
 from order_request_system import *
-from admin_catalog_manager import *
+import admin_catalog_manager
+import admin_posts  # New module for admin content management
+import user_posts   # New module for user content viewing
 from admin_order_processing import *
 # Категории объединены в category_manager.py
 
@@ -333,8 +335,9 @@ async def main():
             for user_id, user_changes in changes.items():
                 if user_changes:
                     try:
-                        await send_user_notification(bot, user_id, user_changes)
-                        print(f"[NOTIFY] Уведомление отправлено пользователю {user_id}")
+                        # Отключаем уведомления при старте, чтобы не спамить при перезапусках
+                        # await send_user_notification(bot, user_id, user_changes)
+                        print(f"[NOTIFY] Обнаружены изменения профиля для {user_id}: {user_changes}")
                     except Exception as notify_error:
                         print(f"[ERROR] Ошибка отправки уведомления {user_id}: {notify_error}")
     except Exception as e:
@@ -654,5 +657,4 @@ async def periodic_showcase():
             logging.error(f"Error in periodic_showcase: {e}")
         await asyncio.sleep(SHOWCASE_INTERVAL)
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())

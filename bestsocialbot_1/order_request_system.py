@@ -134,11 +134,19 @@ async def create_order_start(callback: CallbackQuery, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="personal_account"))
     builder.adjust(1)
 
-    await callback.message.edit_text(
-        "📋 **Создание заявки**\n\n"
-        "Выберите тип карточки:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            "📋 **Создание заявки**\n\n"
+            "Выберите тип карточки:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.delete()
+        await callback.message.answer(
+            "📋 **Создание заявки**\n\n"
+            "Выберите тип карточки:",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -204,7 +212,10 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     )
     await state.update_data(item_type="product")
     await state.set_state(ProductCardStates.waiting_operation)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.callback_query(F.data == "product_sell")
@@ -1700,14 +1711,25 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="create_order"))
     builder.adjust(1)
 
-    await callback.message.edit_text(
-        "📋 **Карточка услуги**\n\n"
-        "Выберите цель:",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            "📋 **Карточка услуги**\n\n"
+            "Выберите цель:",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.delete()
+        await callback.message.answer(
+            "📋 **Карточка услуги**\n\n"
+            "Выберите цель:",
+            reply_markup=builder.as_markup()
+        )
     await state.update_data(item_type="service")
     await state.set_state(ServiceCardStates.waiting_operation)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.callback_query(F.data == "service_offer")
@@ -3192,7 +3214,10 @@ async def offer_select_buy(callback: CallbackQuery, state: FSMContext):
     else:
         await show_offer_category_selection(callback.message, state)
     
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 async def show_offer_category_selection(message: Message, state: FSMContext):
@@ -3205,9 +3230,11 @@ async def show_offer_category_selection(message: Message, state: FSMContext):
 
         for i in items:
             category_name = i[0]
+            # Truncate to ensure callback data < 64 bytes (ocs: + name)
+            safe_name = category_name[:50]
             builder.add(types.InlineKeyboardButton(
                 text=category_name,
-                callback_data=f"off_cat_select:{category_name}"
+                callback_data=f"ocs:{safe_name}"
             ))
 
     builder.add(types.InlineKeyboardButton(
@@ -3232,7 +3259,7 @@ async def show_offer_category_selection(message: Message, state: FSMContext):
     await state.set_state(OfferCardStates.waiting_category)
 
 
-@dp.callback_query(F.data.startswith("off_cat_select:"))
+@dp.callback_query(F.data.startswith("ocs:"))
 async def select_offer_category(callback: CallbackQuery, state: FSMContext):
     """Выбор категории предложения"""
     try:
@@ -3243,7 +3270,10 @@ async def select_offer_category(callback: CallbackQuery, state: FSMContext):
     except Exception as e:
         print(f"❌ Ошибка при выборе категории предложения: {e}")
         await callback.answer("❌ Ошибка при выборе категории", show_alert=True)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.message(OfferCardStates.waiting_category)
@@ -3259,7 +3289,10 @@ async def skip_offer_category(callback: CallbackQuery, state: FSMContext):
     """Пропуск выбора категории предложения"""
     await state.update_data(category="")
     await show_offer_class_selection(callback.message, state)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.callback_query(F.data == "back_off_op")

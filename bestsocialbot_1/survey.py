@@ -115,7 +115,10 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
         user = await cursor.fetchone()
 
         if user and user[0] == 1:
-            await callback.answer("Вы уже проходили опрос.", show_alert=True)
+            try:
+                await callback.answer("Вы уже проходили опрос.", show_alert=True)
+            except Exception:
+                pass
             return
 
     builder = InlineKeyboardBuilder()
@@ -470,7 +473,7 @@ async def process_q16(message: Message, state: FSMContext):
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurSocialBot"
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",
@@ -563,7 +566,7 @@ async def end_surrey(callback: CallbackQuery):
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurSocialBot"
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",

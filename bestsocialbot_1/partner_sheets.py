@@ -107,7 +107,11 @@ async def sync_partners_services_to_sheet():
             print("Ошибка: MAIN_SURVEY_SHEET_URL не указан в config.py")
             return False
             
-        sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
+        try:
+            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры (Услуги)")
+        except gspread.WorksheetNotFound:
+            print("Лист 'Партнеры (Услуги)' не найден, создаем новый")
+            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).add_worksheet(title="Партнеры (Услуги)", rows=1000, cols=34)
         
         headers = [
             "Дата опроса", "Telegram ID", "Username партнера", "Компания-партнер",
@@ -169,7 +173,11 @@ async def sync_investors_to_sheet():
             print("Ошибка: MAIN_SURVEY_SHEET_URL не указан в config.py")
             return False
             
-        sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
+        try:
+            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Инвесторы")
+        except gspread.WorksheetNotFound:
+             print("Лист 'Инвесторы' не найден, создаем новый")
+             sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).add_worksheet(title="Инвесторы", rows=1000, cols=34)
         
         headers = [
             "Дата опроса", "Telegram ID инвестора", "Username инвестора",
@@ -541,6 +549,8 @@ async def scheduled_partner_sync():
             # Выгружаем партнерские данные в карточки (ТЗ п.3-5)
             await sync_partner_data_to_cards()
             
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logging.error(f"Ошибка в scheduled_partner_sync: {e}")
             await asyncio.sleep(3600)  # Ждем час при ошибке

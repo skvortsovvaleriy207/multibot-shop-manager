@@ -545,6 +545,12 @@ async def init_db():
                 )
             """)
 
+            # Миграция: добавляем sub_category в shop_sections
+            try:
+                await db.execute("ALTER TABLE shop_sections ADD COLUMN sub_category TEXT")
+            except Exception:
+                pass
+
 
             await db.commit()
 

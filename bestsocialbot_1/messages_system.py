@@ -53,7 +53,11 @@ async def messages_menu(callback: CallbackQuery):
     if unread_count > 0:
         text += f"\n\n🔔 У вас {unread_count} непрочитанных сообщений"
 
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -530,10 +534,14 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
             callback_data=f"approve_req_{item_type}_{request_id}"
         ))
         builder.add(types.InlineKeyboardButton(
+            text="✏️ Редактировать",
+            callback_data=f"edit_req_{item_type}_{request_id}"
+        ))
+        builder.add(types.InlineKeyboardButton(
             text="❌ Отклонить",
             callback_data=f"reject_req_{item_type}_{request_id}"
         ))
-        builder.adjust(2)
+        builder.adjust(2, 1)
 
         # Отправляем через существующий функционал, но подменяем на прямую отправку для кнопок
         # Так как send_system_message не поддерживает кнопки, отправляем напрямую ботом

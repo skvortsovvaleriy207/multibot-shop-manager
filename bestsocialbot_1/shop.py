@@ -58,7 +58,7 @@ async def main_shop_page(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    await sync_from_sheets_to_db()
+    # await sync_from_sheets_to_db() # Disabled to prevent lag/crashing
 
     user_id = callback.from_user.id
     is_admin = user_id == ADMIN_ID
@@ -75,14 +75,15 @@ async def main_shop_page(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="exit_shop_menu"))
     builder.adjust(2, 2, 2, 1)
 
-    if callback.message.content_type == types.ContentType.TEXT:
-        await callback.message.edit_text(
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.delete()
+        await callback.message.answer(
             text="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
             reply_markup=builder.as_markup()
         )
     else:
-        await callback.message.edit_caption(
-            caption="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
+        await callback.message.edit_text(
+            text="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
             reply_markup=builder.as_markup()
         )
     await callback.answer()
@@ -130,7 +131,10 @@ async def news_menu(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=builder.as_markup())
     else:
         await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "popular_menu")
 async def popular_menu(callback: CallbackQuery):
@@ -155,7 +159,10 @@ async def popular_menu(callback: CallbackQuery):
         await callback.message.edit_text(text, reply_markup=builder.as_markup())
     else:
         await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data.in_({"promo_buy_sell", "promo_events", "promo_forecasts", "promo_analytics", "promo_education",
                                "news_thematic", "news_facts", "news_ads", "news_partners", "news_investors",
@@ -185,7 +192,10 @@ async def all_catalogs(callback: CallbackQuery):
             text=SHOWCASE_TEXT,
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.callback_query(F.data == "exit_shop_menu")
@@ -207,7 +217,10 @@ async def exit_shop_menu_handler(callback: CallbackQuery):
             text=SHOWCASE_TEXT,
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "soon")
 async def soon(callback: CallbackQuery):
@@ -423,8 +436,8 @@ async def product_catalog(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="📋 Карточка товара", callback_data="product_card_form"))
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_products"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="📦 Изменить каталог товаров", callback_data="product_catalog_change"))
+    # if callback.message.chat.id == ADMIN_ID:
+    #     builder.add(types.InlineKeyboardButton(text="📦 Изменить каталог товаров", callback_data="manage_product_cats"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
 
     # Оптимальное расположение: категории по 2 в строке, затем одиночные кнопки
@@ -433,11 +446,17 @@ async def product_catalog(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 1)  # Все кнопки по одной
 
-    await callback.message.edit_text(
-        "📦 **Каталог товаров**\n\n"
-        "Выберите категорию:",
-        reply_markup=builder.as_markup()
-    )
+    text = "📦 **Каталог товаров**\n\nВыберите категорию:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -472,8 +491,8 @@ async def service_catalog(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="📋 Карточка услуги", callback_data="service_card_form"))
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_services"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="🛠 Изменить каталог услуг", callback_data="service_catalog_change"))
+    # if callback.message.chat.id == ADMIN_ID:
+    #     builder.add(types.InlineKeyboardButton(text="🛠 Изменить каталог услуг", callback_data="manage_service_cats"))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
 
@@ -483,11 +502,17 @@ async def service_catalog(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 1)  # Все кнопки по одной
 
-    await callback.message.edit_text(
-        "🛠 **Каталог услуг**\n\n"
-        "Выберите категориу:",
-        reply_markup=builder.as_markup()
-    )
+    text = "🛠 **Каталог услуг**\n\nВыберите категорию:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -536,11 +561,17 @@ async def property_catalog(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 1, 1)
 
-    await callback.message.edit_text(
-        "🤝 **Каталог предложений/активов**\n\n"
-        "Выберите категорию или действие:",
-        reply_markup=builder.as_markup()
-    )
+    text = "🤝 **Каталог предложений/активов**\n\nВыберите категорию или действие:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -579,9 +610,13 @@ async def show_product_category_items(callback: CallbackQuery):
                 response += f"📝 {short_desc}\n"
             response += "────\n"
 
-            # Добавляем кнопку для добавления в корзину
+            # Добавляем кнопки: Просмотр и В корзину
             builder.add(types.InlineKeyboardButton(
-                text=f"➕ {title[:15]}",
+                text=f"👁 {title[:15]}",
+                callback_data=f"item_req_product_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
+                text="➕ В корзину",
                 callback_data=f"add_to_cart_product_{item_id}"
             ))
     else:
@@ -594,16 +629,25 @@ async def show_product_category_items(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="product_catalog"))
 
-    # Оптимальное расположение: товары по 2 в строке, затем кнопка назад
+    # Оптимальное расположение: (Просмотр, В корзину) - по 2 в строке, затем назад
     if items:
-        builder.adjust(2, 2, 2, 1)  # Товары по 2, затем кнопка назад
+        # Создаем массив размеров строк: [2, 2, 2...] для каждой пары кнопок
+        row_sizes = [2] * len(items)
+        row_sizes.append(1) # Кнопка назад
+        builder.adjust(*row_sizes)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -641,8 +685,13 @@ async def show_service_category_items(callback: CallbackQuery):
                 response += f"📝 {short_desc}\n"
             response += "────\n"
 
+            # Добавляем кнопки: Просмотр и В корзину
             builder.add(types.InlineKeyboardButton(
-                text=f"➕ {title[:15]}",
+                text=f"👁 {title[:15]}",
+                callback_data=f"item_req_service_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
+                text="➕ В корзину",
                 callback_data=f"add_to_cart_service_{item_id}"
             ))
     else:
@@ -655,16 +704,24 @@ async def show_service_category_items(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="service_catalog"))
 
-    # Оптимальное расположение
+    # Оптимальное расположение: (Просмотр, В корзину)
     if items:
-        builder.adjust(2, 2, 2, 1)  # Услуги по 2, затем кнопка назад
+        row_sizes = [2] * len(items)
+        row_sizes.append(1)
+        builder.adjust(*row_sizes)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -703,6 +760,10 @@ async def show_property_category_items(callback: CallbackQuery):
             response += "────\n"
 
             builder.add(types.InlineKeyboardButton(
+                text="👁 Просмотр",
+                callback_data=f"view_item_offer_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
                 text=f"➕ {title[:15]}",
                 callback_data=f"add_to_cart_offer_{item_id}"
             ))
@@ -718,14 +779,18 @@ async def show_property_category_items(callback: CallbackQuery):
 
     # Оптимальное расположение
     if items:
-        builder.adjust(2, 2, 2, 1)  # Предложения по 2, затем кнопка назад
+        builder.adjust(2)  # По 2 кнопки в ряд (Просмотр + Добавить)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.delete()
+        await callback.message.answer(response, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 @dp.callback_query(F.data == "back_to_showcase")
@@ -771,7 +836,10 @@ async def new_items_menu(callback: CallbackQuery):
         "Выберите интересующий раздел:",
         reply_markup=builder.as_markup()
     )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "new_products")
 async def show_new_products(callback: CallbackQuery):
