@@ -319,8 +319,11 @@ async def main():
     # Заполнение таблиц из Excel примеров
     await fill_tables_from_excel()
     
+    # Список фоновых задач для корректного завершения
+    background_tasks = []
+
     # Запуск ежедневной синхронизации в 17:00 МСК
-    asyncio.create_task(start_daily_scheduler())
+    background_tasks.append(asyncio.create_task(start_daily_scheduler()))
     
 
     
@@ -374,44 +377,51 @@ async def main():
     await start_admin_sheets_sync()
     
     # Запуск периодических задач
-    asyncio.create_task(periodic_showcase())
-    asyncio.create_task(periodic_sync())
+    background_tasks.append(asyncio.create_task(periodic_showcase()))
+    background_tasks.append(asyncio.create_task(periodic_sync()))
     
     # Синхронизация автомагазина
     from automarket_sheets import scheduled_automarket_sync
-    asyncio.create_task(scheduled_automarket_sync())
+    background_tasks.append(asyncio.create_task(scheduled_automarket_sync()))
     
     # Синхронизация партнерских программ
     from partner_sheets import scheduled_partner_sync
-    asyncio.create_task(scheduled_partner_sync())
+    background_tasks.append(asyncio.create_task(scheduled_partner_sync()))
     
     # Синхронизация статусов заказов (функционал в orders.py)
     
     # ✅ СТАТИСТИКА СОГЛАСНО ТЗ №2 П.4-5
     from statistics_system import scheduled_statistics_export
-    asyncio.create_task(scheduled_statistics_export())
+    background_tasks.append(asyncio.create_task(scheduled_statistics_export()))
     
     # ✅ СИСТЕМА ИНИЦИАТИВ СОГЛАСНО ТЗ №2 П.1
-    asyncio.create_task(scheduled_initiatives_sync())
+    background_tasks.append(asyncio.create_task(scheduled_initiatives_sync()))
     
     # Запуск polling с retry логикой
     max_retries = 5
     retry_delay = 5
     
-    for attempt in range(max_retries):
-        try:
-            print(f"Попытка подключения к Telegram API ({attempt + 1}/{max_retries})...")
-            await dp.start_polling(bot)
-            break
-        except Exception as e:
-            logging.error(f"Ошибка подключения к Telegram (попытка {attempt + 1}): {e}")
-            if attempt < max_retries - 1:
-                print(f"Повторная попытка через {retry_delay} секунд...")
-                await asyncio.sleep(retry_delay)
-                retry_delay *= 2  # Экспоненциальная задержка
-            else:
-                print("Не удалось подключиться к Telegram API. Проверьте интернет-соединение.")
-                raise
+    try:
+        for attempt in range(max_retries):
+            try:
+                print(f"Попытка подключения к Telegram API ({attempt + 1}/{max_retries})...")
+                await dp.start_polling(bot)
+                break
+            except Exception as e:
+                logging.error(f"Ошибка подключения к Telegram (попытка {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    print(f"Повторная попытка через {retry_delay} секунд...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Экспоненциальная задержка
+                else:
+                    print("Не удалось подключиться к Telegram API. Проверьте интернет-соединение.")
+                    raise
+    finally:
+        print("Остановка бота... Завершение фоновых задач.")
+        for task in background_tasks:
+            task.cancel()
+        await asyncio.gather(*background_tasks, return_exceptions=True)
+        print("Фоновые задачи завершены.")
 
 
 
