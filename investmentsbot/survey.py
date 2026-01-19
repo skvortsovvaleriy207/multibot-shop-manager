@@ -449,11 +449,11 @@ async def process_q16(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Дом/Жилье",
-        callback_data="handle_besthome_integration"
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника",
-        callback_data="handle_autoavia_integration_callback"
+        url="https://t.me/BestAutoAviaBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Здоровье/Медицина",
@@ -468,12 +468,12 @@ async def process_q16(message: Message, state: FSMContext):
         url="t.me/wonderful_project_bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Капиталы для инвестиций",
-        url="https://t.me/Our_Inv_Bot"
+        text="Финансы",
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurWonderfulBot"
+        url="https://t.me/bestsocialbot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",
@@ -542,11 +542,11 @@ async def end_surrey(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Дом/Жилье",
-        callback_data="handle_besthome_integration"
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Автотехника ",
-        callback_data="handle_autoavia_integration_callback"
+        text="Автотехника",
+        url="https://t.me/BestAutoAviaBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Здоровье/Медицина",
@@ -561,12 +561,12 @@ async def end_surrey(callback: CallbackQuery):
         url="t.me/wonderful_project_bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Капиталы для инвестиций",
-        url="https://t.me/Our_Inv_Bot"
+        text="Финансы",
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurWonderfulBot"
+        url="https://t.me/bestsocialbot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",
