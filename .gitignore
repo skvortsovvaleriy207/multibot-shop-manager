@@ -11,4 +11,8 @@ debug.log
 logs/
 credentials.json
 *_credentials.json
-bestsocialbot_1/credentials.json_old
+# Ignore old credentials everywhere
+credentials.json_old
+*/credentials.json_old
+# Ignore zip archives
+*.zip

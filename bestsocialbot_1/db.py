@@ -48,7 +48,25 @@ async def init_db():
                     shop_id TEXT,
                     business TEXT,
                     products_services TEXT,
-                    account_status TEXT
+                    account_status TEXT,
+                    updated_at TEXT,
+                    order_status TEXT,
+                    partner_auto_tech TEXT, 
+                    partner_auto_services TEXT,
+                    auto_purchases TEXT,
+                    auto_sales TEXT,
+                    operation_type TEXT DEFAULT 'sale_tech',
+                    order_date TEXT,
+                    investment_program TEXT,
+                    investor_conditions TEXT,
+                    notified_at TEXT,
+                    proposal_status TEXT DEFAULT 'Новое предложение',
+                    last_proposal_notification TEXT,
+                    referrer_id INTEGER,
+                    purchases_count INTEGER DEFAULT 0,
+                    sales_count INTEGER DEFAULT 0,
+                    total_purchases REAL DEFAULT 0,
+                    total_sales REAL DEFAULT 0
                 )
             """)
 
@@ -148,6 +166,22 @@ async def init_db():
                     specifications TEXT, -- JSON характеристики
                     status TEXT DEFAULT 'active', -- active, sold, inactive
                     created_at TEXT,
+                    rating REAL DEFAULT 0,
+                    reviews_count INTEGER DEFAULT 0,
+                    availability_status TEXT DEFAULT 'В наличии',
+                    delivery_info TEXT,
+                    warranty_info TEXT,
+                    operation_type TEXT DEFAULT 'sale_tech',
+                    order_date TEXT,
+                    duration TEXT,
+                    contact_info TEXT,
+                    purpose_id INTEGER,
+                    type_id INTEGER,
+                    class_id INTEGER,
+                    view_id INTEGER,
+                    partner_info TEXT,
+                    partner_conditions TEXT, 
+                    partner_status TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id),
                     FOREIGN KEY (category_id) REFERENCES auto_categories (id)
                 )
@@ -166,6 +200,21 @@ async def init_db():
                     images TEXT, -- JSON массив ID изображений
                     status TEXT DEFAULT 'active',
                     created_at TEXT,
+                    rating REAL DEFAULT 0,
+                    reviews_count INTEGER DEFAULT 0,
+                    availability_status TEXT DEFAULT 'В наличии',
+                    delivery_info TEXT,
+                    warranty_info TEXT,
+                    operation_type TEXT DEFAULT 'sale_tech',
+                    order_date TEXT,
+                    duration TEXT,
+                    purpose_id INTEGER,
+                    type_id INTEGER,
+                    class_id INTEGER,
+                    view_id INTEGER,
+                    partner_info TEXT,
+                    partner_conditions TEXT, 
+                    partner_status TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id),
                     FOREIGN KEY (category_id) REFERENCES auto_categories (id)
                 )
@@ -245,31 +294,10 @@ async def init_db():
             await db.execute("CREATE TABLE IF NOT EXISTS offer_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS offer_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             
-            # Инициализация категорий товаров
-            # Инициализация категорий товаров
-            # Убрана предустановка жилищных категорий по запросу пользователя
-
             # Инициализация категорий услуг
             # Убрана предустановка жилищных категорий по запросу пользователя
 
 
-            # Добавляем новые столбцы для автомагазина
-            new_columns = [
-                "updated_at TEXT",
-                "order_status TEXT",
-                "partner_auto_tech TEXT", 
-                "partner_auto_services TEXT",
-                "auto_purchases TEXT",
-                "auto_sales TEXT",
-                "operation_type TEXT DEFAULT 'sale_tech'",
-                "order_date TEXT"
-            ]
-            
-            for column in new_columns:
-                try:
-                    await db.execute(f"ALTER TABLE users ADD COLUMN {column}")
-                except Exception:
-                    pass
             
             # Таблица для отзывов и рейтингов
             await db.execute("""
@@ -336,81 +364,6 @@ async def init_db():
                 )
             """)
             
-            # Добавляем поля для рейтинга в товары и услуги
-            rating_columns = [
-                "rating REAL DEFAULT 0",
-                "reviews_count INTEGER DEFAULT 0",
-                "availability_status TEXT DEFAULT 'В наличии'",
-                "delivery_info TEXT",
-                "warranty_info TEXT",
-                "operation_type TEXT DEFAULT 'sale_tech'",
-                "order_date TEXT",
-                "duration TEXT",
-                "contact_info TEXT",
-                "purpose_id INTEGER",
-                "type_id INTEGER",
-                "class_id INTEGER",
-                "view_id INTEGER"
-            ]
-            
-            for column in rating_columns:
-                try:
-                    await db.execute(f"ALTER TABLE auto_products ADD COLUMN {column}")
-                except Exception:
-                    pass
-                try:
-                    await db.execute(f"ALTER TABLE auto_services ADD COLUMN {column}")
-                except Exception:
-                    pass
-            
-            # Добавляем поля для партнерской информации согласно ТЗ п.3-5
-            partner_columns = [
-                "partner_info TEXT",
-                "partner_conditions TEXT", 
-                "partner_status TEXT"
-            ]
-            
-            for column in partner_columns:
-                try:
-                    await db.execute(f"ALTER TABLE auto_products ADD COLUMN {column}")
-                except Exception:
-                    pass
-                try:
-                    await db.execute(f"ALTER TABLE auto_services ADD COLUMN {column}")
-                except Exception:
-                    pass
-            
-            # Добавляем поля для инвестиционных программ в профили пользователей
-            investor_columns = [
-                "investment_program TEXT",
-                "investor_conditions TEXT",
-                "notified_at TEXT",
-                "proposal_status TEXT DEFAULT 'Новое предложение'",
-                "last_proposal_notification TEXT",
-                "referrer_id INTEGER"
-            ]
-            
-            for column in investor_columns:
-                try:
-                    await db.execute(f"ALTER TABLE users ADD COLUMN {column}")
-                except Exception:
-                    pass
-
-            # Добавляем столбцы для покупок и продаж согласно ТЗ п.1.8
-            purchase_sale_columns = [
-                "purchases_count INTEGER DEFAULT 0",
-                "sales_count INTEGER DEFAULT 0",
-                "total_purchases REAL DEFAULT 0",
-                "total_sales REAL DEFAULT 0"
-            ]
-            
-            for column in purchase_sale_columns:
-                try:
-                    await db.execute(f"ALTER TABLE users ADD COLUMN {column}")
-                except Exception:
-                    pass
-
-
             # Проверяем и обновляем таблицу order_requests
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS order_requests (
@@ -444,6 +397,16 @@ async def init_db():
                     contact TEXT NOT NULL,
                     status TEXT DEFAULT 'new',
                     created_at TEXT NOT NULL,
+
+                    catalog_id TEXT,
+                    service_date TEXT,
+                    works TEXT,
+                    materials TEXT,
+                    main_photo TEXT,
+                    additional_photos TEXT,
+                    pricing TEXT,
+                    guarantees TEXT,
+                    conditions TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
@@ -485,19 +448,20 @@ async def init_db():
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS categories (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    catalog_type TEXT NOT NULL, -- 'product', 'service', 'offer'
+                    catalog_type TEXT DEFAULT 'product',
                     name TEXT NOT NULL,
                     parent_id INTEGER,
                     created_at TEXT,
+
                     FOREIGN KEY(parent_id) REFERENCES categories(id)
                 )
             """)
             
             # Миграция: добавляем столбец catalog_type в categories, если его нет
-            try:
-                await db.execute("ALTER TABLE categories ADD COLUMN catalog_type TEXT DEFAULT 'product'")
-            except Exception:
-                pass
+            # try:
+            #     await db.execute("ALTER TABLE categories ADD COLUMN catalog_type TEXT DEFAULT 'product'")
+            # except Exception:
+            #     pass
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS cart_order (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -514,23 +478,23 @@ async def init_db():
             """)
             
             # Миграция: добавляем столбец source_table в cart_order, если его нет
-            try:
-                await db.execute("ALTER TABLE cart_order ADD COLUMN source_table TEXT")
-            except Exception:
-                pass
+            # try:
+            #     await db.execute("ALTER TABLE cart_order ADD COLUMN source_table TEXT")
+            # except Exception:
+            #     pass
 
             # Обновленная таблица order_requests с новыми полями (Миграция)
-            new_request_columns = [
-                "deadline TEXT", "tags TEXT", "catalog_id TEXT", "service_date TEXT",
-                "works TEXT", "materials TEXT", "main_photo TEXT", "additional_photos TEXT",
-                "pricing TEXT", "guarantees TEXT", "conditions TEXT"
-            ]
+            # new_request_columns = [
+            #     "deadline TEXT", "tags TEXT", "catalog_id TEXT", "service_date TEXT",
+            #     "works TEXT", "materials TEXT", "main_photo TEXT", "additional_photos TEXT",
+            #     "pricing TEXT", "guarantees TEXT", "conditions TEXT"
+            # ]
             
-            for col in new_request_columns:
-                try:
-                    await db.execute(f"ALTER TABLE order_requests ADD COLUMN {col}")
-                except Exception:
-                    pass
+            # for col in new_request_columns:
+            #     try:
+            #         await db.execute(f"ALTER TABLE order_requests ADD COLUMN {col}")
+            #     except Exception:
+            #         pass
 
             # Таблица для разделов магазина
             await db.execute("""
@@ -541,15 +505,16 @@ async def init_db():
                     content TEXT,
                     image_url TEXT,
                     is_active INTEGER DEFAULT 1,
-                    created_at TEXT
+                    created_at TEXT,
+                    sub_category TEXT
                 )
             """)
 
             # Миграция: добавляем sub_category в shop_sections
-            try:
-                await db.execute("ALTER TABLE shop_sections ADD COLUMN sub_category TEXT")
-            except Exception:
-                pass
+            # try:
+            #     await db.execute("ALTER TABLE shop_sections ADD COLUMN sub_category TEXT")
+            # except Exception:
+            #     pass
 
 
             await db.commit()
