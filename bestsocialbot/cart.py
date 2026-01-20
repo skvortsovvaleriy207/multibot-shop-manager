@@ -9,9 +9,94 @@ from dispatcher import dp
 from utils import check_blocked_user
 
 
+
 class CartOrderStates(StatesGroup):
     waiting_quantity = State()
     waiting_options = State()
+
+
+# Добавление в корзину из каталога (Shop)
+@dp.callback_query(F.data.startswith("add_to_cart_"))
+async def add_to_cart_from_shop(callback: CallbackQuery):
+    """Обработчик добавления в корзину из каталога магазина"""
+    if await check_blocked_user(callback):
+        return
+    
+    # Формат: add_to_cart_{type}_{id}
+    # type: product, service, offer
+    try:
+        parts = callback.data.split("_")
+        
+        item_type_raw = parts[3]
+        item_id = int(parts[4])
+        user_id = callback.from_user.id
+        
+        # Определяем тип для базы данных
+        async with aiosqlite.connect("bot_database.db") as db:
+            # 1. Проверяем существование товара и получаем цену
+            cursor = await db.execute("""
+                SELECT title, price FROM order_requests WHERE id = ?
+            """, (item_id,))
+            item = await cursor.fetchone()
+            
+            if not item:
+                await callback.answer("❌ Товар не найден или удален", show_alert=True)
+                return
+            
+            title, price = item
+            
+            # 2. Проверяем, нет ли уже в корзине
+            cursor = await db.execute("""
+                SELECT quantity FROM cart_order 
+                WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
+            """, (user_id, item_id))
+            existing = await cursor.fetchone()
+            
+            new_qty = 1
+            if existing:
+                # Если уже есть - увеличиваем количество
+                new_qty = existing[0] + 1
+                await db.execute("""
+                    UPDATE cart_order SET quantity = ? 
+                    WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
+                """, (new_qty, user_id, item_id))
+            else:
+                # Если нет - добавляем
+                await db.execute("""
+                    INSERT INTO cart_order (
+                        user_id, item_type, item_id, quantity, selected_options, price, added_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id,
+                    "order_request", # Используем общий тип для товаров из заявок
+                    item_id,
+                    1,
+                    "",
+                    price or "0",
+                    datetime.now().isoformat()
+                ))
+            
+            await db.commit()
+
+            # 3. Обновляем клавиатуру для визуального подтверждения
+            try:
+                current_markup = callback.message.reply_markup
+                if current_markup:
+                    for row in current_markup.inline_keyboard:
+                        for btn in row:
+                            if btn.callback_data == callback.data:
+                                btn.text = f"✅ В корзине ({new_qty})"
+                    
+                    await callback.message.edit_reply_markup(reply_markup=current_markup)
+            except Exception as e:
+                print(f"Не удалось обновить кнопку: {e}")
+
+            await callback.answer(f"✅ Добавлено (всего {new_qty})", show_alert=False)
+            
+    except Exception as e:
+        print(f"Ошибка добавления в корзину: {e}")
+        await callback.answer("❌ Ошибка при добавлении", show_alert=True)
+
 
 
 async def auto_fill_cart_from_orders(user_id: int):
@@ -46,8 +131,8 @@ async def auto_fill_cart_from_orders(user_id: int):
             # Проверяем, нет ли уже этой заявки в корзине
             cursor = await db.execute("""
                 SELECT id FROM cart_order 
-                WHERE user_id = ? AND item_type = ? AND item_id = ?
-            """, (user_id, "order_request", order_id))
+                WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
+            """, (user_id, order_id))
             existing = await cursor.fetchone()
 
             if not existing:
@@ -101,7 +186,7 @@ async def get_cart_items_paginated(user_id: int, page: int = 1, items_per_page: 
                    o.title, o.category, o.operation, o.item_type, o.price as original_price,
                    o.condition, o.specifications, o.purpose, o.created_at
             FROM cart_order c
-            LEFT JOIN order_requests o ON c.item_id = o.id AND c.item_type = 'order_request'
+            LEFT JOIN order_requests o ON c.item_id = o.id AND c.item_type IN ('order_request', 'товар', 'product', 'offer')
             WHERE c.user_id = ?
             ORDER BY c.added_at DESC
             LIMIT ? OFFSET ?
@@ -134,7 +219,8 @@ async def cart_order_main_menu(callback: CallbackQuery, state: FSMContext, page:
 
         if loaded:
             # Обновляем корзину после загрузки
-            await auto_fill_cart_from_orders(user_id)
+            # await auto_fill_cart_from_orders(user_id)  # DISABLED: Prevents clearing cart after order
+            pass
     except Exception as e:
         print(f"Ошибка загрузки заявок: {e}")
 
@@ -286,6 +372,12 @@ async def cart_order_start(callback: CallbackQuery, state: FSMContext):
     await cart_order_main_menu(callback, state, page=1)
 
 
+@dp.callback_query(F.data == "cart_from_account")
+async def cart_from_account_handler(callback: CallbackQuery, state: FSMContext):
+    """Обработчик кнопки Корзина из личного кабинета - перенаправляет в корзину заявок"""
+    await cart_order_main_menu(callback, state, page=1)
+
+
 @dp.callback_query(F.data.startswith("cart_page_"))
 async def cart_order_page(callback: CallbackQuery, state: FSMContext):
     """Обработка переключения страниц корзины"""
@@ -332,14 +424,27 @@ async def cart_refresh_empty(callback: CallbackQuery, state: FSMContext):
 async def cart_edit_item(callback: CallbackQuery, state: FSMContext):
     """Редактирование заявки в корзине"""
     try:
-        # data format: cart_edit_{item_id}_{page}
+        # data format: cart_edit_{item_id}_{page} OR cart_qty_{inc/dec}_{item_id}_{page}
         parts = callback.data.split("_")
-        if len(parts) < 4:
+        if len(parts) < 3:
             await callback.answer("❌ Ошибка формата", show_alert=True)
             return
 
-        item_id = int(parts[2])
-        page = int(parts[3])
+        if parts[1] == 'qty':
+            # cart_qty_inc_123_1
+            if len(parts) < 5:
+                await callback.answer("❌ Ошибка формата количества", show_alert=True)
+                return
+            item_id = int(parts[3])
+            page = int(parts[4])
+        else:
+            # cart_edit_123_1
+            if len(parts) < 4:
+                item_id = int(parts[2])
+                page = 1
+            else:
+                item_id = int(parts[2])
+                page = int(parts[3])
 
         user_id = callback.from_user.id
 
@@ -351,7 +456,7 @@ async def cart_edit_item(callback: CallbackQuery, state: FSMContext):
                        o.condition, o.purpose
                 FROM cart_order c
                 LEFT JOIN order_requests o ON c.item_id = o.id
-                WHERE c.user_id = ? AND c.item_id = ? AND c.item_type = 'order_request'
+                WHERE c.user_id = ? AND c.item_id = ? AND c.item_type IN ('order_request', 'товар', 'product', 'offer')
             """, (user_id, item_id))
             item = await cursor.fetchone()
 
@@ -433,7 +538,7 @@ async def cart_change_quantity(callback: CallbackQuery):
             # Получаем текущее количество
             cursor = await db.execute("""
                 SELECT quantity FROM cart_order 
-                WHERE user_id = ? AND item_id = ? AND item_type = 'order_request'
+                WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
             """, (user_id, item_id))
             result = await cursor.fetchone()
 
@@ -455,7 +560,7 @@ async def cart_change_quantity(callback: CallbackQuery):
             # Обновляем количество
             await db.execute("""
                 UPDATE cart_order SET quantity = ? 
-                WHERE user_id = ? AND item_id = ? AND item_type = 'order_request'
+                WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
             """, (new_qty, user_id, item_id))
 
             await db.commit()
@@ -507,7 +612,7 @@ async def cart_remove_item(callback: CallbackQuery):
         async with aiosqlite.connect("bot_database.db") as db:
             await db.execute("""
                 DELETE FROM cart_order 
-                WHERE user_id = ? AND item_id = ? AND item_type = 'order_request'
+                WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
             """, (user_id, item_id))
             await db.commit()
 
@@ -525,6 +630,22 @@ async def cart_remove_item(callback: CallbackQuery):
 async def cart_order_checkout(callback: CallbackQuery):
     """Оформление заказа из корзины"""
     user_id = callback.from_user.id
+
+    from utils import has_active_process
+    if await has_active_process(user_id):
+        # Получаем детали активного процесса
+        from utils import get_active_process_details
+        reason = await get_active_process_details(user_id)
+        
+        await callback.message.edit_text(
+            f"⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            f"Причина: {reason}\n\n"
+            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            "Пожалуйста, дождитесь выполнения или отмените его в личном кабинете.",
+            reply_markup=InlineKeyboardBuilder().add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="cart_order")).as_markup()
+        )
+        await callback.answer("❌ Есть активная заявка", show_alert=True)
+        return
 
     # Проверяем, есть ли товары в корзине
     async with aiosqlite.connect("bot_database.db") as db:
@@ -565,7 +686,7 @@ async def cart_order_confirm(callback: CallbackQuery):
                    o.title, o.operation, o.item_type, o.category,
                    o.condition, o.purpose, o.specifications
             FROM cart_order c
-            LEFT JOIN order_requests o ON c.item_id = o.id AND c.item_type = 'order_request'
+            LEFT JOIN order_requests o ON c.item_id = o.id AND c.item_type IN ('order_request', 'товар', 'product', 'offer')
             WHERE c.user_id = ?
         """, (user_id,))
         items = await cursor.fetchall()
@@ -620,8 +741,8 @@ async def cart_order_confirm(callback: CallbackQuery):
         # Создаем заявку на заказ из корзины
         await db.execute("""
             INSERT INTO order_requests (
-                user_id, operation, item_type, title, description, 
-                quantity, price, contact, status, created_at
+                user_id, operation, item_type, title, additional_info, 
+                specifications, price, contact, status, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             user_id,
@@ -629,7 +750,7 @@ async def cart_order_confirm(callback: CallbackQuery):
             "cart_order",
             "Заказ из корзины заявок",
             order_description,
-            len(items),
+            str(len(items)),  # Сохраняем количество в specifications
             str(total_price) if total_price > 0 else "",
             f"ID пользователя: {user_id}",
             "new",
@@ -637,8 +758,11 @@ async def cart_order_confirm(callback: CallbackQuery):
         ))
 
         # Очищаем корзину после оформления
-        await db.execute("DELETE FROM cart_order WHERE user_id = ?", (user_id,))
+        print(f"[DEBUG] Очистка корзины для пользователя {user_id}...")
+        cursor = await db.execute("DELETE FROM cart_order WHERE user_id = ?", (user_id,))
+        print(f"[DEBUG] Удалено строк из корзины: {cursor.rowcount}")
         await db.commit()
+        print(f"[DEBUG] Транзакция подтверждена (commit)")
 
     # Синхронизация с Google Sheets
     try:
@@ -646,17 +770,32 @@ async def cart_order_confirm(callback: CallbackQuery):
         await sync_order_requests_to_sheets()
     except Exception as e:
         print(f"Ошибка синхронизации заявок: {e}")
+        import traceback
+        traceback.print_exc()
 
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
     builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
     builder.adjust(1)
 
+    from config import ADMIN_ID
+
+    if user_id == ADMIN_ID:
+        message_text = (
+            "✅ **Заказ успешно оформлен!**\n\n"
+            "Заявки сохранены в базе данных.\n"
+            "Корзина очищена."
+        )
+    else:
+        message_text = (
+            "✅ **Заказ успешно оформлен!**\n\n"
+            "Все заявки из корзины отправлены администратору.\n"
+            "Корзина очищена.\n\n"
+            "Администратор свяжется с вами для уточнения деталей."
+        )
+
     await callback.message.edit_text(
-        "✅ **Заказ успешно оформлен!**\n\n"
-        "Все заявки из корзины отправлены администратору.\n"
-        "Корзина очищена.\n\n"
-        "Администратор свяжется с вами для уточнения деталей.",
+        message_text,
         reply_markup=builder.as_markup()
     )
     await callback.answer()

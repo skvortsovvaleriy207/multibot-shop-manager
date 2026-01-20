@@ -10,13 +10,12 @@ services:
     build: .
     container_name: bestsocialbot
     restart: unless-stopped
-    env_file: .env
     environment:
-      - BOT_NAME=${BESTHOME_TOKEN}
-      - BOT_TOKEN=8555035433:AAHZBgE_nfEHt0WJopirjd0arp7XqsAhY6I
+      - BOT_NAME=bestsocialbot
+      - BOT_TOKEN=${WOND_TOKEN}
     volumes:
-      - besthome_data:/data
+      - wond_data:/data
       - .:/app
 
 volumes:
-  besthome_data:
+  wond_data:

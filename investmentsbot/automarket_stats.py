@@ -106,4 +106,7 @@ async def automarket_stats(callback: CallbackQuery):
     builder.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass

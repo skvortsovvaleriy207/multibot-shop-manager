@@ -55,7 +55,7 @@ async def process_captcha_selection(callback: types.CallbackQuery, state: FSMCon
     print(f"DEBUG: target_emoji={target_emoji}, selected_emoji={selected_emoji}")
 
     if selected_emoji == target_emoji:
-        await callback.message.answer("✅ Вы выбрали правильный цвет!")
+        # await callback.message.answer("✅ Вы выбрали правильный цвет!")  <-- Moved to main handler
         success = True
     else:
         await callback.message.answer(f"❌ Неправильно. Правильный цвет был: {target_emoji}")

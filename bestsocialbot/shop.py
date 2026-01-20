@@ -2,7 +2,7 @@ from aiogram import F, types
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
-from config import ADMIN_ID
+from config import ADMIN_ID, HOUSING_CATEGORIES
 from db import check_channel_subscription
 from dispatcher import dp
 from datetime import *
@@ -31,6 +31,7 @@ async def shop_access(callback: CallbackQuery, state: FSMContext):
     """Обработка входа в магазин с капчей"""
     if await check_blocked_user(callback):
         return
+
     await sync_from_sheets_to_db()
 
     user_id = callback.from_user.id
@@ -56,36 +57,120 @@ async def main_shop_page(callback: CallbackQuery):
     """Главная страница магазина (первый экран после входа)"""
     if await check_blocked_user(callback):
         return
-    await sync_from_sheets_to_db()
-    user_id = callback.from_user.id
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute(
-            "SELECT has_completed_survey FROM users WHERE user_id = ?",
-            (user_id,)
-        )
-        user = await cursor.fetchone()
-        if not user or not user[0]:
-            await callback.answer("Для доступа к магазину необходимо пройти опрос.", show_alert=True)
-            return
 
+    # await sync_from_sheets_to_db() # Disabled to prevent lag/crashing
+
+    user_id = callback.from_user.id
+    is_admin = user_id == ADMIN_ID
 
     builder = InlineKeyboardBuilder()
 
     # Основные разделы магазина
     builder.add(types.InlineKeyboardButton(text="📦 Каталоги", callback_data="all_catalogs"))
-    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="soon"))
+    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="promotions_menu"))
+    builder.add(types.InlineKeyboardButton(text="📰 Новости", callback_data="news_menu"))
+    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="popular_menu"))
+    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="new_items"))
     builder.add(types.InlineKeyboardButton(text="👤 Личный кабинет", callback_data="personal_account"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop_back_to_showcase"))
-    builder.adjust(2,1,1,1,2,1,1)
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="exit_shop_menu"))
+    builder.adjust(2, 2, 2, 1)
 
-    await callback.message.edit_text(
-
-        "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.delete()
+        await callback.message.answer(
+            text="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_text(
+            text="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
+
+@dp.callback_query(F.data == "promotions_menu")
+async def promotions_menu(callback: CallbackQuery):
+    """Меню Акции"""
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="📈 Покупки/Продажи", callback_data="promo_buy_sell"))
+    builder.add(types.InlineKeyboardButton(text="🎉 Мероприятия", callback_data="promo_events"))
+    builder.add(types.InlineKeyboardButton(text="🔮 Прогнозы/Советы", callback_data="promo_forecasts"))
+    builder.add(types.InlineKeyboardButton(text="📊 Аналитика", callback_data="promo_analytics"))
+    builder.add(types.InlineKeyboardButton(text="📚 Образовательные материалы", callback_data="promo_education"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+    builder.adjust(1)
+    
+    text = "🏷️ **Раздел Акции**\n\nВыберите интересующую категорию:"
+    
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    await callback.answer()
+
+@dp.callback_query(F.data == "news_menu")
+async def news_menu(callback: CallbackQuery):
+    """Меню Новости"""
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="📰 Тематические новости", callback_data="news_thematic"))
+    builder.add(types.InlineKeyboardButton(text="💡 Факты/Ситуации", callback_data="news_facts"))
+    builder.add(types.InlineKeyboardButton(text="📢 Объявления", callback_data="news_ads"))
+    builder.add(types.InlineKeyboardButton(text="🤝 Новости партнеров", callback_data="news_partners"))
+    builder.add(types.InlineKeyboardButton(text="💼 Новости инвесторов", callback_data="news_investors"))
+    builder.add(types.InlineKeyboardButton(text="📣 Анонсы товаров/услуг", callback_data="news_announcements"))
+    builder.add(types.InlineKeyboardButton(text="🏆 Успехи", callback_data="news_success"))
+    builder.add(types.InlineKeyboardButton(text="📊 Отчеты", callback_data="news_reports"))
+    builder.add(types.InlineKeyboardButton(text="💬 Отзывы", callback_data="news_reviews"))
+    builder.add(types.InlineKeyboardButton(text="⭐ Оценки", callback_data="news_ratings"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+    builder.adjust(1)
+    
+    text = "📰 **Раздел Новости**\n\nВыберите интересующую категорию:"
+    
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+@dp.callback_query(F.data == "popular_menu")
+async def popular_menu(callback: CallbackQuery):
+    """Меню Популярное"""
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="🔥 Хиты контента", callback_data="pop_hits"))
+    builder.add(types.InlineKeyboardButton(text="📈 Тренды заявок", callback_data="pop_trends"))
+    builder.add(types.InlineKeyboardButton(text="🎵 Плейлисты", callback_data="pop_playlists"))
+    builder.add(types.InlineKeyboardButton(text="🧠 Познавательное", callback_data="pop_cognitive"))
+    builder.add(types.InlineKeyboardButton(text="🎭 Развлекательное", callback_data="pop_entertainment"))
+    builder.add(types.InlineKeyboardButton(text="😂 Юмор-шоу", callback_data="pop_humor"))
+    builder.add(types.InlineKeyboardButton(text="😲 Реакции", callback_data="pop_reactions"))
+    builder.add(types.InlineKeyboardButton(text="📝 Обзоры", callback_data="pop_reviews"))
+    builder.add(types.InlineKeyboardButton(text="🎓 Уроки", callback_data="pop_lessons"))
+    builder.add(types.InlineKeyboardButton(text="📖 Истории успехов", callback_data="pop_stories"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+    builder.adjust(1)
+    
+    text = "⭐ **Раздел Популярное**\n\nВыберите интересующую категорию:"
+    
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+@dp.callback_query(F.data.in_({"promo_buy_sell", "promo_events", "promo_forecasts", "promo_analytics", "promo_education",
+                               "news_thematic", "news_facts", "news_ads", "news_partners", "news_investors",
+                               "news_announcements", "news_success", "news_reports", "news_reviews", "news_ratings",
+                               "pop_hits", "pop_trends", "pop_playlists", "pop_cognitive", "pop_entertainment",
+                               "pop_humor", "pop_reactions", "pop_reviews", "pop_lessons", "pop_stories"}))
+async def section_stub(callback: CallbackQuery):
+    await callback.answer("Раздел в разработке 🛠", show_alert=True)
 
 @dp.callback_query(F.data == "all_catalogs")
 async def all_catalogs(callback: CallbackQuery):
@@ -107,15 +192,19 @@ async def all_catalogs(callback: CallbackQuery):
             text=SHOWCASE_TEXT,
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
-@dp.callback_query(F.data == "shop_back_to_showcase")
-async def shop_back_to_showcase(callback: CallbackQuery):
+@dp.callback_query(F.data == "exit_shop_menu")
+async def exit_shop_menu_handler(callback: CallbackQuery):
+    print(f"DEBUG: exit_shop_menu_handler triggered by {callback.from_user.id}")
     """Назад из магазина на главный экран (опрос/магазин) без проверок"""
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
-    builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"))
+    builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="main_shop_page"))
     builder.adjust(2)
 
     if callback.message.caption is not None:
@@ -128,7 +217,10 @@ async def shop_back_to_showcase(callback: CallbackQuery):
             text=SHOWCASE_TEXT,
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "soon")
 async def soon(callback: CallbackQuery):
@@ -148,13 +240,14 @@ async def personal_account(callback: CallbackQuery):
     # Основные кнопки личного кабинета
     builder.add(types.InlineKeyboardButton(text="👤 Мой профиль", callback_data="my_profile"))
     builder.add(types.InlineKeyboardButton(text="📋 Создать заявку", callback_data="create_order"))
-    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"))
+    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart_from_account"))
     builder.add(types.InlineKeyboardButton(text="🛒 Корзина заявок", callback_data="cart_order"))
     builder.add(types.InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders"))
     builder.add(types.InlineKeyboardButton(text="📦 Заказы на мои товары", callback_data="seller_orders"))
     builder.add(types.InlineKeyboardButton(text="🔗 Рефералы", callback_data="referral_system"))
     builder.add(types.InlineKeyboardButton(text="💳 Оплата", callback_data="payment"))
     builder.add(types.InlineKeyboardButton(text="💬 Сообщения", callback_data="messages"))
+
 
     if is_admin:
         builder.add(types.InlineKeyboardButton(text="🔧 Админ-панель", callback_data="admin_panel"))
@@ -181,15 +274,16 @@ async def personal_account(callback: CallbackQuery):
                  "Выберите действие:",
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 @dp.callback_query(F.data == "my_profile")
 async def my_profile(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
-    await sync_from_sheets_to_db()
-
 
     user_id = callback.from_user.id
 
@@ -276,7 +370,7 @@ async def back_to_personal_account(callback: CallbackQuery):
     # Основные кнопки личного кабинета
     builder.add(types.InlineKeyboardButton(text="👤 Мой профиль", callback_data="my_profile"))
     builder.add(types.InlineKeyboardButton(text="📋 Создать заявку", callback_data="create_order"))
-    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart"))
+    builder.add(types.InlineKeyboardButton(text="🛒 Корзина", callback_data="cart_from_account"))
     builder.add(types.InlineKeyboardButton(text="🛒 Корзина заявок", callback_data="cart_order"))
     builder.add(types.InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders"))
     builder.add(types.InlineKeyboardButton(text="📦 Заказы на мои товары", callback_data="seller_orders"))
@@ -328,6 +422,8 @@ async def product_catalog(callback: CallbackQuery):
 
     if categories:
         for cat_name in categories:
+            if cat_name[0] in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=f"📦 {cat_name[0]}",
                 callback_data=f"product_cat_{cat_name[0]}"
@@ -340,9 +436,9 @@ async def product_catalog(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="📋 Карточка товара", callback_data="product_card_form"))
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_products"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="📦 Изменить каталог товаров", callback_data="product_catalog_change"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="all_catalogs"))
+    # if callback.message.chat.id == ADMIN_ID:
+    #     builder.add(types.InlineKeyboardButton(text="📦 Изменить каталог товаров", callback_data="manage_product_cats"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
 
     # Оптимальное расположение: категории по 2 в строке, затем одиночные кнопки
     if categories:
@@ -350,11 +446,17 @@ async def product_catalog(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 1)  # Все кнопки по одной
 
-    await callback.message.edit_text(
-        "📦 **Каталог товаров**\n\n"
-        "Выберите категорию:",
-        reply_markup=builder.as_markup()
-    )
+    text = "📦 **Каталог товаров**\n\nВыберите категорию:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -375,6 +477,8 @@ async def service_catalog(callback: CallbackQuery):
 
     if categories:
         for cat_name in categories:
+            if cat_name[0] in HOUSING_CATEGORIES:
+                continue
             builder.add(types.InlineKeyboardButton(
                 text=f"🛠 {cat_name[0]}",
                 callback_data=f"service_cat_{cat_name[0]}"
@@ -387,10 +491,10 @@ async def service_catalog(callback: CallbackQuery):
 
     builder.add(types.InlineKeyboardButton(text="📋 Карточка услуги", callback_data="service_card_form"))
     builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_services"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="🛠 Изменить каталог услуг", callback_data="service_catalog_change"))
+    # if callback.message.chat.id == ADMIN_ID:
+    #     builder.add(types.InlineKeyboardButton(text="🛠 Изменить каталог услуг", callback_data="manage_service_cats"))
 
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="all_catalogs"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
 
     # Оптимальное расположение
     if categories:
@@ -398,11 +502,17 @@ async def service_catalog(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 1)  # Все кнопки по одной
 
-    await callback.message.edit_text(
-        "🛠 **Каталог услуг**\n\n"
-        "Выберите категориу:",
-        reply_markup=builder.as_markup()
-    )
+    text = "🛠 **Каталог услуг**\n\nВыберите категорию:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -414,10 +524,14 @@ async def property_catalog(callback: CallbackQuery):
 
     builder = InlineKeyboardBuilder()
 
-    # Получаем категории предложений из таблицы property_purposes
+    # Получаем категории предложений из БД
     async with aiosqlite.connect("bot_database.db") as db:
+        # Для предложений (item_type = 'offer')
         cursor = await db.execute("""
-            SELECT name FROM property_purposes
+            SELECT DISTINCT category FROM order_requests 
+            WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 
+            AND status IN ('active', 'approved')
+            ORDER BY category
         """)
         categories = await cursor.fetchall()
 
@@ -425,7 +539,7 @@ async def property_catalog(callback: CallbackQuery):
         for cat_name in categories:
             builder.add(types.InlineKeyboardButton(
                 text=f"🤝 {cat_name[0]}",
-                callback_data=f"property_cat_{cat_name[0]}"
+                callback_data=f"pc_{cat_name[0]}"
             ))
     else:
         builder.add(types.InlineKeyboardButton(
@@ -433,23 +547,31 @@ async def property_catalog(callback: CallbackQuery):
             callback_data="empty"
         ))
 
-    builder.add(types.InlineKeyboardButton(text="📋 Карточка предложения", callback_data="offer_card_form"))
-    builder.add(types.InlineKeyboardButton(text="🔍 Поиск", callback_data="search_in_offers"))
-    if callback.message.chat.id == ADMIN_ID:
-        builder.add(types.InlineKeyboardButton(text="📋 Изменить каталог предложений/активов", callback_data="property_catalog_change"))
+    # Новое меню согласно ТЗ: 3 кнопки
+    builder.add(types.InlineKeyboardButton(text="🔍 Поиск в Каталоге предложений", callback_data="search_in_offers"))
+    builder.add(types.InlineKeyboardButton(text="📋 Карточка предложений/Заявка", callback_data="offer_card_form"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="all_catalogs"))
 
-    # Оптимальное расположение
+    # Оптимальное расположение: категории по 2, затем функциональные кнопки
     if categories:
-        builder.adjust(2, 2, 2, 1, 1)  # Категории по 2, затем 2 одиночные кнопки
+        builder.adjust(2, 2, 2, 1, 1, 1) # Примерно, если категорий много
+        # Более точная настройка: сначала категории по 2, потом 3 кнопки по 1
+        sizes = [2] * ((len(categories) + 1) // 2) + [1, 1, 1]
+        builder.adjust(*sizes)
     else:
-        builder.adjust(1, 1, 1)  # Все кнопки по одной
+        builder.adjust(1, 1, 1, 1)
 
-    await callback.message.edit_text(
-        "🤝 **Каталог предложений/активов**\n\n"
-        "Выберите категорию:",
-        reply_markup=builder.as_markup()
-    )
+    text = "🤝 **Каталог предложений/активов**\n\nВыберите категорию или действие:"
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            text=text,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=text,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -488,9 +610,13 @@ async def show_product_category_items(callback: CallbackQuery):
                 response += f"📝 {short_desc}\n"
             response += "────\n"
 
-            # Добавляем кнопку для добавления в корзину
+            # Добавляем кнопки: Просмотр и В корзину
             builder.add(types.InlineKeyboardButton(
-                text=f"➕ {title[:15]}",
+                text=f"👁 {title[:15]}",
+                callback_data=f"item_req_product_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
+                text="➕ В корзину",
                 callback_data=f"add_to_cart_product_{item_id}"
             ))
     else:
@@ -498,21 +624,30 @@ async def show_product_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет товаров.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на товар",
-            callback_data="product_card_form"
+            callback_data=f"product_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="product_catalog"))
 
-    # Оптимальное расположение: товары по 2 в строке, затем кнопка назад
+    # Оптимальное расположение: (Просмотр, В корзину) - по 2 в строке, затем назад
     if items:
-        builder.adjust(2, 2, 2, 1)  # Товары по 2, затем кнопка назад
+        # Создаем массив размеров строк: [2, 2, 2...] для каждой пары кнопок
+        row_sizes = [2] * len(items)
+        row_sizes.append(1) # Кнопка назад
+        builder.adjust(*row_sizes)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
@@ -528,7 +663,7 @@ async def show_service_category_items(callback: CallbackQuery):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, additional_info 
-            FROM service_orders 
+            FROM order_requests 
             WHERE item_type = 'service' AND category = ?
             AND status IN ('active', 'approved')
             ORDER BY created_at DESC
@@ -550,8 +685,13 @@ async def show_service_category_items(callback: CallbackQuery):
                 response += f"📝 {short_desc}\n"
             response += "────\n"
 
+            # Добавляем кнопки: Просмотр и В корзину
             builder.add(types.InlineKeyboardButton(
-                text=f"➕ {title[:15]}",
+                text=f"👁 {title[:15]}",
+                callback_data=f"item_req_service_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
+                text="➕ В корзину",
                 callback_data=f"add_to_cart_service_{item_id}"
             ))
     else:
@@ -559,31 +699,39 @@ async def show_service_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет услуг.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на услугу",
-            callback_data="service_card_form"
+            callback_data=f"service_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="service_catalog"))
 
-    # Оптимальное расположение
+    # Оптимальное расположение: (Просмотр, В корзину)
     if items:
-        builder.adjust(2, 2, 2, 1)  # Услуги по 2, затем кнопка назад
+        row_sizes = [2] * len(items)
+        row_sizes.append(1)
+        builder.adjust(*row_sizes)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    else:
+        await callback.message.edit_caption(
+            caption=response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith("property_cat_"))
+@dp.callback_query(F.data.startswith("pc_"))
 async def show_property_category_items(callback: CallbackQuery):
     """Показать предложения в выбранной категории"""
     if await check_blocked_user(callback):
         return
 
-    category_name = callback.data.replace("property_cat_", "")
+    category_name = callback.data.replace("pc_", "")
 
     # Получаем предложения из этой категории из таблицы order_requests
     async with aiosqlite.connect("bot_database.db") as db:
@@ -612,6 +760,10 @@ async def show_property_category_items(callback: CallbackQuery):
             response += "────\n"
 
             builder.add(types.InlineKeyboardButton(
+                text="👁 Просмотр",
+                callback_data=f"view_item_offer_{item_id}"
+            ))
+            builder.add(types.InlineKeyboardButton(
                 text=f"➕ {title[:15]}",
                 callback_data=f"add_to_cart_offer_{item_id}"
             ))
@@ -619,22 +771,26 @@ async def show_property_category_items(callback: CallbackQuery):
         response = f"🤝 **Предложения в категории: {category_name}**\n\n"
         response += "В этой категории пока нет предложений.\n"
         builder.add(types.InlineKeyboardButton(
-            text="📋 Создать заявку на предложение",
-            callback_data="offer_card_form"
+            text="📋 Создать карточку предложения",
+            callback_data=f"offer_card_form|{category_name}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="property_catalog"))
 
     # Оптимальное расположение
     if items:
-        builder.adjust(2, 2, 2, 1)  # Предложения по 2, затем кнопка назад
+        builder.adjust(2)  # По 2 кнопки в ряд (Просмотр + Добавить)
     else:
         builder.adjust(1, 1)  # Обе кнопки по одной
 
-    await callback.message.edit_text(
-        response,
-        reply_markup=builder.as_markup()
-    )
+    if callback.message.content_type == types.ContentType.PHOTO:
+        await callback.message.delete()
+        await callback.message.answer(response, reply_markup=builder.as_markup())
+    else:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
     await callback.answer()
 
 @dp.callback_query(F.data == "back_to_showcase")
@@ -661,3 +817,429 @@ async def back_to_showcase(callback: CallbackQuery):
 @dp.callback_query(F.data == "empty")
 async def empty_category(callback: CallbackQuery):
     await callback.answer("В данной категории пока нет товаров/услуг.", show_alert=True)
+
+@dp.callback_query(F.data == "new_items")
+async def new_items_menu(callback: CallbackQuery):
+    """Меню раздела Новинки"""
+    if await check_blocked_user(callback):
+        return
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="📦 Новые товары", callback_data="new_products"))
+    builder.add(types.InlineKeyboardButton(text="🛠 Новые услуги", callback_data="new_services"))
+    builder.add(types.InlineKeyboardButton(text="🤝 Новые предложения", callback_data="new_offers"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+    builder.adjust(1) # Все кнопки в один столбик
+
+    await callback.message.edit_text(
+        "🆕 **Раздел «Новинки»**\n\n"
+        "Выберите интересующий раздел:",
+        reply_markup=builder.as_markup()
+    )
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+@dp.callback_query(F.data == "new_products")
+async def show_new_products(callback: CallbackQuery):
+    """Показать 10 последних добавленных товаров"""
+    if await check_blocked_user(callback):
+        return
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Берем из order_requests
+        cursor = await db.execute("""
+            SELECT id, title, price 
+            FROM order_requests 
+            WHERE item_type = 'product' AND status IN ('active', 'approved')
+            ORDER BY created_at DESC 
+            LIMIT 10
+        """)
+        items = await cursor.fetchall()
+
+    builder = InlineKeyboardBuilder()
+
+    if items:
+        response = "🆕 **Новые товары**\n\nПоследние поступления:\n\n"
+        for item_id, title, price in items:
+            price_text = f"{price}₽" if price else "Цена не указана"
+            builder.add(types.InlineKeyboardButton(
+                text=f"{title[:20]}.. - {price_text}",
+                callback_data=f"item_req_product_{item_id}_new"
+            ))
+    else:
+        response = "🆕 **Новые товары**\n\nТоваров пока нет."
+        builder.add(types.InlineKeyboardButton(text="Пока пусто", callback_data="empty"))
+
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="new_items"))
+    builder.adjust(1)
+
+    try:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    await callback.answer()
+
+@dp.callback_query(F.data == "new_services")
+async def show_new_services(callback: CallbackQuery):
+    """Показать 10 последних добавленных услуг"""
+    if await check_blocked_user(callback):
+        return
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("""
+            SELECT id, title, price 
+            FROM order_requests 
+            WHERE item_type = 'service' AND status IN ('active', 'approved')
+            ORDER BY created_at DESC 
+            LIMIT 10
+        """)
+        items = await cursor.fetchall()
+
+    builder = InlineKeyboardBuilder()
+
+    if items:
+        response = "🆕 **Новые услуги**\n\nПоследние добавленные услуги:\n\n"
+        for item_id, title, price in items:
+            price_text = f"{price}₽" if price else "Цена не указана"
+            builder.add(types.InlineKeyboardButton(
+                text=f"{title[:20]}.. - {price_text}",
+                callback_data=f"item_req_service_{item_id}_new"
+            ))
+    else:
+        response = "🆕 **Новые услуги**\n\nУслуг пока нет."
+        builder.add(types.InlineKeyboardButton(text="Пока пусто", callback_data="empty"))
+
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="new_items"))
+    builder.adjust(1)
+
+    try:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    await callback.answer()
+
+@dp.callback_query(F.data == "new_offers")
+async def show_new_offers(callback: CallbackQuery):
+    """Показать 10 последних предложений"""
+    if await check_blocked_user(callback):
+        return
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Для предложений используем order_requests
+        cursor = await db.execute("""
+            SELECT id, title, price 
+            FROM order_requests 
+            WHERE item_type = 'offer' AND status IN ('active', 'approved')
+            ORDER BY created_at DESC 
+            LIMIT 10
+        """)
+        items = await cursor.fetchall()
+
+    builder = InlineKeyboardBuilder()
+
+    if items:
+        response = "🆕 **Новые предложения**\n\nПоследние добавленные предложения:\n\n"
+        for item_id, title, price in items:
+            price_text = f"{price}₽" if price else "?"
+            builder.add(types.InlineKeyboardButton(
+                text=f"{title[:20]}.. - {price_text}",
+                callback_data=f"item_offer_{item_id}"
+            ))
+    else:
+        response = "🆕 **Новые предложения**\n\nПредложений пока нет."
+        builder.add(types.InlineKeyboardButton(text="Пока пусто", callback_data="empty"))
+
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="new_items"))
+    builder.adjust(1)
+
+    try:
+        await callback.message.edit_text(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    except Exception:
+        await callback.message.delete()
+        await callback.message.answer(
+            response,
+            reply_markup=builder.as_markup()
+        )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("item_req_product_"))
+async def show_req_product_details(callback: CallbackQuery):
+    """Показать детали товара (из order_requests)"""
+    if await check_blocked_user(callback):
+        return
+
+    parts = callback.data.split("_")
+    # Format: item_req_product_{id}_new
+    # parts: ['item', 'req', 'product', '123', 'new']
+    try:
+        item_id = int(parts[3])
+    except:
+        item_id = int(parts[2]) # Fallback
+
+    is_new = "new" in parts
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("""
+            SELECT title, additional_info, price, category, contact, user_id, images
+            FROM order_requests 
+            WHERE id = ?
+        """, (item_id,))
+        item = await cursor.fetchone()
+
+    if not item:
+        await callback.answer("Товар не найден", show_alert=True)
+        return
+
+    title, description, price, category, contact, user_id, images_json = item
+    
+    username = None
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
+        user_row = await cursor.fetchone()
+        if user_row:
+            username = user_row[0]
+
+    text = f"📦 **{title}**\n\n"
+    text += f"Категория: {category or 'Общее'}\n"
+    text += f"Цена: {price if price else 'Цена не указана'}\n\n"
+    text += f"{description}\n\n"
+    
+    if contact:
+        text += f"📞 Контакт: {contact}\n"
+    if username:
+        text += f"👤 Продавец: @{username}\n"
+
+    # Images
+    import json
+    images = []
+    try:
+        if images_json:
+            images_list = json.loads(images_json)
+            if isinstance(images_list, list) and images_list:
+               images = images_list
+            elif isinstance(images_list, dict):
+               if images_list.get('main'):
+                   images.append(images_list['main'].get('file_id'))
+    except:
+        pass
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="➕ В корзину", callback_data=f"add_to_cart_product_{item_id}"))
+    
+    if is_new:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к новинкам", callback_data="new_products"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+        
+    builder.adjust(1)
+    
+    try:
+        await callback.message.delete()
+    except:
+        pass
+        
+    if images and isinstance(images[0], str):
+        try:
+             await callback.message.answer_photo(
+                 photo=images[0],
+                 caption=text[:1024],
+                 reply_markup=builder.as_markup()
+             )
+        except Exception as e:
+             await callback.message.answer(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+        
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("item_req_service_"))
+async def show_req_service_details(callback: CallbackQuery):
+    """Показать детали услуги (из order_requests)"""
+    if await check_blocked_user(callback):
+        return
+
+    parts = callback.data.split("_")
+    try:
+        item_id = int(parts[3])
+    except:
+        item_id = int(parts[2]) 
+
+    is_new = "new" in parts
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("""
+            SELECT title, additional_info, price, category, contact, user_id, images
+            FROM order_requests 
+            WHERE id = ?
+        """, (item_id,))
+        item = await cursor.fetchone()
+
+    if not item:
+        await callback.answer("Услуга не найдена", show_alert=True)
+        return
+
+    title, description, price, category, contact, user_id, images_json = item
+    
+    username = None
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
+        user_row = await cursor.fetchone()
+        if user_row:
+            username = user_row[0]
+
+    text = f"🛠 **{title}**\n\n"
+    text += f"Категория: {category or 'Общее'}\n"
+    text += f"Цена: {price if price else 'Цена не указана'}\n\n"
+    text += f"{description}\n\n"
+    
+    if contact:
+        text += f"📞 Контакт: {contact}\n"
+    if username:
+        text += f"👤 Исполнитель: @{username}\n"
+
+    import json
+    images = []
+    try:
+        if images_json:
+            images_list = json.loads(images_json)
+            if isinstance(images_list, list) and images_list:
+               images = images_list
+            elif isinstance(images_list, dict):
+               if images_list.get('main'):
+                   images.append(images_list['main'].get('file_id'))
+    except:
+        pass
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="➕ В корзину", callback_data=f"add_to_cart_service_{item_id}"))
+    
+    if is_new:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад к новинкам", callback_data="new_services"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+        
+    builder.adjust(1)
+    
+    try:
+        await callback.message.delete()
+    except:
+        pass
+        
+    if images and isinstance(images[0], str):
+        try:
+             await callback.message.answer_photo(
+                 photo=images[0],
+                 caption=text[:1024],
+                 reply_markup=builder.as_markup()
+             )
+        except Exception as e:
+             await callback.message.answer(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+        
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("item_offer_"))
+async def show_offer_details(callback: CallbackQuery):
+    """Показать детали предложения (из order_requests)"""
+    if await check_blocked_user(callback):
+        return
+
+    item_id = int(callback.data.split("_")[-1])
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("""
+            SELECT title, additional_info, price, category, contact, user_id, images
+            FROM order_requests 
+            WHERE id = ?
+        """, (item_id,))
+        item = await cursor.fetchone()
+
+    if not item:
+        await callback.answer("Предложение не найдено", show_alert=True)
+        return
+
+    title, description, price, category, contact, user_id, images_json = item
+    
+    # Пытаемся получить username
+    username = None
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
+        user_row = await cursor.fetchone()
+        if user_row:
+            username = user_row[0]
+
+    text = f"🤝 **{title}**\n\n"
+    text += f"Категория: {category or 'Общее'}\n"
+    text += f"Цена: {price if price else 'Договорная'}\n\n"
+    text += f"{description}\n\n"
+    
+    if contact:
+        text += f"📞 Контакт: {contact}\n"
+    if username:
+        text += f"👤 Пользователь: @{username}\n"
+
+    # Обработка изображений (если есть)
+    import json
+    images = []
+    try:
+        if images_json:
+            images_list = json.loads(images_json)
+            # Формат может быть разный, допустим это список file_id или dict
+            # В admin_order_processing сохраняется как JSON, но структура зависит от source
+            # В order_requests images часто сохранялись как list of strings
+            if isinstance(images_list, list) and images_list:
+               images = images_list
+            elif isinstance(images_list, dict):
+               # Если формат {main: ..., additional: ...}
+               if images_list.get('main'):
+                   images.append(images_list['main'].get('file_id'))
+    except:
+        pass
+
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="➕ В корзину", callback_data=f"add_to_cart_offer_{item_id}"))
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад к списку", callback_data="new_offers"))
+    builder.adjust(1)
+    
+    # Удаляем старое сообщение чтобы прислать новое с фото если есть
+    try:
+        await callback.message.delete()
+    except:
+        pass
+        
+    if images and isinstance(images[0], str):
+        # Отправляем с фото
+        try:
+             await callback.message.answer_photo(
+                 photo=images[0],
+                 caption=text[:1024], # Ограничение caption
+                 reply_markup=builder.as_markup()
+             )
+        except Exception as e:
+             # Если ошибка (например не тот file_id), шлем текст
+             print(f"Error sending photo for offer: {e}")
+             await callback.message.answer(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.answer(text, reply_markup=builder.as_markup())
+        
+    await callback.answer()

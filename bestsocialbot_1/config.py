@@ -9,6 +9,7 @@ CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/avto_avia_club")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 SHOWCASE_INTERVAL = int(os.getenv("SHOWCASE_INTERVAL", "21600"))
 CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "credentials.json")
+SHOWCASE_IMAGE_URL = os.getenv("SHOWCASE_IMAGE_URL", "https://i.postimg.cc/d3DLXMwT/social.jpg")
 
 TELETHON_API_ID = int(os.getenv("TELETHON_API_ID", "0"))
 TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", "")

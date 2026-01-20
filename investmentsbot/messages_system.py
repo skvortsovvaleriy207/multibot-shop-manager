@@ -53,7 +53,11 @@ async def messages_menu(callback: CallbackQuery):
     if unread_count > 0:
         text += f"\n\n🔔 У вас {unread_count} непрочитанных сообщений"
 
-    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    else:
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=builder.as_markup())
     await callback.answer()
 
 
@@ -339,8 +343,8 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
                 table_name = "product_views"
 
         message_text += f"   - Таблица: `{table_name}`\n\n"
-        message_text += f"**💬 SQL запрос для добавления:**\n"
-        message_text += f"```sql\nINSERT INTO {table_name} (name) VALUES ('{value}');\n```"
+        message_text += f"**⚙️ Управление:**\n"
+        message_text += f"Используйте **Админ Панель** -> **Магазин** -> **Каталог товаров** -> **{category_names.get(category_type, category_type).capitalize()}** для добавления.\n"
 
         # Сохраняем уведомление в БД для админа
         try:
@@ -372,7 +376,7 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
             print(f"❌ Ошибка отправки сообщения: {send_error}")
             # Отправляем напрямую
             try:
-                from dispatcher import bot
+                from bot_instance import bot
                 await bot.send_message(ADMIN_ID, message_text)
             except Exception as bot_error:
                 print(f"❌ Ошибка прямой отправки: {bot_error}")
@@ -523,8 +527,30 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
             """, (user_id, ADMIN_ID, subject, message_text, datetime.now().isoformat()))
             await db.commit()
 
-        # Отправляем через существующий функционал
-        await send_system_message(ADMIN_ID, subject, message_text)
+        # Формируем клавиатуру для админа
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(
+            text="✅ Одобрить",
+            callback_data=f"approve_req_{item_type}_{request_id}"
+        ))
+        builder.add(types.InlineKeyboardButton(
+            text="✏️ Редактировать",
+            callback_data=f"edit_req_{item_type}_{request_id}"
+        ))
+        builder.add(types.InlineKeyboardButton(
+            text="❌ Отклонить",
+            callback_data=f"reject_req_{item_type}_{request_id}"
+        ))
+        builder.adjust(2, 1)
+
+        # Отправляем через существующий функционал, но подменяем на прямую отправку для кнопок
+        # Так как send_system_message не поддерживает кнопки, отправляем напрямую ботом
+        from bot_instance import bot
+        await bot.send_message(
+            ADMIN_ID,
+            f"📧 **Новое сообщение**\n\n📋 **{subject}**\n\n{message_text}",
+            reply_markup=builder.as_markup()
+        )
 
         print(f"✅ Полная заявка #{request_id} отправлена админу для одобрения")
         return True

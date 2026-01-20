@@ -267,6 +267,8 @@ async def scheduled_activity_sync():
             
             logging.info("✅ Activity sync completed successfully")
                 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logging.error(f"Error in scheduled activity sync: {e}")
         

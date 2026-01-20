@@ -6,6 +6,10 @@ DB_FILE = "bot_database.db"
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
+            await db.execute("PRAGMA journal_mode=WAL")
+            await db.execute("PRAGMA synchronous=NORMAL")
+            await db.commit()
+            
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
@@ -44,9 +48,17 @@ async def init_db():
                     shop_id TEXT,
                     business TEXT,
                     products_services TEXT,
-                    account_status TEXT
+                    account_status TEXT,
+                    requests_text TEXT
                 )
             """)
+
+            # Проверка и добавление колонки requests_text если её нет (миграция)
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN requests_text TEXT")
+                print("Added column requests_text to users table")
+            except Exception:
+                pass # Колонка уже существует
 
             cursor = await db.execute("SELECT COUNT(*) FROM users")
             count = (await cursor.fetchone())[0]
@@ -60,14 +72,14 @@ async def init_db():
                         investor_trader, business_proposal, bonus_total, bonus_adjustment, current_balance, problem_cost,
                         notes, partnership_date, referral_count, referral_payment, subscription_date,
                         subscription_payment_date, purchases, sales, requisites, shop_id, business,
-                        products_services, account_status, first_name, last_name, has_completed_survey, created_at
+                        products_services, account_status, first_name, last_name, has_completed_survey, created_at, requests_text
                     ) VALUES (
                         'Дата опроса', 0, 'Telegram ID', 'ФИО', 'Дата рождения', 'Место жительства', 'Email', 'Телефон', 'Занятость',
                         'Финансовая проблема', 'Социальная проблема', 'Экологическая проблема', 'Пассивный подписчик', 'Активный партнер',
                         'Инвестор/трейдер', 'Бизнес-предложение', 0, 0, 0, 'Стоимость проблем',
                         'Примечания', 'Дата партнерства', 0, 'Оплата за рефералов', 'Дата подписки',
                         'Дата оплаты подписки', 'Покупки', 'Продажи', 'Реквизиты', 'ID в магазине', 'Бизнес',
-                        'Товары/услуги', 'Статус аккаунта', '', '', 0, datetime('now')
+                        'Товары/услуги', 'Статус аккаунта', '', '', 0, datetime('now'), '0 / 0'
                     )
                 """)
 
@@ -231,56 +243,22 @@ async def init_db():
             await db.execute("CREATE TABLE IF NOT EXISTS service_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS service_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS service_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS service_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS service_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
 
-            # Таблицы категорий для ПРЕДЛОЖЕНИЙ (Property/Offers)
-            await db.execute("CREATE TABLE IF NOT EXISTS property_purposes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
-            await db.execute("CREATE TABLE IF NOT EXISTS property_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
-            await db.execute("CREATE TABLE IF NOT EXISTS property_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
-            await db.execute("CREATE TABLE IF NOT EXISTS property_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
-            await db.execute("CREATE TABLE IF NOT EXISTS property_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            # Таблицы для предложений (Offers)
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_purposes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS offer_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             
             # Инициализация категорий товаров
-            cursor = await db.execute("SELECT COUNT(*) FROM product_purposes")
-            if (await cursor.fetchone())[0] == 0:
-                for p in ["Односемейный жилой дом", "Таунхаус", "Таунхаус и Дуплекс", "Кондоминиум", "Квартира", "Комната"]:
-                    await db.execute("INSERT INTO product_purposes (name) VALUES (?)", (p,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM product_types")
-            if (await cursor.fetchone())[0] == 0:
-                for t in ["Панельные", "Кирпичные", "Монолитные", "Кирпично-монолитные", "Иные"]:
-                    await db.execute("INSERT INTO product_types (name) VALUES (?)", (t,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM product_classes")
-            if (await cursor.fetchone())[0] == 0:
-                for c in ["Эконом", "Комфорт", "Бизнес", "Премиум/Элитные"]:
-                    await db.execute("INSERT INTO product_classes (name) VALUES (?)", (c,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM product_views")
-            if (await cursor.fetchone())[0] == 0:
-                for v in ["Коммунальная квартира", "Гостинка/Малосемейная", "Квартира-студия", "Евродвухкомнатная", "Трехкомнатная", "Многокомнатная", "Смарт-квартира", "Сталинка", "Хрущевка", "Другие"]:
-                    await db.execute("INSERT INTO product_views (name) VALUES (?)", (v,))
-            
+            # Инициализация категорий товаров
+            # Убрана предустановка жилищных категорий по запросу пользователя
+
             # Инициализация категорий услуг
-            cursor = await db.execute("SELECT COUNT(*) FROM service_purposes")
-            if (await cursor.fetchone())[0] == 0:
-                for p in ["Односемейный жилой дом", "Таунхаус", "Таунхаус и Дуплекс", "Кондоминиум", "Квартира", "Комната"]:
-                    await db.execute("INSERT INTO service_purposes (name) VALUES (?)", (p,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM service_types")
-            if (await cursor.fetchone())[0] == 0:
-                for t in ["Панельные", "Кирпичные", "Монолитные", "Кирпично-монолитные", "Иные"]:
-                    await db.execute("INSERT INTO service_types (name) VALUES (?)", (t,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM service_classes")
-            if (await cursor.fetchone())[0] == 0:
-                for c in ["Эконом", "Комфорт", "Бизнес", "Премиум/Элитные"]:
-                    await db.execute("INSERT INTO service_classes (name) VALUES (?)", (c,))
-            
-            cursor = await db.execute("SELECT COUNT(*) FROM service_views")
-            if (await cursor.fetchone())[0] == 0:
-                for v in ["Коммунальная квартира", "Гостинка/Малосемейная", "Квартира-студия", "Евродвухкомнатная", "Трехкомнатная", "Многокомнатная", "Смарт-квартира", "Сталинка", "Хрущевка", "Другие"]:
-                    await db.execute("INSERT INTO service_views (name) VALUES (?)", (v,))
+            # Убрана предустановка жилищных категорий по запросу пользователя
 
 
             # Добавляем новые столбцы для автомагазина
@@ -478,6 +456,39 @@ async def init_db():
                 )
             """)
 
+            # Таблица заявок на услуги (восстановлена для синхронизации)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS service_orders (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    operation TEXT,
+                    category TEXT,
+                    item_class TEXT,
+                    item_type TEXT,
+                    item_kind TEXT,
+                    title TEXT,
+                    works TEXT,
+                    materials TEXT,
+                    service_date TEXT,
+                    conditions TEXT,
+                    pricing TEXT,
+                    guarantees TEXT,
+                    additional_info TEXT,
+                    images TEXT,
+                    price TEXT,
+                    deadline TEXT,
+                    reviews TEXT,
+                    rating TEXT,
+                    supplier_info TEXT,
+                    statistics TEXT,
+                    tags TEXT,
+                    contact TEXT,
+                    status TEXT,
+                    created_at TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
             # Таблица категорий
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS categories (
@@ -489,6 +500,12 @@ async def init_db():
                     FOREIGN KEY(parent_id) REFERENCES categories(id)
                 )
             """)
+            
+            # Миграция: добавляем столбец catalog_type в categories, если его нет
+            try:
+                await db.execute("ALTER TABLE categories ADD COLUMN catalog_type TEXT DEFAULT 'product'")
+            except Exception:
+                pass
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS cart_order (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -499,20 +516,29 @@ async def init_db():
                     selected_options TEXT,
                     price TEXT,
                     added_at TEXT,
+                    source_table TEXT,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
-
-            # Обновленная таблица order_requests с новыми полями
+            
+            # Миграция: добавляем столбец source_table в cart_order, если его нет
             try:
-                await db.execute("ALTER TABLE order_requests ADD COLUMN deadline TEXT")
-            except:
-                pass  # Поле уже существует
+                await db.execute("ALTER TABLE cart_order ADD COLUMN source_table TEXT")
+            except Exception:
+                pass
 
-            try:
-                await db.execute("ALTER TABLE order_requests ADD COLUMN tags TEXT")
-            except:
-                pass  # Поле уже существует
+            # Обновленная таблица order_requests с новыми полями (Миграция)
+            new_request_columns = [
+                "deadline TEXT", "tags TEXT", "catalog_id TEXT", "service_date TEXT",
+                "works TEXT", "materials TEXT", "main_photo TEXT", "additional_photos TEXT",
+                "pricing TEXT", "guarantees TEXT", "conditions TEXT"
+            ]
+            
+            for col in new_request_columns:
+                try:
+                    await db.execute(f"ALTER TABLE order_requests ADD COLUMN {col}")
+                except Exception:
+                    pass
 
             # Таблица для разделов магазина
             await db.execute("""
@@ -527,6 +553,12 @@ async def init_db():
                 )
             """)
 
+            # Миграция: добавляем sub_category в shop_sections
+            try:
+                await db.execute("ALTER TABLE shop_sections ADD COLUMN sub_category TEXT")
+            except Exception:
+                pass
+
 
             await db.commit()
 
@@ -534,8 +566,7 @@ async def check_channel_subscription(bot, user_id: int, channel_id: int) -> bool
     try:
         member = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
         return member.status in ["member", "administrator", "creator"]
-    except Exception as e:
-        print(f"DEBUG: check_channel_subscription error: {e}")
+    except Exception:
         return False
 
 async def check_account_status(user_id: int) -> bool:

@@ -21,7 +21,7 @@ async def sync_products_to_sheet():
             spreadsheet = gc.open_by_url(AUTO_PRODUCTS_SHEET_URL)
             try:
                 sheet = spreadsheet.worksheet('Товары')
-            except:
+            except Exception:
                 sheet = spreadsheet.add_worksheet(title='Товары', rows=1000, cols=20)
         except Exception as e:
             print(f"Ошибка открытия таблицы товаров: {e}")
@@ -56,7 +56,7 @@ async def sync_products_to_sheet():
             try:
                 images = json.loads(product[10] or "[]")
                 images_count = len(images)
-            except:
+            except Exception:
                 pass
             
             row = [
@@ -105,7 +105,7 @@ async def sync_services_to_sheet():
             spreadsheet = gc.open_by_url(AUTO_SERVICES_SHEET_URL)
             try:
                 sheet = spreadsheet.worksheet('Услуги')
-            except:
+            except Exception:
                 sheet = spreadsheet.add_worksheet(title='Услуги', rows=1000, cols=20)
         except Exception as e:
             print(f"Ошибка открытия таблицы услуг: {e}")
@@ -137,7 +137,7 @@ async def sync_services_to_sheet():
             try:
                 images = json.loads(service[11] or "[]")
                 images_count = len(images)
-            except:
+            except Exception:
                 pass
             
             row = [
@@ -180,7 +180,7 @@ async def sync_orders_to_sheet():
             spreadsheet = gc.open_by_url(AUTO_ORDERS_SHEET_URL)
             try:
                 sheet = spreadsheet.worksheet('Заказы')
-            except:
+            except Exception:
                 sheet = spreadsheet.add_worksheet(title='Заказы', rows=1000, cols=20)
         except Exception as e:
             print(f"Ошибка открытия таблицы заказов: {e}")
@@ -446,10 +446,78 @@ async def instant_export_service(service_id: int):
     except Exception as e:
         print(f"❌ Ошибка мгновенной выгрузки услуги: {e}")
 
-async def instant_export_order(order_id: int):
-    """Мгновенная выгрузка заказа в Google Sheets"""
-    try:
-        await sync_orders_to_sheet()
-        print(f"✅ Заказ {order_id} мгновенно выгружен в Google Sheets")
     except Exception as e:
         print(f"❌ Ошибка мгновенной выгрузки заказа: {e}")
+
+async def export_request_to_sheet(request_id: int, item_type: str, catalog_id: int):
+    """Экспорт одобренной заявки в Google Sheets (Заявки)"""
+    try:
+        from config import SHEET_ORDERS
+        gc = get_google_sheets_client()
+        
+        # URL должен быть определен в config/google_sheets, но здесь используем общий URL
+        # Предполагаем, что SHEET_ORDERS - это имя листа в главной таблице опросов?
+        # Или отдельная таблица?
+        # По ТЗ "доп. гугл таблицу Заявки". Пусть это будет вкладка "Заявки" в таблице автомагазина
+        
+        if not AUTO_ORDERS_SHEET_URL:
+            # Fallback to survey sheet URL if orders sheet url is not set (unlikely)
+            print("Ошибка: AUTO_ORDERS_SHEET_URL не установлен.")
+            return False
+
+        try:
+            spreadsheet = gc.open_by_url(AUTO_ORDERS_SHEET_URL)
+            try:
+                sheet = spreadsheet.worksheet('Заявки')
+            except Exception:
+                sheet = spreadsheet.add_worksheet(title='Заявки', rows=1000, cols=20)
+        except Exception as e:
+            print(f"Ошибка открытия таблицы Заявок: {e}")
+            return False
+
+        headers = [
+            "ID заявки", "Дата одобрения", "Тип", "Название", "Описание",
+            "Цена", "Категория", "Класс", "Тип (Деталь)", "Вид",
+            "Telegram ID поставщика", "ID в каталоге", "Статус"
+        ]
+        
+        # Получаем данные заявки
+        table_name = "service_orders" if item_type == "service" else "order_requests"
+        
+        async with aiosqlite.connect("bot_database.db") as db:
+            cursor = await db.execute(f"SELECT * FROM {table_name} WHERE id = ?", (request_id,))
+            row = await cursor.fetchone()
+            columns = [description[0] for description in cursor.description]
+            data = dict(zip(columns, row))
+            
+        if not data:
+            return False
+
+        # Подготавливаем строку
+        row_values = [
+            data.get('id'),
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            item_type,
+            data.get('title'),
+            data.get('additional_info') or data.get('description', ''),
+            data.get('price'),
+            data.get('category'),
+            data.get('item_class'),
+            data.get('item_type_detail'),
+            data.get('item_kind'),
+            data.get('user_id'), # ID поставщика (автора заявки)
+            catalog_id,
+            "Одобрено"
+        ]
+        
+        # Если таблица пустая, добавляем заголовки
+        if not sheet.get_all_values():
+            sheet.append_row(headers)
+            
+        sheet.append_row(row_values)
+        print(f"✅ Заявка #{request_id} экспортирована в таблицу 'Заявки'")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Ошибка экспорта заявки в таблицу: {e}")
+        return False

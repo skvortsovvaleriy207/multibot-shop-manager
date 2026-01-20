@@ -230,6 +230,8 @@ async def scheduled_referral_sync():
             
             logging.info("✅ Referral sync completed successfully")
                 
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logging.error(f"Error in scheduled referral sync: {e}")
         

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL
+from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL, SHOWCASE_IMAGE_URL
 from db import init_db
 from dispatcher import dp
 from aiogram import types, F
@@ -10,16 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
 from bot_instance import bot
 from captcha import send_captcha, process_captcha_selection, CaptchaStates
-from google_sheets import sync_db_to_google_sheets, sync_db_to_main_survey_sheet, sync_with_google_sheets, sync_requests_from_sheets_to_db, sync_from_sheets_to_db
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
-# Debug handler to verify updates are received
-@dp.message(lambda message: print(f"DEBUG_LISTENER: Received message: {message.text} from {message.from_user.id}") or False)
-async def debug_listener(message: types.Message):
-    pass
-
+from google_sheets import sync_db_to_google_sheets, sync_db_to_main_survey_sheet, sync_with_google_sheets, sync_requests_from_sheets_to_db #, sync_from_sheets_to_db
 
 async def check_blocked_user(callback):
     """Проверка заблокированных пользователей"""
@@ -65,41 +56,25 @@ async def get_showcase_keyboard(user_id: int):
     return builder.as_markup()
 
 @dp.message(Command("start_shop"))
-async def cmd_start_shop(message: types.Message):
+async def cmd_start_shop(message: types.Message ):
     """Главная страница магазина (первый экран после входа)"""
 
-    user_id = message.from_user.id
+    user_id = message.chat.id
 
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT has_completed_survey, account_status FROM users WHERE user_id = ?", (user_id,))
-        row = await cursor.fetchone()
-        
-        if not row:
-            await message.answer("Пожалуйста, начните с команды /start.")
-            return
-
-        has_survey, status = row
-
-        if status == 'О':
-            await message.answer("Ваш аккаунт заблокирован администратором.")
-            return
-            
-        if not has_survey:
-            await message.answer("Для доступа к магазину необходимо пройти опрос.")
-            return
-
-    await sync_from_sheets_to_db()
+    # Sync not imported yet, do it in main flow or inside function
+    # await sync_from_sheets_to_db()
 
     builder = InlineKeyboardBuilder()
 
     # Основные разделы магазина
     builder.add(types.InlineKeyboardButton(text="📦 Каталоги", callback_data="all_catalogs"))
-    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="soon"))
-    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="soon"))
+    builder.add(types.InlineKeyboardButton(text="🏷️ Акции", callback_data="promotions_menu"))
+    builder.add(types.InlineKeyboardButton(text="📰 Новости", callback_data="news_menu"))
+    builder.add(types.InlineKeyboardButton(text="⭐ Популярное", callback_data="popular_menu"))
+    builder.add(types.InlineKeyboardButton(text="🆕 Новинки", callback_data="new_items"))
     builder.add(types.InlineKeyboardButton(text="👤 Личный кабинет", callback_data="personal_account"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop_back_to_showcase"))
-    builder.adjust(2, 1, 1, 1, 2, 1, 1)
+    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="exit_shop_menu"))
+    builder.adjust(2, 2, 2, 1)
 
     await message.answer(
         "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
@@ -113,9 +88,11 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     user_id = message.from_user.id
     print(f"DEBUG: /start command received from user_id={user_id}")
+    
     param=command.args
     if param=="shop":
         await cmd_start_shop(message)
+        return
     # Проверяем реферальную ссылку
     referrer_id = None
     if message.text and len(message.text.split()) > 1:
@@ -161,14 +138,21 @@ from orders import *
 from automarket_stats import *
 from plans_reports import *
 from daily_scheduler import start_daily_scheduler
-from aiogram.filters import CommandObject
+
 # Новые системы согласно ТЗ №2
 from referral_system import start_referral_system
 from activity_system import start_activity_system
 from initiatives_system import scheduled_initiatives_sync
 from user_interface import *
+try:
+    from table_links import *
+except ImportError as e:
+    logging.error(f"Error importing table_links: {e}")
 from order_request_system import *
-from admin_catalog_manager import *
+import admin_catalog_manager
+import admin_posts  # New module for admin content management
+import user_posts   # New module for user content viewing
+from admin_order_processing import *
 # Категории объединены в category_manager.py
 
 # Основные модули согласно ТЗ
@@ -351,8 +335,9 @@ async def main():
             for user_id, user_changes in changes.items():
                 if user_changes:
                     try:
-                        await send_user_notification(bot, user_id, user_changes)
-                        print(f"[NOTIFY] Уведомление отправлено пользователю {user_id}")
+                        # Отключаем уведомления при старте, чтобы не спамить при перезапусках
+                        # await send_user_notification(bot, user_id, user_changes)
+                        print(f"[NOTIFY] Обнаружены изменения профиля для {user_id}: {user_changes}")
                     except Exception as notify_error:
                         print(f"[ERROR] Ошибка отправки уведомления {user_id}: {notify_error}")
     except Exception as e:
@@ -431,7 +416,6 @@ async def main():
 
 
 
-
 async def send_showcase(chat_id: int):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT message_id FROM showcase_messages WHERE chat_id = ?", (chat_id,))
@@ -444,10 +428,16 @@ async def send_showcase(chat_id: int):
         await db.execute("DELETE FROM showcase_messages WHERE chat_id = ?", (chat_id,))
         await db.commit()
     
-    photo_url = "https://i.postimg.cc/T2thBcsP/photo-2025-08-01-21-47-44.jpg"
+
+    
+    # Получаем информацию о боте для формирования динамической ссылки
+    bot_info = await bot.get_me()
+    bot_username = bot_info.username
+
+    photo_url = SHOWCASE_IMAGE_URL
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Опрос", url="https://t.me/Better_House_Bot"))
-    builder.add(types.InlineKeyboardButton(text="Магазин", url="https://t.me/Better_House_Bot"))
+    builder.add(types.InlineKeyboardButton(text="Опрос", url=f"https://t.me/{bot_username}?start=survey"))
+    builder.add(types.InlineKeyboardButton(text="Магазин", url=f"https://t.me/{bot_username}?start=shop"))
     builder.adjust(2)
     
     message = await bot.send_photo(
@@ -559,6 +549,7 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
             attempt_count += 1
             print(f"DEBUG: Успешная попытка #{attempt_count}")
             if attempt_count < 3:
+                await callback.message.answer("✅ Вы выбрали правильный цвет!")
                 await state.update_data(captcha_attempt_count=attempt_count)
                 await send_captcha(callback.message, state)
             else:
@@ -595,17 +586,47 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
                             message=callback.message,
                             data="main_shop_page"
                         )
+                        # Fix identifying: Mount the fake callback to the bot instance
+                        if callback.bot:
+                            fake_callback.as_(callback.bot)
+                        
                         await main_shop_page(fake_callback)
                     else:
                         # Только теперь формируем клавиатуру
                         keyboard = await get_showcase_keyboard(user_id)
-                        await bot.send_message(callback.message.chat.id, "✅ Капча пройдена! Добро пожаловать!",
-                                               reply_markup=keyboard)
+                        
+                        try:
+                            # Попытка 1: через message.answer (самый стандартный способ)
+                            if callback.message:
+                                await callback.message.answer("✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
+                            else:
+                                raise Exception("Message object is missing")
+                        except Exception as e1:
+                            print(f"Failed to use message.answer: {e1}")
+                            # Попытка 2: через callback.bot (гарантированно привязанный бот)
+                            if callback.bot:
+                                await callback.bot.send_message(
+                                    chat_id=user_id,
+                                    text="✅ Капча пройдена! Добро пожаловать!",
+                                    reply_markup=keyboard
+                                )
+                            else:
+                                print("CRITICAL: callback.bot is None!")
+                                # Попытка 3: глобальный бот (крайний случай)
+                                from bot_instance import bot as global_bot
+                                await global_bot.send_message(user_id, "✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
+
                     print("SYNC CALL")
-                    from google_sheets import sync_db_to_google_sheets
-                    await sync_db_to_google_sheets()
+                    try:
+                        from google_sheets import sync_db_to_google_sheets
+                        await sync_db_to_google_sheets()
+                    except Exception as sync_e:
+                        print(f"⚠️ Warning: Background sync failed: {sync_e}")
+                        # Don't fail the user interaction because of background sync
                 except Exception as send_msg_error:
                     print(f"Ошибка при отправке сообщения: {send_msg_error}")
+                    import traceback
+                    traceback.print_exc()
         else:
             await state.update_data(captcha_attempt_count=0)
             await send_captcha(callback.message, state)
@@ -615,17 +636,25 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
             print(f"Ошибка при ответе на callback: {callback_answer_error}")
     except Exception as e:
         print(f"ОШИБКА в captcha_callback: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             await callback.answer("Произошла ошибка, попробуйте еще раз")
         except Exception as callback_answer_error:
             print(f"Ошибка при ответе на callback после исключения: {callback_answer_error}")
 async def periodic_showcase():
+    from aiogram.exceptions import TelegramBadRequest
     while True:
         try:
+            logging.info(f"Sending showcase to channel ID: {CHANNEL_ID}")
             await send_showcase(CHANNEL_ID)
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower():
+                 logging.error(f"CRITICAL ERROR: Channel {CHANNEL_ID} not found. Please check if the bot is added to the channel and is an admin.")
+            else:
+                 logging.error(f"Telegram error in periodic_showcase: {e}")
         except Exception as e:
             logging.error(f"Error in periodic_showcase: {e}")
         await asyncio.sleep(SHOWCASE_INTERVAL)
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())

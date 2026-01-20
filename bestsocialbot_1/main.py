@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL
+from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL, SHOWCASE_IMAGE_URL
 from db import init_db
 from dispatcher import dp
 from aiogram import types, F
@@ -434,7 +434,7 @@ async def send_showcase(chat_id: int):
     bot_info = await bot.get_me()
     bot_username = bot_info.username
 
-    photo_url = "https://i.postimg.cc/d3DLXMwT/social.jpg"
+    photo_url = SHOWCASE_IMAGE_URL
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="Опрос", url=f"https://t.me/{bot_username}?start=survey"))
     builder.add(types.InlineKeyboardButton(text="Магазин", url=f"https://t.me/{bot_username}?start=shop"))

@@ -4,17 +4,17 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-import re
 import aiosqlite
 import asyncio
+from integration import *
 from datetime import datetime
 from db import check_channel_subscription
-from config import CHANNEL_ID, ADMIN_ID
+from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
 from bot_instance import bot
 from filters import is_valid_email, is_valid_phone
 from utils import check_blocked_user
-from handler_integration import handle_wond_integration_callback, handle_autoavia_integration_callback
+from handler_integration import handle_besthome_integration_callback, handle_autoavia_integration_callback
 
 class SurveyStates(StatesGroup):
     START = State()
@@ -100,17 +100,25 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
 
     user_id = callback.from_user.id
 
-    is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
-    if not is_subscribed:
-        await callback.answer("Для прохождения опроса необходимо подписаться на наш канал.", show_alert=True)
-        return
+    # is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
+    # if not is_subscribed:
+    #    builder = InlineKeyboardBuilder()
+    #    builder.add(types.InlineKeyboardButton(text="Подписаться", url=CHANNEL_URL))
+    #    builder.add(types.InlineKeyboardButton(text="Я подписался", callback_data="start_survey"))
+    #    builder.adjust(1)
+    #    await callback.message.answer("Для прохождения опроса необходимо подписаться на наш канал.", reply_markup=builder.as_markup())
+    #    await callback.answer()
+    #    return
 
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
         user = await cursor.fetchone()
 
         if user and user[0] == 1:
-            await callback.answer("Вы уже проходили опрос.", show_alert=True)
+            try:
+                await callback.answer("Вы уже проходили опрос.", show_alert=True)
+            except Exception:
+                pass
             return
 
     builder = InlineKeyboardBuilder()
@@ -146,6 +154,11 @@ async def check_bad_words(message: Message, state: FSMContext) -> bool:
 @dp.message(SurveyStates.Q1)
 async def process_q1(message: Message, state: FSMContext):
     if await check_bad_words(message, state):
+        return
+    try:
+        datetime.strptime(message.text, "%y-%m-%d")
+    except ValueError:
+        await message.answer("Пожалуйста, введите дату в формате ГГ-ММ-ДД (например, 90-05-15)")
         return
 
     if len(message.text) > 150:
@@ -201,11 +214,6 @@ async def process_q4(message: Message, state: FSMContext):
         await message.answer("Ответ должен содержать не более 150 символов.")
         return
 
-    pattern = r'^[a-zA-Zа-яА-ЯёЁ\s]+$'
-    if not bool(re.match(pattern, message.text)):
-        await message.answer("Ответ должен только буквы.")
-        return
-
     await state.update_data(q4=message.text)
     await message.answer(SURVEY_QUESTIONS[5])
     await state.set_state(SurveyStates.Q5)
@@ -213,6 +221,11 @@ async def process_q4(message: Message, state: FSMContext):
 @dp.message(SurveyStates.Q5)
 async def process_q5(message: Message, state: FSMContext):
     if await check_bad_words(message, state):
+        return
+    try:
+        datetime.strptime(message.text, "%y-%m-%d")
+    except ValueError:
+        await message.answer("Пожалуйста, введите дату в формате ГГ-ММ-ДД (например, 90-05-15)")
         return
 
     if len(message.text) > 150:
@@ -357,9 +370,6 @@ async def process_q15(message: Message, state: FSMContext):
 async def process_q16(message: Message, state: FSMContext):
     if await check_bad_words(message, state):
         return
-    if len(message.text) > 150:
-        await message.answer("Ответ должен содержать не более 150 символов.")
-        return
 
     user_id = message.from_user.id
     await state.update_data(q16=message.text)
@@ -438,12 +448,12 @@ async def process_q16(message: Message, state: FSMContext):
     )
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="Финансы/Доходы",
-        callback_data="handle_wond_integration"
+        text="Дом/Жилье",
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника",
-        callback_data="handle_autoavia_integration"
+        callback_data="handle_autoavia_integration_callback"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Здоровье/Медицина",
@@ -463,7 +473,7 @@ async def process_q16(message: Message, state: FSMContext):
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurSocialBot"
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",
@@ -509,12 +519,14 @@ async def process_q16(message: Message, state: FSMContext):
         text="выход из чат-бота",
         url="https://t.me/+vz7-Ko4rDy03Yjhi"
     ))
-    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1, 1)
+
+
+    builder.adjust(1, 1, 1)
 
 
 
     await message.answer(
-        text="Вы можете выбрать кнопку меню по теме вашей проблемы и перейти в чат-бот вашего целевого сообщества:",
+        text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
         reply_markup=builder.as_markup()
     )
 
@@ -529,12 +541,12 @@ from dispatcher import dp
 async def end_surrey(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="Финансы/Доходы",
-        callback_data="handle_wond_integration"
+        text="Дом/Жилье",
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Автотехника",
-        callback_data="handle_autoavia_integration"
+        text="Автотехника ",
+        callback_data="handle_autoavia_integration_callback"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Здоровье/Медицина",
@@ -554,7 +566,7 @@ async def end_surrey(callback: CallbackQuery):
     ))
     builder.add(types.InlineKeyboardButton(
         text="Бизнес/Партнерство",
-        url="https://t.me/OurSocialBot"
+        url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Образование/Профессия",
@@ -600,18 +612,19 @@ async def end_surrey(callback: CallbackQuery):
         text="выход из чат-бота",
         url="https://t.me/+vz7-Ko4rDy03Yjhi"
     ))
-    builder.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1, 1)
+
+    builder.adjust(1, 1, 1)
 
     if callback.message.caption is not None:
 
         await callback.message.edit_caption(
-            caption="Вы можете выбрать кнопку меню по теме вашей проблемы и перейти в чат-бот вашего целевого сообщества:",
+            caption="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
             reply_markup=builder.as_markup()
         )
     else:
 
         await callback.message.edit_text(
-            text="Вы можете выбрать кнопку меню по теме вашей проблемы и перейти в чат-бот вашего целевого сообщества:",
+            text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
             reply_markup=builder.as_markup()
         )
     await callback.answer()
@@ -650,23 +663,16 @@ async def links(callback: CallbackQuery, name_bot, url_bot, url_chanel, url_grou
         )
     await callback.answer()
 
-@dp.callback_query(F.data == "finance_links")
-async def finance_links(callback: CallbackQuery):
+@dp.callback_query(F.data == "besthome_links")
+async def besthome_links(callback: CallbackQuery):
 
     text = "выберите кнопку для перехода:"
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="чат-бот Wond",
-        callback_data=f"handle_wond_integration"
+        text="чат-бот BestHome",
+        callback_data=f"handle_besthome_integration_callback"
     ))
-    builder.add(types.InlineKeyboardButton(
-        text="канал",
-        url="https://t.me/+-Vb_fN2PDl1jYmMy"
-    ))
-    builder.add(types.InlineKeyboardButton(
-        text="группа",
-        url="https://t.me/+rxHACf-jbW45MzAy"
-    ))
+
     builder.add(types.InlineKeyboardButton(
         text="назад",
         callback_data="end_surrey"
@@ -690,7 +696,7 @@ async def automotive_equipment_links(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="чат-бот Auto7bot",
-        callback_data=f"handle_autoavia_integration"
+        callback_data=f"handle_autoavia_integration_callback"
     ))
     builder.add(types.InlineKeyboardButton(
         text="канал",

@@ -132,24 +132,30 @@ async def sync_proposal_statuses():
                     status = row[status_col]
                     
                     if user_id and status and status in PROPOSAL_STATUSES:
-                        # Обновляем статус в БД
-                        await db.execute(
-                            "UPDATE users SET proposal_status = ? WHERE user_id = ?",
-                            (status, int(user_id))
-                        )
+                        # Получаем текущий статус
+                        cursor = await db.execute("SELECT proposal_status FROM users WHERE user_id = ?", (int(user_id),))
+                        current_status_row = await cursor.fetchone()
+                        current_status = current_status_row[0] if current_status_row else None
                         
-                        # Уведомляем пользователя об изменении статуса
-                        try:
-                            message = f"""
+                        # Если статус изменился, обновляем и уведомляем
+                        if current_status != status:
+                            await db.execute(
+                                "UPDATE users SET proposal_status = ? WHERE user_id = ?",
+                                (status, int(user_id))
+                            )
+                            
+                            # Уведомляем пользователя об изменении статуса
+                            try:
+                                message = f"""
 📋 **Обновление статуса вашей инициативы**
 
 Статус изменен на: **{status}**
 
 Следите за обновлениями в личном кабинете.
-                            """
-                            await bot.send_message(int(user_id), message)
-                        except:
-                            pass
+                                """
+                                await bot.send_message(int(user_id), message)
+                            except Exception:
+                                pass
             
             await db.commit()
         

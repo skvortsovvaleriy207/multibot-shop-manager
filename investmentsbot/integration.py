@@ -9,13 +9,13 @@ from config import BESTHOME_SURVEY_SHEET_URL, WOND_SURVEY_SHEET_URL, AUTO_SURVEY
 class GoogleSheetsIntegrator:
     """Класс для интеграции данных только между Google Sheets разных ботов"""
 
-    def __init__(self, source_bot: str = "besthome"):
+    def __init__(self, source_bot: str = "wond"):
         self.source_bot = source_bot
         self.client = gspread.service_account(filename=CREDENTIALS_FILE)
 
-    async def integrate_to_wond_sheets_only(self, user_id: int) -> Dict[str, Any]:
+    async def integrate_to_besthome_sheets_only(self, user_id: int) -> Dict[str, Any]:
         """
-        Интегрирует данные пользователя только в Google Sheets бота Wond
+        Интегрирует данные пользователя только в Google Sheets бота besthome
 
         Args:
             user_id: ID пользователя
@@ -31,34 +31,34 @@ class GoogleSheetsIntegrator:
                 return {
                     "success": False,
                     "message": "Пользователь не найден в таблице besthome",
-                    "target_bot": "wond"
+                    "target_bot": "besthome"
                 }
 
-            # Записываем данные в таблицу Wond
-            sheets_success = await self._write_to_target_sheets(user_data, "wond")
+            # Записываем данные в таблицу besthome
+            sheets_success = await self._write_to_target_sheets(user_data, "besthome")
 
             if sheets_success:
                 return {
                     "success": True,
-                    "message": "Данные успешно интегрированы в Google Sheets бота Wond",
+                    "message": "Данные успешно интегрированы в Google Sheets бота besthome",
                     "user_id": user_id,
-                    "target_bot": "wond",
+                    "target_bot": "besthome",
                     "sheets_sync": True
                 }
             else:
                 return {
                     "success": False,
-                    "message": "Ошибка интеграции в Google Sheets бота Wond",
-                    "target_bot": "wond",
+                    "message": "Ошибка интеграции в Google Sheets бота besthome",
+                    "target_bot": "besthome",
                     "sheets_sync": False
                 }
 
         except Exception as e:
-            logging.error(f"Ошибка интеграции в Wond Sheets: {e}")
+            logging.error(f"Ошибка интеграции в besthome Sheets: {e}")
             return {
                 "success": False,
                 "message": f"Ошибка интеграции: {str(e)}",
-                "target_bot": "wond"
+                "target_bot": "besthome"
             }
 
     async def integrate_to_autoavia_sheets_only(self, user_id: int) -> Dict[str, Any]:
@@ -78,7 +78,7 @@ class GoogleSheetsIntegrator:
             if not user_data:
                 return {
                     "success": False,
-                    "message": "Пользователь не найден в таблице besthome",
+                    "message": "Пользователь не найден в таблице wond",
                     "target_bot": "autoavia"
                 }
 
@@ -120,8 +120,21 @@ class GoogleSheetsIntegrator:
             dict: Данные пользователя или пустой словарь если не найден
         """
         try:
-            # Открываем таблицу besthome
-            spreadsheet = self.client.open_by_url(BESTHOME_SURVEY_SHEET_URL)
+            # Определяем URL исходной таблицы
+            source_url = None
+            if self.source_bot == "wond":
+                source_url = WOND_SURVEY_SHEET_URL
+            elif self.source_bot == "besthome":
+                source_url = BESTHOME_SURVEY_SHEET_URL
+            elif self.source_bot == "autoavia":
+                source_url = AUTO_SURVEY_SHEET_URL
+            
+            if not source_url:
+                logging.error(f"Неизвестный исходный бот или URL: {self.source_bot}")
+                return {}
+
+            # Открываем исходную таблицу
+            spreadsheet = self.client.open_by_url(source_url)
             worksheet = spreadsheet.worksheet("Основная таблица")
 
             # Получаем все данные
@@ -163,15 +176,15 @@ class GoogleSheetsIntegrator:
 
         Args:
             user_data: Данные пользователя из исходной таблицы
-            target_bot: Название целевого бота ('wond' или 'autoavia')
+            target_bot: Название целевого бота ('besthome' или 'autoavia')
 
         Returns:
             bool: Успешность записи
         """
         try:
             # Определяем URL целевой таблицы
-            if target_bot == "wond":
-                sheet_url = WOND_SURVEY_SHEET_URL
+            if target_bot == "besthome":
+                sheet_url = BESTHOME_SURVEY_SHEET_URL
             elif target_bot == "autoavia":
                 sheet_url = AUTO_SURVEY_SHEET_URL
             else:
@@ -293,13 +306,13 @@ class GoogleSheetsIntegrator:
 
 
 # Функции для использования в боте bestHome
-async def integrate_user_to_wond_sheets_only(user_id: int) -> Dict[str, Any]:
-    """Интегрирует пользователя только в Google Sheets бота Wond"""
-    integrator = GoogleSheetsIntegrator("besthome")
-    return await integrator.integrate_to_wond_sheets_only(user_id)
+async def integrate_user_to_besthome_sheets_only(user_id: int) -> Dict[str, Any]:
+    """Интегрирует пользователя только в Google Sheets бота besthome"""
+    integrator = GoogleSheetsIntegrator("wond")
+    return await integrator.integrate_to_besthome_sheets_only(user_id)
 
 
 async def integrate_user_to_autoavia_sheets_only(user_id: int) -> Dict[str, Any]:
     """Интегрирует пользователя только в Google Sheets бота Autoavia"""
-    integrator = GoogleSheetsIntegrator("besthome")
+    integrator = GoogleSheetsIntegrator("wond")
     return await integrator.integrate_to_autoavia_sheets_only(user_id)

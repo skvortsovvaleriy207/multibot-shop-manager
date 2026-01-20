@@ -15,8 +15,7 @@ SHEET_INVITES = "Инвайты"
 SHEET_REFERRALS = "Рефералы"
 SHEET_PRODUCTS = "Товары"
 SHEET_SERVICES = "Услуги"
-SHEET_ORDERS = "Заявки"
-SHEET_REAL_ORDERS = "Заказы"
+SHEET_ORDERS = "Заявки"  # Лист для заявки (ранее Заказы)
 
 
 def get_google_sheets_client():
@@ -112,57 +111,84 @@ async def sync_with_google_sheets():
             db_user_ids = {user[0] for user in db_users}
             db_user_survey_status = {user[0]: user[1] for user in db_users}
             changes = defaultdict(dict)
+            # Дедупликация данных из Google Sheets
+            unique_rows = {}
             for row in gsheet_data:
+                user_id_raw = row.get('Telegram ID') or row.get('User ID')
+                if not user_id_raw or str(user_id_raw).strip() == '':
+                    continue
                 try:
-                    user_id_raw = row.get('Telegram ID') or row.get('User ID')
-                    if not user_id_raw or str(user_id_raw).strip() == '':
-                        continue  # пропускать строки без ID
-                    user_id = int(user_id_raw)
-                    cursor = await db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-                    db_user = await cursor.fetchone()
-                    if db_user:
-                        db_fields = {
-                            'username': db_user[1],
-                            'full_name': db_user[7],
-                            'birth_date': db_user[8],
-                            'location': db_user[9],
-                            'email': db_user[10],
-                            'phone': db_user[11],
-                            'employment': db_user[12],
-                            'financial_problem': db_user[13],
-                            'social_problem': db_user[14],
-                            'ecological_problem': db_user[15],
-                            'passive_subscriber': db_user[16],
-                            'active_partner': db_user[17],
-                            'investor_trader': db_user[18],
-                            'business_proposal': db_user[19],
-                            'bonus_total': db_user[20],
-                            'current_balance': db_user[22]
-                        }
-                        gsheet_fields = {
-                            'username': row.get('Username', ''),
-                            'full_name': row.get('ФИО', ''),
-                            'birth_date': row.get('Дата рождения', ''),
-                            'location': row.get('Место жительства', ''),
-                            'email': row.get('Email', ''),
-                            'phone': row.get('Телефон', ''),
-                            'employment': row.get('Занятость', ''),
-                            'financial_problem': row.get('Финансовая проблема', ''),
-                            'social_problem': row.get('Социальная проблема', ''),
-                            'ecological_problem': row.get('Экологическая проблема', ''),
-                            'passive_subscriber': row.get('Пассивный подписчик', ''),
-                            'active_partner': row.get('Активный партнер', ''),
-                            'investor_trader': row.get('Инвестор/трейдер', ''),
-                            'business_proposal': row.get('Бизнес-предложение', ''),
-                            'bonus_total': float(row.get('Сумма бонусов') or 0),
-                            'current_balance': float(row.get('Текущий баланс') or 0)
-                        }
-                        for field in gsheet_fields:
-                            if str(db_fields[field]) != str(gsheet_fields[field]):
-                                changes[user_id][field] = {
-                                    'old': db_fields[field],
-                                    'new': gsheet_fields[field]
-                                }
+                    user_id = int(str(user_id_raw).strip())
+                    unique_rows[user_id] = row
+                except ValueError:
+                    continue
+            
+            for user_id, row in unique_rows.items():
+                cursor = await db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+                db_user = await cursor.fetchone()
+                
+                if db_user:
+                    db_fields = {
+                        'username': str(db_user[1] or '').strip(),
+                        'full_name': str(db_user[7] or '').strip(),
+                        'birth_date': str(db_user[8] or '').strip(),
+                        'location': str(db_user[9] or '').strip(),
+                        'email': str(db_user[10] or '').strip(),
+                        'phone': str(db_user[11] or '').strip(),
+                        'employment': str(db_user[12] or '').strip(),
+                        'financial_problem': str(db_user[13] or '').strip(),
+                        'social_problem': str(db_user[14] or '').strip(),
+                        'ecological_problem': str(db_user[15] or '').strip(),
+                        'passive_subscriber': str(db_user[16] or '').strip(),
+                        'active_partner': str(db_user[17] or '').strip(),
+                        'investor_trader': str(db_user[18] or '').strip(),
+                        'business_proposal': str(db_user[19] or '').strip(),
+                        'bonus_total': float(db_user[20] or 0),
+                        'current_balance': float(db_user[22] or 0)
+                    }
+                    
+                    gsheet_fields = {
+                        'username': str(row.get('Username', '')).strip(),
+                        'full_name': str(row.get('ФИО', '')).strip(),
+                        'birth_date': str(row.get('Дата рождения', '')).strip(),
+                        'location': str(row.get('Место жительства', '')).strip(),
+                        'email': str(row.get('Email', '')).strip(),
+                        'phone': str(row.get('Телефон', '')).strip(),
+                        'employment': str(row.get('Занятость', '')).strip(),
+                        'financial_problem': str(row.get('Финансовая проблема', '')).strip(),
+                        'social_problem': str(row.get('Социальная проблема', '')).strip(),
+                        'ecological_problem': str(row.get('Экологическая проблема', '')).strip(),
+                        'passive_subscriber': str(row.get('Пассивный подписчик', '')).strip(),
+                        'active_partner': str(row.get('Активный партнер', '')).strip(),
+                        'investor_trader': str(row.get('Инвестор/трейдер', '')).strip(),
+                        'business_proposal': str(row.get('Бизнес-предложение', '')).strip(),
+                        'bonus_total': _safe_float(row.get('Сумма бонусов', 0)),
+                        'current_balance': _safe_float(row.get('Текущий баланс', 0))
+                    }
+
+                    for field in gsheet_fields:
+                        val_db = db_fields[field]
+                        val_sheet = gsheet_fields[field]
+                        
+                        # Сравнение с учетом типов
+                        is_diff = False
+                        if isinstance(val_db, float) or isinstance(val_sheet, float):
+                             try:
+                                 if abs(float(val_db) - float(val_sheet)) > 0.01:
+                                     is_diff = True
+                             except:
+                                 if str(val_db) != str(val_sheet):
+                                     is_diff = True
+                        else:
+                            if str(val_db) != str(val_sheet):
+                                is_diff = True
+                                
+                        if is_diff:
+                            changes[user_id][field] = {
+                                'old': val_db,
+                                'new': val_sheet
+                            }
+                try:
                     has_completed_survey = db_user_survey_status.get(user_id, 0)
                     user_data = {
                         "user_id": user_id,
@@ -194,13 +220,24 @@ async def sync_with_google_sheets():
                     columns = ", ".join(user_data.keys())
                     placeholders = ", ".join([f":{key}" for key in user_data.keys()])
                     await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
-                    await db.execute(
-                        """
-                        INSERT OR REPLACE INTO user_bonuses 
-                        (user_id, bonus_total, current_balance, updated_at)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
+                    cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
+                    bonus_record = await cursor.fetchone()
+                    if bonus_record:
+                        await db.execute(
+                            """
+                            UPDATE user_bonuses 
+                            SET bonus_total = ?, current_balance = ?, updated_at = ?
+                            WHERE user_id = ?
+                            """,
+                            (user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"], user_id))
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO user_bonuses 
+                            (user_id, bonus_total, current_balance, updated_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
                     print(f"[SYNC] Добавлен/обновлён user_id: {user_id}, username: {user_data.get('username', '')}")
                 except Exception as e:
                     logging.error(f"Error processing row {row}: {e}")
@@ -217,6 +254,10 @@ async def sync_with_google_sheets():
 
 async def sync_db_to_google_sheets():
     try:
+        # Сначала агрегируем статистику
+        from data_aggregator import aggregate_user_statistics
+        await aggregate_user_statistics()
+
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
         sheet = spreadsheet.worksheet(SHEET_MAIN)
@@ -247,10 +288,11 @@ async def sync_db_to_google_sheets():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
-                    u.referral_count,
-                    u.referral_payment,
+                    COALESCE(u.total_referrals, u.referral_count, 0) as referral_count,
+                    COALESCE(u.referral_earnings, u.referral_payment, 0) as referral_payment,
                     u.subscription_date,
-                    u.subscription_payment_date,
+                    u.subscription_date,
+                    u.requests_text,
                     u.purchases,
                     u.sales,
                     u.requisites,
@@ -637,140 +679,85 @@ async def sync_order_requests_to_sheets():
 
         # Создаем или получаем лист для заявок
         try:
-            orders_sheet = spreadsheet.worksheet(SHEET_ORDERS)
-            print(f"✅ Лист '{SHEET_ORDERS}' найден")
+            orders_sheet = spreadsheet.worksheet("Заявки")
+            print(f"✅ Лист 'Заявки' найден")
 
             # Получаем заголовки и проверяем их
-            existing_headers = orders_sheet.row_values(1)
-            if not existing_headers:
-                headers = [
-                    "ID заявки", "Дата создания", "ID пользователя", "Username", "Операция",
-                    "Тип заявки", "Категория", "Класс", "Тип", "Вид",
-                    "Название", "Назначение", "Имя", "Дата создания товара", "Состояние",
-                    "Спецификации", "Преимущества", "Доп. информация", "Изображения", "Цена",
-                    "Наличие", "Подробные характеристики", "Отзывы", "Рейтинг",
-                    "Информация о доставке", "Информация о поставщике", "Статистика",
-                    "Сроки", "Теги", "Контакты", "Статус"
-                ]
-                orders_sheet.update('A1', [headers])
-                print("✅ Восстановлены заголовки таблицы")
+            orders_sheet.update('A1', [[
+                "ID заказа", "Дата заказа", "Тип заказа", "ID товара/услуги", "Название",
+                "Telegram ID покупателя", "Username покупателя", "Telegram ID продавца", "Username продавца",
+                "Статус заказа", "Цена", "Примечания"
+            ]])
+            print("✅ Заголовки таблицы обновлены")
         except Exception as e:
-            orders_sheet = spreadsheet.add_worksheet(title=SHEET_ORDERS, rows=1000, cols=31)
+            orders_sheet = spreadsheet.add_worksheet(title="Заявки", rows=1000, cols=12)
             headers = [
-                "ID заявки", "Дата создания", "ID пользователя", "Username", "Операция",
-                "Тип заявки", "Категория", "Класс", "Тип", "Вид",
-                "Название", "Назначение", "Имя", "Дата создания товара", "Состояние",
-                "Спецификации", "Преимущества", "Доп. информация", "Изображения", "Цена",
-                "Наличие", "Подробные характеристики", "Отзывы", "Рейтинг",
-                "Информация о доставке", "Информация о поставщике", "Статистика",
-                "Сроки", "Теги", "Контакты", "Статус"
+                "ID заказа", "Дата заказа", "Тип заказа", "ID товара/услуги", "Название",
+                "Telegram ID покупателя", "Username покупателя", "Telegram ID продавца", "Username продавца",
+                "Статус заказа", "Цена", "Примечания"
             ]
-            orders_sheet.update('A1:AE1', [headers])
-            print(f"✅ Создан новый лист '{SHEET_ORDERS}' с заголовками")
+            orders_sheet.update('A1', [headers])
+            print(f"✅ Создан новый лист 'Заявки' с заголовками")
             existing_headers = headers
 
         # Получаем все данные из базы данных для товаров и предложений
         all_requests = []
 
         async with aiosqlite.connect("bot_database.db") as db:
-            # 1. Получаем заявки на товары и предложения из order_requests
+            # 1. Получаем заявки на товары и предложения
             cursor = await db.execute("""
                 SELECT 
-                    r.id as request_id,  -- БЕЗ префикса 'P'
-                    r.created_at, 
-                    r.user_id, 
-                    COALESCE(u.username, 'Не указан'),
-                    CASE 
-                        WHEN r.operation = 'buy' THEN 'Купить'
-                        WHEN r.operation = 'sell' THEN 'Продать'
-                        ELSE r.operation
-                    END as operation,
+                    'P' || r.id as order_id,
+                    r.created_at as order_date,
                     CASE 
                         WHEN r.item_type = 'product' THEN 'Товар'
                         WHEN r.item_type = 'offer' THEN 'Предложение'
+                        WHEN r.item_type = 'cart_order' THEN 'Заказ из корзины'
                         ELSE r.item_type
-                    END as item_type,
-                    COALESCE(r.category, ''),
-                    COALESCE(r.item_class, ''),
-                    COALESCE(r.item_type_detail, ''),
-                    COALESCE(r.item_kind, ''),
-                    COALESCE(r.title, 'Без названия'),
-                    COALESCE(r.purpose, ''),
-                    COALESCE(r.name, ''),
-                    COALESCE(r.creation_date, ''),
-                    COALESCE(r.condition, ''),
-                    COALESCE(r.specifications, ''),
-                    COALESCE(r.advantages, ''),
-                    COALESCE(r.additional_info, ''),
-                    COALESCE(r.images, ''),
-                    COALESCE(r.price, '0'),
-                    COALESCE(r.availability, ''),
-                    COALESCE(r.detailed_specs, ''),
-                    COALESCE(r.reviews, ''),
-                    COALESCE(r.rating, ''),
-                    COALESCE(r.delivery_info, ''),
-                    COALESCE(r.supplier_info, ''),
-                    COALESCE(r.statistics, ''),
-                    COALESCE(r.deadline, ''),
-                    COALESCE(r.tags, ''),
-                    COALESCE(r.contact, ''),
+                    END as order_type,
+                    COALESCE(r.id, '') as item_id,
+                    COALESCE(r.title, 'Без названия') as title,
+                    r.user_id as buyer_id,
+                    COALESCE(u.username, 'Не указан') as buyer_username,
+                    '' as seller_id, -- Пока нет данных о продавце в order_requests
+                    '' as seller_username, -- Пока нет данных
                     CASE 
-                        WHEN r.status = 'new' THEN 'Новая'
-                        WHEN r.status = 'active' THEN 'Активная'
-                        WHEN r.status = 'completed' THEN 'Завершена'
+                        WHEN r.status = 'new' THEN 'Новый'
+                        WHEN r.status = 'active' THEN 'Активен'
+                        WHEN r.status = 'completed' THEN 'Завершен'
                         ELSE r.status
-                    END as status
+                    END as status,
+                    COALESCE(r.price, '0') as price,
+                    COALESCE(r.additional_info, '') as notes
                 FROM order_requests r
                 LEFT JOIN users u ON r.user_id = u.user_id
-                WHERE r.item_type IN ('product', 'offer')
+                WHERE r.item_type IN ('product', 'offer', 'cart_order')
                 ORDER BY r.id ASC
             """)
             product_requests = await cursor.fetchall()
+            print(f"[DEBUG] Найдено {len(product_requests)} заявок для выгрузки (включая корзину)")
             all_requests.extend(product_requests)
 
-            # 2. Получаем заявки на услуги из service_orders
+            # 2. Получаем заявки на услуги
             cursor = await db.execute("""
                 SELECT 
-                    s.id as request_id,  -- БЕЗ префикса 'S'
-                    s.created_at, 
-                    s.user_id, 
-                    COALESCE(u.username, 'Не указан'),
+                    'S' || s.id as order_id,
+                    s.created_at as order_date,
+                    'Услуга' as order_type,
+                    COALESCE(s.id, '') as item_id,
+                    COALESCE(s.title, 'Без названия') as title,
+                    s.user_id as buyer_id,
+                    COALESCE(u.username, 'Не указан') as buyer_username,
+                    '' as seller_id,
+                    '' as seller_username,
                     CASE 
-                        WHEN s.operation = 'buy' THEN 'Заказать услугу'
-                        WHEN s.operation = 'sell' THEN 'Предложить услугу'
-                        ELSE s.operation
-                    END as operation,
-                    'Услуга' as item_type,
-                    COALESCE(s.category, ''),
-                    COALESCE(s.item_class, ''),
-                    COALESCE(s.item_type, ''),
-                    COALESCE(s.item_kind, ''),
-                    COALESCE(s.title, 'Без названия'),
-                    COALESCE(s.works, ''), -- Назначение (используем works)
-                    COALESCE(s.materials, ''), -- Имя (используем materials)
-                    COALESCE(s.service_date, ''), -- Дата создания товара
-                    COALESCE(s.conditions, ''), -- Состояние (используем conditions)
-                    COALESCE(s.pricing, ''), -- Спецификации (используем pricing)
-                    COALESCE(s.guarantees, ''), -- Преимущества (используем guarantees)
-                    COALESCE(s.additional_info, ''), -- Доп. информация
-                    COALESCE(s.images, ''),
-                    COALESCE(s.price, '0'),
-                    COALESCE(s.deadline, ''), -- Наличие (используем deadline)
-                    '', -- Подробные характеристики (пусто для услуг)
-                    COALESCE(s.reviews, ''),
-                    COALESCE(s.rating, ''),
-                    '', -- Информация о доставке (пусто для услуг)
-                    COALESCE(s.supplier_info, ''),
-                    COALESCE(s.statistics, ''),
-                    COALESCE(s.deadline, ''), -- Сроки
-                    COALESCE(s.tags, ''),
-                    COALESCE(s.contact, ''),
-                    CASE 
-                        WHEN s.status = 'new' THEN 'Новая'
-                        WHEN s.status = 'active' THEN 'Активная'
-                        WHEN s.status = 'completed' THEN 'Завершена'
+                        WHEN s.status = 'new' THEN 'Новый'
+                        WHEN s.status = 'active' THEN 'Активен'
+                        WHEN s.status = 'completed' THEN 'Завершен'
                         ELSE s.status
-                    END as status
+                    END as status,
+                    COALESCE(s.price, '0') as price,
+                    COALESCE(s.additional_info, '') as notes
                 FROM service_orders s
                 LEFT JOIN users u ON s.user_id = u.user_id
                 ORDER BY s.id ASC
@@ -783,143 +770,37 @@ async def sync_order_requests_to_sheets():
         print(f"   • Услуги: {len(service_requests)}")
 
         # Получаем текущие данные из Google Sheets
-        existing_data = orders_sheet.get_all_values()
-
-        if len(existing_data) <= 1:  # Только заголовки или пустая таблица
-            if all_requests:
-                # Преобразуем данные в правильный формат
-                all_data_formatted = [list(req) for req in all_requests]
-                # Сохраняем заголовки и добавляем все данные
-                headers = existing_headers if existing_data else [
-                    "ID заявки", "Дата создания", "ID пользователя", "Username", "Операция",
-                    "Тип заявки", "Категория", "Класс", "Тип", "Вид",
-                    "Название", "Назначение", "Имя", "Дата создания товара", "Состояние",
-                    "Спецификации", "Преимущества", "Доп. информация", "Изображения", "Цена",
-                    "Наличие", "Подробные характеристики", "Отзывы", "Рейтинг",
-                    "Информация о доставке", "Информация о поставщике", "Статистика",
-                    "Сроки", "Теги", "Контакты", "Статус"
-                ]
-
-                # Очищаем весь лист кроме первой строки
-                if len(existing_data) > 1:
-                    orders_sheet.clear()
-                    orders_sheet.update('A1', [headers])
-
-                if all_requests:
-                    orders_sheet.update('A2', all_data_formatted)
-                print(f"✅ Таблица полностью обновлена с {len(all_requests)} записями")
-            else:
-                # Если в базе данных нет данных, оставляем только заголовки
-                if len(existing_data) > 1:
-                    orders_sheet.clear()
-                    orders_sheet.update('A1', [existing_headers])
-                print("ℹ️ В базе данных нет записей, таблица очищена")
-            return True
-
-        # Если есть существующие данные (кроме заголовков)
-        existing_dict = {}
-        existing_ids_in_sheets = set()
-
-        # Пропускаем заголовки (первая строка)
-        for i, row in enumerate(existing_data[1:], start=2):  # start=2 потому что строка 1 - заголовки
-            if row and len(row) > 0 and row[0]:  # Проверяем, что строка и ID не пустые
-                try:
-                    request_id = int(row[0])  # Теперь ID как число без префикса
-                    existing_dict[request_id] = {
-                        'row_index': i,
-                        'data': row
-                    }
-                    existing_ids_in_sheets.add(request_id)
-                except (ValueError, IndexError):
-                    continue
-
-        # Получаем ID из базы данных (теперь без префиксов)
-        db_ids = set()
-        for req in all_requests:
-            try:
-                db_ids.add(int(req[0]))  # ID как число без префикса
-            except (IndexError, TypeError, ValueError):
-                continue
-
-        # Определяем какие записи нужно добавить, обновить или удалить
-        ids_to_add = db_ids - existing_ids_in_sheets
-        ids_to_update = db_ids & existing_ids_in_sheets  # Те, что есть в обоих местах
-        ids_to_remove = existing_ids_in_sheets - db_ids
-
-        print(f"📊 Анализ изменений:")
-        print(f"   • Добавить: {len(ids_to_add)} записей")
-        print(f"   • Обновить: {len(ids_to_update)} записей")
-        print(f"   • Удалить: {len(ids_to_remove)} записей")
-
-        # Подготовка данных для массового обновления
-        updates = []
-        rows_to_delete = []
-
-        # 1. Подготавливаем новые записи для добавления
-        new_rows = []
-        for req in all_requests:
-            request_id = int(req[0])
-            if request_id in ids_to_add:
-                new_rows.append(list(req))
-
-        # 2. Подготавливаем обновления существующих записей
-        for req in all_requests:
-            request_id = int(req[0])
-            if request_id in ids_to_update:
-                new_row_data = list(req)
-                existing_row = existing_dict.get(request_id)
-                if existing_row:
-                    # Сравниваем данные (кроме индекса строки)
-                    if existing_row['data'] != new_row_data:
-                        # Обновляем строку начиная со строки existing_row['row_index']
-                        updates.append({
-                            'range': f'A{existing_row["row_index"]}:AE{existing_row["row_index"]}',
-                            'values': [new_row_data]
-                        })
-
-        # 3. Отмечаем строки для удаления
-        for request_id in ids_to_remove:
-            row_info = existing_dict.get(request_id)
-            if row_info:
-                rows_to_delete.append(row_info['row_index'])
-
-        # Выполняем все операции
-
-        # Удаляем строки (снизу вверх, чтобы индексы не сбивались)
-        if rows_to_delete:
-            rows_to_delete.sort(reverse=True)  # Удаляем с конца
-            for row_index in rows_to_delete:
-                orders_sheet.delete_rows(row_index)
-            print(f"✅ Удалено {len(rows_to_delete)} записей")
-
-        # Обновляем существующие записи
-        if updates:
-            batch_updates = []
-            for update in updates:
-                batch_updates.append({
-                    'range': update['range'],
-                    'values': update['values']
-                })
-
-            # Выполняем обновления батчами (Google Sheets API имеет ограничения)
-            batch_size = 10
-            for i in range(0, len(batch_updates), batch_size):
-                batch = batch_updates[i:i + batch_size]
-                orders_sheet.batch_update([{'range': item['range'], 'values': item['values']} for item in batch])
-            print(f"✅ Обновлено {len(updates)} записей")
-
-        # Добавляем новые записи
-        if new_rows:
-            # Добавляем все новые строки одним запросом
-            orders_sheet.append_rows(new_rows)
-            print(f"✅ Добавлено {len(new_rows)} новых записей")
-
-        if not (rows_to_delete or updates or new_rows):
-            print("ℹ️ Данные уже синхронизированы, изменений не требуется")
-
-        # Получаем итоговое количество строк
-        final_data = orders_sheet.get_all_values()
-        print(f"📊 Итоговое количество записей в таблице: {max(0, len(final_data) - 1)}")
+        # Переписываем таблицу полностью для гарантии соответствия схеме (12 колонок)
+        
+        if all_requests:
+            # Преобразуем данные в правильный формат для записи
+            all_data_formatted = [list(req) for req in all_requests]
+            
+            # Очищаем таблицу, но оставляем заголовки (первая строка)
+            orders_sheet.clear()
+            
+            # Восстанавливаем заголовки
+            headers = [
+                "ID заказа", "Дата заказа", "Тип заказа", "ID товара/услуги", "Название",
+                "Telegram ID покупателя", "Username покупателя", "Telegram ID продавца", "Username продавца",
+                "Статус заказа", "Цена", "Примечания"
+            ]
+            orders_sheet.update('A1', [headers])
+            
+            # Записываем все данные начиная со 2-й строки
+            orders_sheet.update('A2', all_data_formatted)
+            
+            print(f"✅ Таблица полностью обновлена с {len(all_requests)} записями")
+        else:
+            # Если данных нет, просто чистим всё кроме заголовков (или восстанавливаем их)
+            orders_sheet.clear()
+            headers = [
+                "ID заказа", "Дата заказа", "Тип заказа", "ID товара/услуги", "Название",
+                "Telegram ID покупателя", "Username покупателя", "Telegram ID продавца", "Username продавца",
+                "Статус заказа", "Цена", "Примечания"
+            ]
+            orders_sheet.update('A1', [headers])
+            print("ℹ️ В базе данных нет записей, таблица очищена")
 
         return True
 
@@ -928,6 +809,9 @@ async def sync_order_requests_to_sheets():
         import traceback
         traceback.print_exc()
         return False
+
+
+
 
 async def auto_fill_cart_from_orders(user_id: int):
     """Автоматическое заполнение корзины из активных заявок пользователя"""
@@ -1144,16 +1028,37 @@ async def sync_requests_from_sheets_to_db():
                 try:
                     # Пропускаем строки без ID заявки
                     if not row.get('ID заявки'):
+
                         print(f"⚠️ Строка {row_idx}: пропущена, нет ID заявки")
                         skipped_count += 1
                         continue
 
-                    # Парсим ID заявки (теперь без префикса)
+                    # Парсим ID заявки
                     try:
-                        request_id = int(row['ID заявки'])
+                        # request_id = int(row['ID заявки'])  <- ОШИБКА ЗДЕСЬ, убираем
+                        request_id_str = str(row['ID заявки']).strip()
+                        if request_id_str.startswith('P'):
+                            # Это товар/предложение из order_requests
+                            request_id = int(request_id_str[1:])  # Убираем префикс 'P'
+                            source_table = 'order_requests'
+                        elif request_id_str.startswith('S'):
+                            # Это услуга из service_orders
+                            request_id = int(request_id_str[1:])  # Убираем префикс 'S'
+                            source_table = 'service_orders'
+                        else:
+                            # Старый формат без префикса (для обратной совместимости)
+                            request_id = int(request_id_str)
+                            source_table = 'order_requests'  # По умолчанию
+
+                    # Обработка ошибки
                     except (ValueError, TypeError):
                         print(f"⚠️ Строка {row_idx}: неверный формат ID заявки: {row.get('ID заявки')}")
                         skipped_count += 1
+                        continue
+
+                    item_type_raw = str(row.get('Тип заявки', '')).lower()
+                    if 'корзин' in item_type_raw or 'cart_order' in item_type_raw:
+                        # Пропускаем заказы из корзины (они только для отчетности)
                         continue
 
                     # Проверяем обязательные поля
@@ -1201,13 +1106,12 @@ async def sync_requests_from_sheets_to_db():
                     operation = row.get('Операция', 'buy')
                     operation_lower = str(operation).lower()
 
-                    # Определяем тип заявки (по столбцу "Тип заявки")
-                    item_type_raw = row.get('Тип заявки', 'product')
-                    item_type_lower = str(item_type_raw).lower()
+                    # Определяем тип заявки
+                    item_type = row.get('Тип заявки', 'product')
+                    item_type_lower = str(item_type).lower()
 
-                    # Определяем в какую таблицу загружать по типу заявки
+                    # Для услуг
                     if any(word in item_type_lower for word in ['услуга', 'service', 'сервис']):
-                        # Это услуга - загружаем в service_orders
                         item_type = 'service'
                         # Определяем операцию для услуг
                         if any(word in operation_lower for word in ['заказать', 'order', 'купить']):
@@ -1339,8 +1243,8 @@ async def sync_requests_from_sheets_to_db():
                                 ))
                                 print(f"🛒 Услуга {request_id} добавлена в корзину пользователя {user_id}")
 
+                    # Для товаров и предложений
                     else:
-                        # Это товар или предложение - загружаем в order_requests
                         if any(word in item_type_lower for word in ['предложение', 'offer', 'актив']):
                             item_type = 'offer'
                         else:

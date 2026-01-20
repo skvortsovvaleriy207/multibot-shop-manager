@@ -34,6 +34,8 @@ async def start_daily_scheduler():
             # Выполняем ежедневную синхронизацию
             await daily_sync_task()
             
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logging.error(f"Ошибка в планировщике: {e}")
             # При ошибке ждем час и пробуем снова
@@ -61,7 +63,8 @@ async def daily_sync_task():
         # await sync_order_statuses_from_sheets()
         
         # 5. Синхронизация планов и отчетов (ТЗ №2 п.1)
-        await sync_plans_and_reports()
+        # Удалено во избежание конфликтов с initiatives_system.py
+        # await sync_plans_and_reports()
         
         # 6. Обновление реферальной системы (ТЗ №2 п.2)
         await update_referral_system()
@@ -171,6 +174,7 @@ async def notify_proposal_initiators():
                 SELECT user_id, business_proposal
                 FROM users 
                 WHERE business_proposal IS NOT NULL AND business_proposal != ''
+                AND user_id != 0 AND user_id IS NOT NULL
                 AND (last_proposal_notification IS NULL OR 
                      date(last_proposal_notification) < date('now'))
             """)
@@ -178,6 +182,10 @@ async def notify_proposal_initiators():
         
         for user_id, proposal in users:
             try:
+                # Пропускаем некорректные ID
+                if not user_id or user_id == 0:
+                    continue
+                    
                 message = f"""
 🔔 **Уведомление о вашем бизнес-предложении**
 

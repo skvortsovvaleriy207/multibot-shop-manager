@@ -20,89 +20,104 @@ async def plans_reports_menu(callback: CallbackQuery):
         return
     
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="🚗 Партнеры по автотехнике", callback_data="partners_auto_tech"))
-    builder.add(types.InlineKeyboardButton(text="🔧 Партнеры по автоуслугам", callback_data="partners_auto_services"))
-    builder.add(types.InlineKeyboardButton(text="📊 Статистика автомагазина", callback_data="automarket_statistics"))
+    builder.add(types.InlineKeyboardButton(text="📦 Партнеры по товарам", callback_data="partners_products"))
+    builder.add(types.InlineKeyboardButton(text="🛠 Партнеры по услугам", callback_data="partners_services"))
+    builder.add(types.InlineKeyboardButton(text="📊 Статистика магазина", callback_data="store_statistics"))
     builder.add(types.InlineKeyboardButton(text="📈 Отчеты по продажам", callback_data="sales_reports"))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
     builder.adjust(2, 1, 1, 1)
     
     text = """📈 **Планы и отчеты**
 
-Управление партнерскими программами и аналитика автомагазина:
+Управление партнерскими программами и аналитика магазина:
 
-🚗 **Партнеры по автотехнике** - управление поставщиками автотехники
-🔧 **Партнеры по автоуслугам** - управление поставщиками автоуслуг  
-📊 **Статистика** - детальная аналитика автомагазина
+📦 **Партнеры по товарам** - управление поставщиками товаров
+🛠 **Партнеры по услугам** - управление поставщиками услуг  
+📊 **Статистика** - детальная аналитика магазина
 📈 **Отчеты** - отчеты по продажам и заказам"""
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
-@dp.callback_query(F.data == "partners_auto_tech")
-async def partners_auto_tech(callback: CallbackQuery):
+@dp.callback_query(F.data == "partners_products")
+async def partners_products(callback: CallbackQuery):
     user_id = callback.from_user.id
     if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
+        try:
+            await callback.answer("Доступ запрещен.", show_alert=True)
+        except Exception:
+            pass
         return
     
     from config import AUTO_PRODUCTS_SHEET_URL
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="📈 Открыть таблицу партнеров по автотехнике",
+        text="📈 Открыть таблицу партнеров по товарам",
         url=AUTO_PRODUCTS_SHEET_URL
     ))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="plans_reports"))
     builder.adjust(1)
     
-    text = """🚗 **Партнеры по автотехнике**
+    text = """📦 **Партнеры по товарам**
 
-Управление партнерскими программами с поставщиками автотехники:
+Управление партнерскими программами с поставщиками товаров:
 
 • Учет данных партнеров-поставщиков
 • Редактирование партнерских программ  
-• Выгрузка данных в карточки автотехники
+• Выгрузка данных в карточки товаров
 • Синхронизация 1 раз в день в 17:00 МСК
-
+    
 Данные автоматически обновляются в Google Sheets."""
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
-@dp.callback_query(F.data == "partners_auto_services")
-async def partners_auto_services(callback: CallbackQuery):
+@dp.callback_query(F.data == "partners_services")
+async def partners_services(callback: CallbackQuery):
     user_id = callback.from_user.id
     if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
+        try:
+            await callback.answer("Доступ запрещен.", show_alert=True)
+        except Exception:
+            pass
         return
     
     from config import AUTO_SERVICES_SHEET_URL
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="📈 Открыть таблицу партнеров по автоуслугам",
+        text="📈 Открыть таблицу партнеров по услугам",
         url=AUTO_SERVICES_SHEET_URL
     ))
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="plans_reports"))
     builder.adjust(1)
     
-    text = """🔧 **Партнеры по автоуслугам**
+    text = """🛠 **Партнеры по услугам**
 
-Управление партнерскими программами с поставщиками автоуслуг:
+Управление партнерскими программами с поставщиками услуг:
 
 • Учет данных партнеров-поставщиков услуг
 • Редактирование партнерских программ
-• Выгрузка данных в карточки автоуслуг  
+• Выгрузка данных в карточки услуг  
 • Синхронизация 1 раз в день в 17:00 МСК
-
+    
 Данные автоматически обновляются в Google Sheets."""
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
-@dp.callback_query(F.data == "automarket_statistics")
-async def automarket_statistics(callback: CallbackQuery):
+@dp.callback_query(F.data == "store_statistics")
+async def store_statistics(callback: CallbackQuery):
     # Перенаправляем на существующую статистику
     from automarket_stats import automarket_stats
     await automarket_stats(callback)
@@ -111,7 +126,10 @@ async def automarket_statistics(callback: CallbackQuery):
 async def sales_reports(callback: CallbackQuery):
     user_id = callback.from_user.id
     if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
+        try:
+            await callback.answer("Доступ запрещен.", show_alert=True)
+        except Exception:
+            pass
         return
     
     from config import AUTO_ORDERS_SHEET_URL
@@ -126,14 +144,17 @@ async def sales_reports(callback: CallbackQuery):
     
     text = """📈 **Отчеты по продажам**
 
-Детальная аналитика продаж автомагазина:
+Детальная аналитика продаж магазина:
 
 • Все заказы и их статусы
 • Статистика по категориям товаров/услуг
 • Анализ эффективности продавцов
 • Отчеты по выручке и конверсии
-
+    
 Данные обновляются автоматически каждые 6 часов."""
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
