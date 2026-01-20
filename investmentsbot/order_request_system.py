@@ -194,8 +194,19 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     preset_category = None
     if "|" in callback.data:
         try:
-            preset_category = callback.data.split("|")[1]
-            await state.update_data(preset_category=preset_category)
+            val = callback.data.split("|")[1]
+            if val.isdigit():
+                 # Resolve ID to name
+                 async with aiosqlite.connect("bot_database.db") as db:
+                     cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (int(val),))
+                     row = await cursor.fetchone()
+                     if row:
+                         preset_category = row[0]
+            else:
+                 preset_category = val
+            
+            if preset_category:
+                await state.update_data(preset_category=preset_category)
         except IndexError:
             pass
 
@@ -1724,12 +1735,22 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Есть активная заявка", show_alert=True)
         return
 
-    # Проверяем, передана ли категория
     preset_category = None
     if "|" in callback.data:
         try:
-            preset_category = callback.data.split("|")[1]
-            await state.update_data(preset_category=preset_category)
+            val = callback.data.split("|")[1]
+            if val.isdigit():
+                 # Resolve ID to name
+                 async with aiosqlite.connect("bot_database.db") as db:
+                     cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (int(val),))
+                     row = await cursor.fetchone()
+                     if row:
+                         preset_category = row[0]
+            else:
+                 preset_category = val
+            
+            if preset_category:
+                await state.update_data(preset_category=preset_category)
         except IndexError:
             pass
 

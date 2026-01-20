@@ -15,7 +15,8 @@ SHEET_INVITES = "Инвайты"
 SHEET_REFERRALS = "Рефералы"
 SHEET_PRODUCTS = "Товары"
 SHEET_SERVICES = "Услуги"
-SHEET_ORDERS = "Заявки"  # Лист для заявки (ранее Заказы)
+SHEET_REQUESTS = "Заявки"  # Лист для заявки
+SHEET_REAL_ORDERS = "Заказы"  # Лист для реальных заказов
 
 
 def get_google_sheets_client():
@@ -65,12 +66,15 @@ def init_unified_sheet():
              ["Дата и статус заказа", "ID заказчика", "№ в Основной таблице", "Категория услуги", "Наименование услуги",
               "Объем услуги", "Данные поставщика", "№, дата соглашения", "Оплата заказчиком",
               "№, дата документа выполнения", "Иная информация, отзывы", "Статус услуги/поставщика", "Примечание"]),
-            (SHEET_ORDERS, 29,
+            (SHEET_REQUESTS, 29,
              ["ID заявки", "Дата создания", "ID пользователя", "Username", "Операция", "Тип заявки", "Категория",
               "Класс товара", "Тип товара", "Вид товара", "Название", "Назначение", "Имя", "Дата создания товара",
               "Состояние", "Спецификации", "Преимущества", "Доп. информация", "Изображения", "Цена", "Наличие",
               "Подробные характеристики", "Отзывы", "Рейтинг", "Информация о доставке", "Информация о поставщике",
-              "Статистика", "Сроки", "Теги", "Контакты", "Статус"])
+              "Статистика", "Сроки", "Теги", "Контакты", "Статус"]),
+            (SHEET_REAL_ORDERS, 10,
+             ["ID заказа", "Дата заказа", "Тип заказа", "ID товара", "ID продавца", "ID покупателя",
+              "Статус", "Дата изменения", "Заметки", "Сумма"])
         ]
 
         for sheet_name, cols, headers in sheets_config:
@@ -725,6 +729,7 @@ async def sync_order_requests_to_sheets():
                         WHEN r.status = 'new' THEN 'Новый'
                         WHEN r.status = 'active' THEN 'Активен'
                         WHEN r.status = 'completed' THEN 'Завершен'
+                        WHEN r.status = 'processing' THEN 'В обработке'
                         ELSE r.status
                     END as status,
                     COALESCE(r.price, '0') as price,
@@ -993,13 +998,13 @@ async def sync_requests_from_sheets_to_db():
 
         # Пробуем найти лист с заявками
         try:
-            orders_sheet = spreadsheet.worksheet(SHEET_ORDERS)
+            requests_sheet = spreadsheet.worksheet(SHEET_REQUESTS)
         except:
-            print(f"ℹ️ Лист '{SHEET_ORDERS}' не найден в Google Sheets")
+            print(f"ℹ️ Лист '{SHEET_REQUESTS}' не найден в Google Sheets")
             return False
 
         # Получаем данные из листа
-        requests_data = orders_sheet.get_all_records()
+        requests_data = requests_sheet.get_all_records()
         print(f"📊 Найдено {len(requests_data)} записей в Google Sheets")
 
         if not requests_data:
@@ -1027,7 +1032,7 @@ async def sync_requests_from_sheets_to_db():
 
                 try:
                     # Пропускаем строки без ID заявки
-                    if not row.get('ID заявки'):
+                    if not row.get('ID заказа'):
 
                         print(f"⚠️ Строка {row_idx}: пропущена, нет ID заявки")
                         skipped_count += 1
@@ -1036,7 +1041,7 @@ async def sync_requests_from_sheets_to_db():
                     # Парсим ID заявки
                     try:
                         # request_id = int(row['ID заявки'])  <- ОШИБКА ЗДЕСЬ, убираем
-                        request_id_str = str(row['ID заявки']).strip()
+                        request_id_str = str(row['ID заказа']).strip()
                         if request_id_str.startswith('P'):
                             # Это товар/предложение из order_requests
                             request_id = int(request_id_str[1:])  # Убираем префикс 'P'
@@ -1511,4 +1516,116 @@ async def sync_all_sheets(bidirectional=False):
         return True
     except Exception as e:
         logging.error(f"Ошибка синхронизации всех листов: {e}")
+        return False
+
+
+async def sync_orders_to_sheets():
+    """Синхронизация заказов (таблица orders) с Google Sheet 'Заказы'"""
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
+        
+        try:
+            sheet = spreadsheet.worksheet(SHEET_REAL_ORDERS)
+            print(f"✅ Лист '{SHEET_REAL_ORDERS}' найден")
+        except:
+            sheet = spreadsheet.add_worksheet(title=SHEET_REAL_ORDERS, rows=1000, cols=15)
+            headers = [
+                "ID заказа", "Дата заказа", "Тип", "Статус", "ID покупателя", "Username покупателя", 
+                "ID товара", "Название товара", "Цена", "ID продавца", "Username продавца", 
+                "Количество", "Сумма", "Примечания", "Дата обновления"
+            ]
+            sheet.update('A1', [headers])
+            print(f"✅ Лист '{SHEET_REAL_ORDERS}' создан с заголовками")
+
+        # Получаем данные из orders
+        async with aiosqlite.connect("bot_database.db") as db:
+            cursor = await db.execute("""
+                SELECT 
+                    o.id,
+                    o.order_date,
+                    o.order_type,
+                    o.status,
+                    o.user_id,
+                    ub.username,
+                    o.item_id,
+                    COALESCE(p.title, s.title, 'Неизвестно') as item_title,
+                    COALESCE(p.price, s.price, '0') as item_price,
+                    o.seller_id,
+                    us.username as seller_username,
+                    '1' as quantity, -- В orders пока поштучно или надо парсить notes
+                    o.notes,
+                    datetime('now')
+                FROM orders o
+                LEFT JOIN users ub ON o.user_id = ub.user_id
+                LEFT JOIN users us ON o.seller_id = us.user_id
+                LEFT JOIN order_requests p ON (o.item_id = p.id AND o.order_type IN ('product', 'offer', 'order_request'))
+                LEFT JOIN service_orders s ON (o.item_id = s.id AND o.order_type = 'service')
+                ORDER BY o.order_date DESC
+            """)
+            orders = await cursor.fetchall()
+            
+        print(f"[DEBUG] Найдено {len(orders)} заказов для выгрузки в '{SHEET_REAL_ORDERS}'")
+        
+        if orders:
+            # Формируем данные
+            data_rows = []
+            for order in orders:
+                (id, date, type_, status, buyer_id, buyer_name, item_id, title, price, 
+                 seller_id, seller_name, qty, notes, updated) = order
+                 
+                # Пытаемся распарсить notes на предмет количества и цены
+                # "Заказ из корзины. Кол-во: {quantity}. Цена: {price}. Опции: {options}"
+                import re
+                
+                final_qty = qty
+                final_sum = 0
+                
+                qty_match = re.search(r"Кол-во: (\d+)", str(notes))
+                if qty_match:
+                    final_qty = qty_match.group(1)
+                    
+                price_val = 0
+                try:
+                    price_val = float(str(price).replace(' ', ''))
+                except:
+                    pass
+                    
+                try:
+                    qty_val = float(final_qty)
+                    final_sum = price_val * qty_val
+                except:
+                    pass
+
+                row = [
+                    id, date, type_, status, buyer_id, buyer_name,
+                    item_id, title, price, seller_id or "", seller_name or "",
+                    final_qty, final_sum, notes, updated
+                ]
+                data_rows.append(row)
+                
+            # Записываем (оставляем заголовки)
+            sheet.clear()
+            headers = [
+                "ID заказа", "Дата заказа", "Тип", "Статус", "ID покупателя", "Username покупателя", 
+                "ID товара", "Название товара", "Цена", "ID продавца", "Username продавца", 
+                "Количество", "Сумма", "Примечания", "Дата обновления"
+            ]
+            sheet.update('A1', [headers])
+            sheet.update('A2', data_rows)
+            print(f"✅ Таблица '{SHEET_REAL_ORDERS}' обновлена: {len(data_rows)} строк")
+            
+        else:
+            sheet.clear()
+            headers = [
+                "ID заказа", "Дата заказа", "Тип", "Статус", "ID покупателя", "Username покупателя", 
+                "ID товара", "Название товара", "Цена", "ID продавца", "Username продавца", 
+                "Количество", "Сумма", "Примечания", "Дата обновления"
+            ]
+            sheet.update('A1', [headers])
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Ошибка синхронизации заказов: {e}")
         return False

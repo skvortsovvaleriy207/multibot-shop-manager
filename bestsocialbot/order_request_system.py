@@ -194,7 +194,16 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     preset_category = None
     if "|" in callback.data:
         try:
-            preset_category = callback.data.split("|")[1]
+            val = callback.data.split("|")[1]
+            # Пытаемся найти категорию по ID
+            async with aiosqlite.connect("bot_database.db") as db:
+                cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (val,))
+                result = await cursor.fetchone()
+                if result:
+                    preset_category = result[0]
+                else:
+                    preset_category = val # Если не нашли по ID, считаем что это название
+            
             await state.update_data(preset_category=preset_category)
         except IndexError:
             pass
@@ -1728,7 +1737,16 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
     preset_category = None
     if "|" in callback.data:
         try:
-            preset_category = callback.data.split("|")[1]
+            val = callback.data.split("|")[1]
+            # Пытаемся найти категорию по ID
+            async with aiosqlite.connect("bot_database.db") as db:
+                cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (val,))
+                result = await cursor.fetchone()
+                if result:
+                    preset_category = result[0]
+                else:
+                    preset_category = val
+            
             await state.update_data(preset_category=preset_category)
         except IndexError:
             pass

@@ -401,7 +401,7 @@ async def main():
     for attempt in range(max_retries):
         try:
             print(f"Попытка подключения к Telegram API ({attempt + 1}/{max_retries})...")
-            await dp.start_polling(bot)
+            await dp.start_polling(bot, polling_timeout=60)
             break
         except Exception as e:
             logging.error(f"Ошибка подключения к Telegram (попытка {attempt + 1}): {e}")

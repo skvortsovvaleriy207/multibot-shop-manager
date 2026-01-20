@@ -7,6 +7,7 @@ import aiosqlite
 from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
+from messages_system import send_system_message
 
 
 
@@ -738,38 +739,55 @@ async def cart_order_confirm(callback: CallbackQuery):
         order_description += f"👤 **Пользователь:** ID {user_id}\n"
         order_description += f"📅 **Дата оформления:** {datetime.now().strftime('%d.%m.%Y %H:%M')}"
 
-        # Создаем заявку на заказ из корзины
-        await db.execute("""
-            INSERT INTO order_requests (
-                user_id, operation, item_type, title, additional_info, 
-                specifications, price, contact, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id,
-            "buy",
-            "cart_order",
-            "Заказ из корзины заявок",
-            order_description,
-            str(len(items)),  # Сохраняем количество в specifications
-            str(total_price) if total_price > 0 else "",
-            f"ID пользователя: {user_id}",
-            "new",
-            datetime.now().isoformat()
-        ))
+    # Create entries in the orders table for each product
+        created_orders_count = 0
+        for item in items:
+            item_id, quantity, options, price, title, operation, item_type_detail, category, condition, purpose, specifications = item
+            
+            # Find the seller
+            cursor = await db.execute("SELECT user_id FROM order_requests WHERE id = ?", (item_id,))
+            seller_row = await cursor.fetchone()
+            seller_id = seller_row[0] if seller_row else None
+            
+            # Insert into orders
+            await db.execute("""
+                INSERT INTO orders (user_id, order_type, item_id, seller_id, status, order_date, notes)
+                VALUES (?, ?, ?, ?, 'new', ?, ?)
+            """, (
+                user_id, 
+                'product' if operation == 'buy' else 'service', # Approximate type determination
+                item_id, 
+                seller_id, 
+                datetime.now().isoformat(),
+                f"Заказ из корзины. Кол-во: {quantity}. Цена: {price}. Опции: {options}"
+            ))
+            created_orders_count += 1
+            
+            # Notify the seller
+            if seller_id and seller_id != user_id:
+                await send_system_message(
+                    seller_id,
+                    "📦 Новый заказ!",
+                    f"Пользователь оформил заказ на ваш товар: {title}.\nКоличество: {quantity}\nПроверьте Google Таблицу 'Заказы'."
+                )
 
-        # Очищаем корзину после оформления
+        # Clear the cart after checkout
         print(f"[DEBUG] Очистка корзины для пользователя {user_id}...")
         cursor = await db.execute("DELETE FROM cart_order WHERE user_id = ?", (user_id,))
         print(f"[DEBUG] Удалено строк из корзины: {cursor.rowcount}")
         await db.commit()
-        print(f"[DEBUG] Транзакция подтверждена (commit)")
+        print(f"[DEBUG] Заказы созданы: {created_orders_count}")
 
-    # Синхронизация с Google Sheets
+    # Google Sheets synchronization (now including orders)
     try:
+        from google_sheets import sync_orders_to_sheets
+        await sync_orders_to_sheets()
+        
+        # Also sync requests to update statuses if needed
         from google_sheets import sync_order_requests_to_sheets
         await sync_order_requests_to_sheets()
     except Exception as e:
-        print(f"Ошибка синхронизации заявок: {e}")
+        print(f"Ошибка синхронизации заказов: {e}")
         import traceback
         traceback.print_exc()
 

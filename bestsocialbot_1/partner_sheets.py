@@ -43,6 +43,7 @@ async def sync_partners_tech_to_sheet():
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
                 WHERE u.active_partner = 'Да' OR u.account_status = 'ПАРТНЕР'
                    OR EXISTS (SELECT 1 FROM auto_products ap WHERE ap.user_id = u.user_id)
+                GROUP BY u.user_id
                 ORDER BY u.created_at DESC
             """)
             partners = await cursor.fetchall()
@@ -136,6 +137,7 @@ async def sync_partners_services_to_sheet():
                 LEFT JOIN auto_services as_ ON u.user_id = as_.user_id
                 WHERE (u.active_partner = 'Да' OR u.account_status = 'ПАРТНЕР') 
                    AND as_.id IS NOT NULL
+                GROUP BY u.user_id
                 ORDER BY u.created_at DESC
             """)
             partners = await cursor.fetchall()
@@ -201,6 +203,7 @@ async def sync_investors_to_sheet():
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
                 WHERE u.investor_trader = 'Да' OR u.account_status = 'ИНВЕСТОР'
+                GROUP BY u.user_id
                 ORDER BY u.created_at DESC
             """)
             investors = await cursor.fetchall()

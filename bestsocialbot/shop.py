@@ -416,17 +416,17 @@ async def product_catalog(callback: CallbackQuery):
     # Получаем категории товаров из БД из таблицы product_purposes
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
-            SELECT name FROM product_purposes
+            SELECT id, name FROM product_purposes
         """)
         categories = await cursor.fetchall()
 
     if categories:
-        for cat_name in categories:
-            if cat_name[0] in HOUSING_CATEGORIES:
+        for cat_id, cat_name in categories:
+            if cat_name in HOUSING_CATEGORIES:
                 continue
             builder.add(types.InlineKeyboardButton(
-                text=f"📦 {cat_name[0]}",
-                callback_data=f"product_cat_{cat_name[0]}"
+                text=f"📦 {cat_name}",
+                callback_data=f"product_cat_{cat_id}"
             ))
     else:
         builder.add(types.InlineKeyboardButton(
@@ -471,17 +471,17 @@ async def service_catalog(callback: CallbackQuery):
     # Получаем категории услуг из таблицы service_purposes
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
-            SELECT name FROM service_purposes
+            SELECT id, name FROM service_purposes
         """)
         categories = await cursor.fetchall()
 
     if categories:
-        for cat_name in categories:
-            if cat_name[0] in HOUSING_CATEGORIES:
+        for cat_id, cat_name in categories:
+            if cat_name in HOUSING_CATEGORIES:
                 continue
             builder.add(types.InlineKeyboardButton(
-                text=f"🛠 {cat_name[0]}",
-                callback_data=f"service_cat_{cat_name[0]}"
+                text=f"🛠 {cat_name}",
+                callback_data=f"service_cat_{cat_id}"
             ))
     else:
         builder.add(types.InlineKeyboardButton(
@@ -582,10 +582,20 @@ async def show_product_category_items(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    category_name = callback.data.replace("product_cat_", "")
+    category_id = callback.data.replace("product_cat_", "")
 
     # Получаем товары из этой категории из таблицы order_requests
     async with aiosqlite.connect("bot_database.db") as db:
+        # Сначала получаем имя категории по ID
+        cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (category_id,))
+        cat_result = await cursor.fetchone()
+        
+        if not cat_result:
+            await callback.answer("Категория не найдена", show_alert=True)
+            return
+            
+        category_name = cat_result[0]
+
         cursor = await db.execute("""
             SELECT id, title, price, additional_info 
             FROM order_requests 
@@ -624,7 +634,7 @@ async def show_product_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет товаров.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на товар",
-            callback_data=f"product_card_form|{category_name}"
+            callback_data=f"product_card_form|{category_id}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="product_catalog"))
@@ -657,10 +667,20 @@ async def show_service_category_items(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    category_name = callback.data.replace("service_cat_", "")
+    category_id = callback.data.replace("service_cat_", "")
 
     # Получаем услуги из этой категории из таблицы order_requests
     async with aiosqlite.connect("bot_database.db") as db:
+        # Сначала получаем имя категории по ID
+        cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (category_id,))
+        cat_result = await cursor.fetchone()
+        
+        if not cat_result:
+            await callback.answer("Категория не найдена", show_alert=True)
+            return
+            
+        category_name = cat_result[0]
+
         cursor = await db.execute("""
             SELECT id, title, price, additional_info 
             FROM order_requests 
@@ -699,7 +719,7 @@ async def show_service_category_items(callback: CallbackQuery):
         response += "В этой категории пока нет услуг.\n"
         builder.add(types.InlineKeyboardButton(
             text="📋 Создать заявку на услугу",
-            callback_data=f"service_card_form|{category_name}"
+            callback_data=f"service_card_form|{category_id}"
         ))
 
     builder.add(types.InlineKeyboardButton(text="◀️ Назад к каталогу", callback_data="service_catalog"))
