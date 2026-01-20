@@ -472,7 +472,7 @@ async def process_q16(message: Message, state: FSMContext):
         url="https://t.me/Our_Inv_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Бизнес/Партнерство",
+        text="Финансы/Деньги",
         url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
@@ -565,7 +565,7 @@ async def end_surrey(callback: CallbackQuery):
         url="https://t.me/Our_Inv_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Бизнес/Партнерство",
+        text="Финансы/Деньги",
         url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
