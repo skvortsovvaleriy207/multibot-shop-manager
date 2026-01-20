@@ -126,6 +126,23 @@ async def aggregate_user_statistics():
                 AND (partnership_date IS NULL OR partnership_date = '')
             """)
 
+            # 6. Агрегация заявок (Requests)
+            # Считаем общее количество заявок и количество активных
+            cursor = await db.execute("""
+                SELECT user_id, 
+                       COUNT(*) as total,
+                       SUM(CASE WHEN status IN ('new', 'active') THEN 1 ELSE 0 END) as active
+                FROM order_requests
+                GROUP BY user_id
+            """)
+            requests_counts = await cursor.fetchall()
+            
+            for user_id, total, active in requests_counts:
+                 requests_text = f"{total} / {active or 0}"
+                 await db.execute("""
+                    UPDATE users SET requests_text = ? WHERE user_id = ?
+                 """, (requests_text, user_id))
+
             await db.commit()
             print("Агрегация статистики успешно завершена.")
             return True

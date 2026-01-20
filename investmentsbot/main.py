@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL
+from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL, SHOWCASE_IMAGE_URL, SURVEY_BOT_LINK, SHOP_BOT_LINK
 from db import init_db
 from dispatcher import dp
 from aiogram import types, F
@@ -426,10 +426,10 @@ async def send_showcase(chat_id: int):
         await db.execute("DELETE FROM showcase_messages WHERE chat_id = ?", (chat_id,))
         await db.commit()
     
-    photo_url = "https://i.postimg.cc/T2thBcsP/photo-2025-08-01-21-47-44.jpg"
+    photo_url = SHOWCASE_IMAGE_URL
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="Опрос", url="https://t.me/Better_House_Bot"))
-    builder.add(types.InlineKeyboardButton(text="Магазин", url="https://t.me/Better_House_Bot"))
+    builder.add(types.InlineKeyboardButton(text="Опрос", url=SURVEY_BOT_LINK))
+    builder.add(types.InlineKeyboardButton(text="Магазин", url=SHOP_BOT_LINK))
     builder.adjust(2)
     
     message = await bot.send_photo(

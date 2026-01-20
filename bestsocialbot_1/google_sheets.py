@@ -15,7 +15,7 @@ SHEET_INVITES = "Инвайты"
 SHEET_REFERRALS = "Рефералы"
 SHEET_PRODUCTS = "Товары"
 SHEET_SERVICES = "Услуги"
-SHEET_ORDERS = "Заказы"  # Лист для заказов
+SHEET_ORDERS = "Заявки"  # Лист для заявки (ранее Заказы)
 
 
 def get_google_sheets_client():
@@ -38,7 +38,7 @@ def init_unified_sheet():
               "Социальная проблема", "Экологическая проблема", "Пассивный подписчик (1.0)", "Активный партнер (2.0)",
               "Инвестор/трейдер (3.0)", "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
               "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация", "ДД/ММ/ГГ партнерства", "Количество рефералов",
-              "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Срок подписки", "Покупки в магазине", "Продажи в магазине",
+              "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
               "Иная информация магазин", "Статус в магазине", "Бизнес подписчика", "Заказы/Товары/Услуги",
               "Статус аккаунта (Р/Б)"]),
             (SHEET_PARTNERS, 6,
@@ -291,7 +291,8 @@ async def sync_db_to_google_sheets():
                     COALESCE(u.total_referrals, u.referral_count, 0) as referral_count,
                     COALESCE(u.referral_earnings, u.referral_payment, 0) as referral_payment,
                     u.subscription_date,
-                    u.subscription_payment_date,
+                    u.subscription_date,
+                    u.requests_text,
                     u.purchases,
                     u.sales,
                     u.requisites,
@@ -330,7 +331,7 @@ async def sync_db_to_google_sheets():
             "Бизнес-предложение", "Сумма бонусов", "Корректировка бонусов",
             "Текущий баланс", "Стоимость проблем", "Примечания",
             "Дата партнерства", "Количество рефералов", "Оплата за рефералов",
-            "Дата подписки", "Дата оплаты подписки", "Покупки", "Продажи",
+            "Дата подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
             "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
         ]
 
@@ -678,8 +679,8 @@ async def sync_order_requests_to_sheets():
 
         # Создаем или получаем лист для заявок
         try:
-            orders_sheet = spreadsheet.worksheet("Заказы")
-            print(f"✅ Лист 'Заказы' найден")
+            orders_sheet = spreadsheet.worksheet("Заявки")
+            print(f"✅ Лист 'Заявки' найден")
 
             # Получаем заголовки и проверяем их
             orders_sheet.update('A1', [[
@@ -689,14 +690,14 @@ async def sync_order_requests_to_sheets():
             ]])
             print("✅ Заголовки таблицы обновлены")
         except Exception as e:
-            orders_sheet = spreadsheet.add_worksheet(title="Заказы", rows=1000, cols=12)
+            orders_sheet = spreadsheet.add_worksheet(title="Заявки", rows=1000, cols=12)
             headers = [
                 "ID заказа", "Дата заказа", "Тип заказа", "ID товара/услуги", "Название",
                 "Telegram ID покупателя", "Username покупателя", "Telegram ID продавца", "Username продавца",
                 "Статус заказа", "Цена", "Примечания"
             ]
             orders_sheet.update('A1', [headers])
-            print(f"✅ Создан новый лист 'Заказы' с заголовками")
+            print(f"✅ Создан новый лист 'Заявки' с заголовками")
             existing_headers = headers
 
         # Получаем все данные из базы данных для товаров и предложений

@@ -449,7 +449,7 @@ async def process_q16(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Дом/Жилье",
-        callback_data="handle_besthome_integration"
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника",
@@ -542,7 +542,7 @@ async def end_surrey(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Дом/Жилье",
-        callback_data="handle_besthome_integration"
+        url="https://t.me/Better_House_Bot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника ",

@@ -9,8 +9,15 @@ import aiosqlite
 import asyncio
 from datetime import datetime
 from db import check_channel_subscription
-from config import CHANNEL_ID, ADMIN_ID
+from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
+from bot_instance import bot
+from filters import is_valid_email, is_valid_phone
+from utils import check_blocked_user
+from handler_integration import handle_wond_integration_callback, handle_autoavia_integration_callback
+
+class SurveyStates(StatesGroup):
+    START = State()
 from bot_instance import bot
 from filters import is_valid_email, is_valid_phone
 from utils import check_blocked_user
@@ -102,6 +109,7 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
 
     is_subscribed = await check_channel_subscription(bot, user_id, CHANNEL_ID)
     if not is_subscribed:
+        await callback.message.answer(f"Для прохождения опроса необходимо подписаться на наш канал: {CHANNEL_URL}")
         await callback.answer("Для прохождения опроса необходимо подписаться на наш канал.", show_alert=True)
         return
 

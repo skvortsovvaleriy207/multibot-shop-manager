@@ -65,10 +65,28 @@ async def get_showcase_keyboard(user_id: int):
     return builder.as_markup()
 
 @dp.message(Command("start_shop"))
-async def cmd_start_shop(message: types.Message ):
+async def cmd_start_shop(message: types.Message):
     """Главная страница магазина (первый экран после входа)"""
 
-    user_id = message.chat.id
+    user_id = message.from_user.id
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT has_completed_survey, account_status FROM users WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        
+        if not row:
+            await message.answer("Пожалуйста, начните с команды /start.")
+            return
+
+        has_survey, status = row
+
+        if status == 'О':
+            await message.answer("Ваш аккаунт заблокирован администратором.")
+            return
+            
+        if not has_survey:
+            await message.answer("Для доступа к магазину необходимо пройти опрос.")
+            return
 
     await sync_from_sheets_to_db()
 
@@ -83,7 +101,7 @@ async def cmd_start_shop(message: types.Message ):
     builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="shop_back_to_showcase"))
     builder.adjust(2, 1, 1, 1, 2, 1, 1)
 
-    await message.edit_text(
+    await message.answer(
         "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
         reply_markup=builder.as_markup()
     )

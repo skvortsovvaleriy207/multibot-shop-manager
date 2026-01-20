@@ -232,6 +232,13 @@ async def init_db():
             await db.execute("CREATE TABLE IF NOT EXISTS service_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS service_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             await db.execute("CREATE TABLE IF NOT EXISTS service_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+
+            # Таблицы категорий для ПРЕДЛОЖЕНИЙ (Property/Offers)
+            await db.execute("CREATE TABLE IF NOT EXISTS property_purposes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS property_types (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS property_classes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS property_views (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
+            await db.execute("CREATE TABLE IF NOT EXISTS property_other_chars (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
             
             # Инициализация категорий товаров
             cursor = await db.execute("SELECT COUNT(*) FROM product_purposes")
@@ -527,7 +534,8 @@ async def check_channel_subscription(bot, user_id: int, channel_id: int) -> bool
     try:
         member = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
         return member.status in ["member", "administrator", "creator"]
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: check_channel_subscription error: {e}")
         return False
 
 async def check_account_status(user_id: int) -> bool:

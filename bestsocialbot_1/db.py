@@ -48,9 +48,17 @@ async def init_db():
                     shop_id TEXT,
                     business TEXT,
                     products_services TEXT,
-                    account_status TEXT
+                    account_status TEXT,
+                    requests_text TEXT
                 )
             """)
+
+            # Проверка и добавление колонки requests_text если её нет (миграция)
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN requests_text TEXT")
+                print("Added column requests_text to users table")
+            except Exception:
+                pass # Колонка уже существует
 
             cursor = await db.execute("SELECT COUNT(*) FROM users")
             count = (await cursor.fetchone())[0]
@@ -64,14 +72,14 @@ async def init_db():
                         investor_trader, business_proposal, bonus_total, bonus_adjustment, current_balance, problem_cost,
                         notes, partnership_date, referral_count, referral_payment, subscription_date,
                         subscription_payment_date, purchases, sales, requisites, shop_id, business,
-                        products_services, account_status, first_name, last_name, has_completed_survey, created_at
+                        products_services, account_status, first_name, last_name, has_completed_survey, created_at, requests_text
                     ) VALUES (
                         'Дата опроса', 0, 'Telegram ID', 'ФИО', 'Дата рождения', 'Место жительства', 'Email', 'Телефон', 'Занятость',
                         'Финансовая проблема', 'Социальная проблема', 'Экологическая проблема', 'Пассивный подписчик', 'Активный партнер',
                         'Инвестор/трейдер', 'Бизнес-предложение', 0, 0, 0, 'Стоимость проблем',
                         'Примечания', 'Дата партнерства', 0, 'Оплата за рефералов', 'Дата подписки',
                         'Дата оплаты подписки', 'Покупки', 'Продажи', 'Реквизиты', 'ID в магазине', 'Бизнес',
-                        'Товары/услуги', 'Статус аккаунта', '', '', 0, datetime('now')
+                        'Товары/услуги', 'Статус аккаунта', '', '', 0, datetime('now'), '0 / 0'
                     )
                 """)
 

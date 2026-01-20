@@ -332,6 +332,12 @@ async def add_product_category(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ProductCardStates.waiting_category)
+async def process_product_category_direct_input(message: Message, state: FSMContext):
+    """Прямой ввод категории без нажатия 'Добавить'"""
+    await process_product_category_input(message, state)
+
+
 @dp.message(ProductCardStates.waiting_category_input)
 async def process_product_category_input(message: Message, state: FSMContext):
     """Обработка ввода новой категории товара"""
@@ -490,6 +496,14 @@ async def add_product_class(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(ProductCardStates.waiting_class_input)
     await callback.answer()
+
+
+@dp.message(ProductCardStates.waiting_class)
+async def process_product_class_direct_input(message: Message, state: FSMContext):
+    """Прямой ввод класса без нажатия 'Добавить'"""
+    # Если введен текст, считаем что пользователь хочет добавить новый
+    if message.text:
+       await process_product_class_input(message, state)
 
 
 @dp.message(ProductCardStates.waiting_class_input)
@@ -655,6 +669,13 @@ async def add_product_type(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.message(ProductCardStates.waiting_item_type)
+async def process_product_type_direct_input(message: Message, state: FSMContext):
+    """Прямой ввод типа без нажатия 'Добавить'"""
+    if message.text:
+        await process_product_type_input(message, state)
+
+
 @dp.message(ProductCardStates.waiting_item_type_input)
 async def process_product_type_input(message: Message, state: FSMContext):
     """Обработка ввода нового типа товара"""
@@ -816,6 +837,13 @@ async def add_product_view(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(ProductCardStates.waiting_item_kind_input)
     await callback.answer()
+
+
+@dp.message(ProductCardStates.waiting_item_kind)
+async def process_product_view_direct_input(message: Message, state: FSMContext):
+    """Прямой ввод вида без нажатия 'Добавить'"""
+    if message.text:
+        await process_product_view_input(message, state)
 
 
 @dp.message(ProductCardStates.waiting_item_kind_input)
