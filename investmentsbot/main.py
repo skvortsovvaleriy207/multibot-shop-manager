@@ -336,7 +336,7 @@ async def main():
                 if user_changes:
                     try:
                         # Отключаем уведомления при старте, чтобы не спамить при перезапусках
-                        # await send_user_notification(bot, user_id, user_changes)
+                        await send_user_notification(bot, user_id, user_changes)
                         print(f"[NOTIFY] Обнаружены изменения профиля для {user_id}: {user_changes}")
                     except Exception as notify_error:
                         print(f"[ERROR] Ошибка отправки уведомления {user_id}: {notify_error}")

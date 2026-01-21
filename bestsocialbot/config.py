@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("WOND_BOT_TOKEN")
+BOT_TOKEN = os.getenv("MAIN_BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1002160822750"))
 CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/avto_avia_club")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
@@ -15,7 +15,7 @@ TELETHON_API_ID = int(os.getenv("TELETHON_API_ID", "0"))
 TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", "")
 TELETHON_PHONE_NUMBER = os.getenv("TELETHON_PHONE_NUMBER", "")
 
-MAIN_SURVEY_SHEET_URL = os.getenv("WOND_SURVEY_SHEET_URL", "")
+MAIN_SURVEY_SHEET_URL = os.getenv("MAIN_GOOGLE_SHEET", "")
 BESTHOME_SURVEY_SHEET_URL = os.getenv("BESTHOME_SURVEY_SHEET_URL", "")
 AUTO_SURVEY_SHEET_URL = os.getenv("AUTO_SURVEY_SHEET_URL", "")
 WOND_SURVEY_SHEET_URL = MAIN_SURVEY_SHEET_URL
