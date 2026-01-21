@@ -109,6 +109,21 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         user_exists = await cursor.fetchone()
         print(f"DEBUG: user_exists query result: {user_exists}")
     
+    # Если пользователя нет, пробуем синхронизировать с Google Sheets (возможно он пришел из другого бота)
+    if not user_exists:
+        print("DEBUG: User not found, attempting to sync with Google Sheets...")
+        try:
+            from google_sheets import sync_with_google_sheets
+            await sync_with_google_sheets()
+            
+            # Проверяем снова
+            async with aiosqlite.connect("bot_database.db") as db:
+                cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
+                user_exists = await cursor.fetchone()
+                print(f"DEBUG: user_exists query result after sync: {user_exists}")
+        except Exception as e:
+            print(f"ERROR: Failed to sync with Google Sheets on start: {e}")
+
     if not user_exists:
         print("DEBUG: New user detected, sending captcha")
         try:
