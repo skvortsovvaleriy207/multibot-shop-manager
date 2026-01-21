@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  autoavia-bot:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.33'
+          memory: '256M'
+    build: .
+    container_name: autoavia_bot_new
+    restart: unless-stopped
+    environment:
+      - BOT_NAME=autoavia
+      - BOT_TOKEN=${AUTOAVIA_TOKEN}
+    volumes:
+      - autoavia_data:/data
+      - .:/app
+
+volumes:
+  autoavia_data:
