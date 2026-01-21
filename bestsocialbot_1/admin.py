@@ -2,8 +2,8 @@ from aiogram import F, types
 from aiogram.types import CallbackQuery, FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from config import ADMIN_ID, TELETHON_API_ID, TELETHON_API_HASH, TELETHON_PHONE_NUMBER
-from config import REFERRALS_SHEET_URL, COMMON_EXPORT_SHEET_URL, CREDENTIALS_FILE, INVESTORS_SHEET_URL, PARTNERS_SHEET_URL, \
-    PARSING_USERS_GOOGLE_SHEET_URL, PARSING_USERS_GOOGLE_SHEET_URL
+from config import COMMON_EXPORT_SHEET_URL, CREDENTIALS_FILE, INVESTORS_SHEET_URL, PARTNERS_SHEET_URL, \
+    PARSING_USERS_GOOGLE_SHEET_URL
 from dispatcher import dp
 from bot_instance import bot
 import aiosqlite
@@ -724,7 +724,7 @@ async def scheduled_exports():
         await asyncio.sleep((next_run - now).total_seconds())
         await export_users_by_column_with_flag(PARSING_USERS_GOOGLE_SHEET_URL, PARTNERS_SHEET_URL, 13)
         await export_users_by_column_with_flag(PARSING_USERS_GOOGLE_SHEET_URL, INVESTORS_SHEET_URL, 14)
-        await export_users_by_column_with_flag(PARSING_USERS_GOOGLE_SHEET_URL, REFERRALS_SHEET_URL, 21)
+
 
 
 async def scheduled_merge():
@@ -773,24 +773,7 @@ async def investors_handler(callback: CallbackQuery):
     )
     await callback.answer()
 
-@dp.callback_query(F.data == "referral")
-async def referral_handler(callback: CallbackQuery):
-    user_id = callback.from_user.id
-    if user_id != ADMIN_ID:
-        await callback.answer("Доступ запрещен.", show_alert=True)
-        return
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(
-        text="Открыть Google Таблицу Рефералы",
-        url=REFERRALS_SHEET_URL
-    ))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_admin"))
-    builder.adjust(1)
-    await callback.message.edit_text(
-        text="Таблица рефералов:",
-        reply_markup=builder.as_markup()
-    )
-    await callback.answer()
+
 
 @dp.callback_query(F.data == "stats")
 async def stats_handler(callback: CallbackQuery):

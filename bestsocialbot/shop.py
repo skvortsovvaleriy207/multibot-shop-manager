@@ -244,7 +244,7 @@ async def personal_account(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🛒 Корзина заявок", callback_data="cart_order"))
     builder.add(types.InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders"))
     builder.add(types.InlineKeyboardButton(text="📦 Заказы на мои товары", callback_data="seller_orders"))
-    builder.add(types.InlineKeyboardButton(text="🔗 Рефералы", callback_data="referral_system"))
+
     builder.add(types.InlineKeyboardButton(text="💳 Оплата", callback_data="payment"))
     builder.add(types.InlineKeyboardButton(text="💬 Сообщения", callback_data="messages"))
 
@@ -374,7 +374,7 @@ async def back_to_personal_account(callback: CallbackQuery):
     builder.add(types.InlineKeyboardButton(text="🛒 Корзина заявок", callback_data="cart_order"))
     builder.add(types.InlineKeyboardButton(text="📋 Мои заказы", callback_data="my_orders"))
     builder.add(types.InlineKeyboardButton(text="📦 Заказы на мои товары", callback_data="seller_orders"))
-    builder.add(types.InlineKeyboardButton(text="🔗 Рефералы", callback_data="referral_system"))
+
     builder.add(types.InlineKeyboardButton(text="💳 Оплата", callback_data="payment"))
     builder.add(types.InlineKeyboardButton(text="💬 Сообщения", callback_data="messages"))
 

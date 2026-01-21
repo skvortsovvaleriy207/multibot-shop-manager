@@ -1,7 +1,7 @@
 import aiosqlite
 import gspread
 from datetime import datetime, timedelta
-from config import CREDENTIALS_FILE, REFERRALS_SHEET_URL
+from config import CREDENTIALS_FILE
 import asyncio
 import logging
 from bot_instance import bot
@@ -148,47 +148,8 @@ async def calculate_monthly_referral_bonuses():
         return False
 
 async def export_referral_data():
-    """Выгрузка данных реферальной системы"""
-    try:
-        async with aiosqlite.connect("bot_database.db") as db:
-            cursor = await db.execute("""
-                SELECT u.user_id, u.username, u.full_name, u.total_referrals,
-                       u.referral_earnings, u.referral_link, u.created_at
-                FROM users u
-                WHERE u.total_referrals > 0 OR u.referral_earnings > 0
-                ORDER BY u.total_referrals DESC
-            """)
-            referrers = await cursor.fetchall()
-        
-        if not referrers:
-            return True
-        
-        gc = gspread.service_account(filename=CREDENTIALS_FILE)
-        sheet = gc.open_by_url(REFERRALS_SHEET_URL).sheet1
-        
-        # Заголовки
-        headers = [
-            "ID пользователя", "Username", "ФИО", "Количество рефералов",
-            "Заработано монет", "Реферальная ссылка", "Дата регистрации"
-        ]
-        
-        # Данные
-        data = [headers]
-        for referrer in referrers:
-            data.append([
-                referrer[0], referrer[1] or "", referrer[2] or "",
-                referrer[3], referrer[4], referrer[5] or "", referrer[6]
-            ])
-        
-        sheet.clear()
-        sheet.update('A1', data)
-        
-        logging.info("Referral data exported successfully")
-        return True
-        
-    except Exception as e:
-        logging.error(f"Error exporting referral data: {e}")
-        return False
+    """Выгрузка данных реферальной системы - DISABLED"""
+    return True
 
 async def get_referral_stats(user_id: int):
     """Получение статистики рефералов пользователя"""
@@ -226,7 +187,7 @@ async def scheduled_referral_sync():
             await calculate_monthly_referral_bonuses()
             
             # Выгружаем данные
-            await export_referral_data()
+            # await export_referral_data()
             
             logging.info("✅ Referral sync completed successfully")
                 

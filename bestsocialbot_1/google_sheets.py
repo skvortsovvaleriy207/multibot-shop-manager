@@ -12,7 +12,7 @@ SHEET_PARTNERS = "Партнеры"
 SHEET_INVESTORS = "Инвесторы"
 SHEET_PARSING = "Парсинги"
 SHEET_INVITES = "Инвайты"
-SHEET_REFERRALS = "Рефералы"
+
 SHEET_PRODUCTS = "Товары"
 SHEET_SERVICES = "Услуги"
 SHEET_ORDERS = "Заявки"  # Лист для заявки (ранее Заказы)
@@ -53,10 +53,7 @@ def init_unified_sheet():
             (SHEET_INVITES, 12,
              ["ID", "Username", "Телефон", "Имя", "Иная информация", "Источник инвайта", "Дата инвайта",
               "№ рассылки/инвайта", "Исполнитель инвайта", "Канал/чат подписки", "№ в Основной таблице", "Примечание"]),
-            (SHEET_REFERRALS, 17,
-             ["ID", "Username", "Телефон", "Имя", "Заявленные проблемы", "Предложения", "Текущий баланс",
-              "Иная информация", "№ в Основной таблице", "Данные по бизнесу", "№ и дата соглашения", "Условия оплата",
-              "Каналы/чаты", "Количество рефералов", "Статус референта", "Примечание", "Telegram ID"]),
+
             (SHEET_PRODUCTS, 13,
              ["Дата и статус заказа", "ID заказчика", "№ в Основной таблице", "Категория товара", "Наименование товара",
               "Количество", "Данные поставщика", "№, дата соглашения", "Оплата заказчиком",
@@ -1438,21 +1435,7 @@ async def sync_all_sheets(bidirectional=False):
                 investors_sheet.clear()
                 investors_sheet.update('A1', [list(investors_sheet.row_values(1))] + [list(i) for i in investors])
 
-            referrals_sheet = spreadsheet.worksheet(SHEET_REFERRALS)
-            cursor = await db.execute("""
-                SELECT u.user_id, u.username, u.phone, u.full_name, 
-                       u.financial_problem || ', ' || u.social_problem, u.business_proposal,
-                       ub.current_balance, u.notes, '', u.business, u.partnership_date,
-                       u.referral_payment, '', u.referral_count,
-                       CASE WHEN u.referral_count > 0 THEN 'Активный' ELSE 'Неактивный' END, '', u.user_id
-                FROM users u
-                LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
-                WHERE u.referral_count > 0 OR u.partnership_date IS NOT NULL
-            """)
-            referrals = await cursor.fetchall()
-            if referrals:
-                referrals_sheet.clear()
-                referrals_sheet.update('A1', [list(referrals_sheet.row_values(1))] + [list(r) for r in referrals])
+
 
             products_sheet = spreadsheet.worksheet(SHEET_PRODUCTS)
             cursor = await db.execute("""
