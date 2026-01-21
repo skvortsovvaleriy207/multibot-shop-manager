@@ -517,7 +517,7 @@ async def process_q16(message: Message, state: FSMContext):
     ))
     builder.add(types.InlineKeyboardButton(
         text="выход из чат-бота",
-        url="https://t.me/+vz7-Ko4rDy03Yjhi"
+        url="https://t.me/+b6yAidzNRd8yMTgy"
     ))
 
 

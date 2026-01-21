@@ -468,11 +468,11 @@ async def process_q16(message: Message, state: FSMContext):
         url="t.me/wonderful_project_bot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Капиталы для инвестиций",
-        url="https://t.me/Our_Inv_Bot"
+        text="Бизнес/Партнерство",
+        url="https://t.me/bestsocialbot"
     ))
     builder.add(types.InlineKeyboardButton(
-        text="Бизнес/Партнерство",
+        text="Финансы/Деньги",
         url="https://t.me/OurWonderfulBot"
     ))
     builder.add(types.InlineKeyboardButton(
@@ -517,7 +517,7 @@ async def process_q16(message: Message, state: FSMContext):
     ))
     builder.add(types.InlineKeyboardButton(
         text="выход из чат-бота",
-        url="https://t.me/+vz7-Ko4rDy03Yjhi"
+        url="https://t.me/+Za9_9dD6hOEwZWQy"
     ))
 
 
