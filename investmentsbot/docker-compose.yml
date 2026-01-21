@@ -1,21 +1,21 @@
 version: '3.8'
 
 services:
-  bestsocialbot:
+  investmentsbot:
     deploy:
       resources:
         limits:
           cpus: '0.33'
           memory: '256M'
     build: .
-    container_name: bestsocialbot
+    container_name: investmentsbot
     restart: unless-stopped
     environment:
-      - BOT_NAME=bestsocialbot
-      - BOT_TOKEN=${WOND_TOKEN}
+      - BOT_NAME=investmentsbot
+      - BOT_TOKEN=${MAIN_BOT_TOKEN}
     volumes:
-      - wond_data:/data
+      - investmentsbot_data:/data
       - .:/app
 
 volumes:
-  wond_data:
+  investmentsbot_data:

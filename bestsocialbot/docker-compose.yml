@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     environment:
       - BOT_NAME=bestsocialbot
-      - BOT_TOKEN=${WOND_TOKEN}
+      - BOT_TOKEN=${MAIN_BOT_TOKEN}
     volumes:
       - wond_data:/data
       - .:/app
