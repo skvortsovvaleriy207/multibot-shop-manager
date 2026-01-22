@@ -90,9 +90,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     print(f"DEBUG: /start command received from user_id={user_id}")
     
     param=command.args
-    if param=="shop":
-        await cmd_start_shop(message)
-        return
     # Проверяем реферальную ссылку
     referrer_id = None
     if message.text and len(message.text.split()) > 1:
@@ -105,9 +102,11 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 pass
     
     async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-        user_exists = await cursor.fetchone()
-        print(f"DEBUG: user_exists query result: {user_exists}")
+        cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
+        user_row = await cursor.fetchone()
+        user_exists = user_row is not None
+        has_survey = user_row[0] if user_row else 0
+        print(f"DEBUG: user_exists={user_exists}, has_survey={has_survey}")
     
     # Если пользователя нет, пробуем синхронизировать с Google Sheets (возможно он пришел из другого бота)
     if not user_exists:
@@ -118,11 +117,17 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             
             # Проверяем снова
             async with aiosqlite.connect("bot_database.db") as db:
-                cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-                user_exists = await cursor.fetchone()
-                print(f"DEBUG: user_exists query result after sync: {user_exists}")
+                cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
+                user_row = await cursor.fetchone()
+                user_exists = user_row is not None
+                has_survey = user_row[0] if user_row else 0
+                print(f"DEBUG: user_exists after sync={user_exists}, has_survey={has_survey}")
         except Exception as e:
             print(f"ERROR: Failed to sync with Google Sheets on start: {e}")
+
+    if param == "shop" and user_exists and has_survey:
+        await cmd_start_shop(message)
+        return
 
     if not user_exists:
         print("DEBUG: New user detected, sending captcha")
@@ -135,6 +140,11 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         # Сохраняем реферера для обработки после капчи
         if referrer_id:
             await state.update_data(referrer_id=referrer_id)
+            # Также сохраняем намерение перейти в магазин
+            if param == "shop":
+                await state.update_data(shop_captcha_pending=True)
+        elif param == "shop":
+             await state.update_data(shop_captcha_pending=True)
         
         await send_captcha(message, state)
     else:

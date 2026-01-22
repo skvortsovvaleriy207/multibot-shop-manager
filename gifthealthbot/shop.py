@@ -38,8 +38,11 @@ async def shop_access(callback: CallbackQuery, state: FSMContext):
 
     # Проверяем, прошел ли пользователь опрос
     if not await check_survey_completed(user_id):
-        await callback.answer("Для доступа к магазину необходимо пройти опрос.", show_alert=True)
-        return
+        # Попробуем синхронизировать перед отказом (возможно пользователь прошел опрос в другом боте только что)
+        await sync_from_sheets_to_db()
+        if not await check_survey_completed(user_id):
+            await callback.answer("Для доступа к магазину необходимо пройти опрос.", show_alert=True)
+            return
 
     # Проверяем, прошла ли уже капча
     data = await state.get_data()
