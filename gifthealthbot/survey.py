@@ -397,8 +397,8 @@ async def process_q16(message: Message, state: FSMContext):
                 user_id, username, first_name, last_name, has_completed_survey, created_at,
                 survey_date, full_name, birth_date, location, email, phone, employment,
                 financial_problem, social_problem, ecological_problem, passive_subscriber,
-                active_partner, investor_trader, business_proposal
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                active_partner, investor_trader, business_proposal, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -420,7 +420,8 @@ async def process_q16(message: Message, state: FSMContext):
                 data.get("q13", ""),
                 data.get("q14", ""),
                 data.get("q15", ""),
-                data.get("q16", "")
+                data.get("q16", ""),
+                datetime.now().isoformat()
             )
         )
 

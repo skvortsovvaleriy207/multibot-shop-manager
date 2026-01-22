@@ -18,14 +18,10 @@ from handler_integration import handle_besthome_integration_callback, handle_aut
 
 class SurveyStates(StatesGroup):
     START = State()
-    Q1 = State()
-    Q2 = State()
     Q3 = State()
     Q4 = State()
-    Q5 = State()
     Q6 = State()
     Q7 = State()
-    Q8 = State()
     Q9 = State()
     Q10 = State()
     Q11 = State()
@@ -61,22 +57,18 @@ SURVEY_GREETING = """
 """
 
 SURVEY_QUESTIONS = {
-    1: "1. ГГ-ММ-ДД опроса подписчика",
-    2: "2. Телеграм ID подписчика",
-    3: "3. Телеграм @username подписчика",
-    4: "4. ФИО подписчика",
-    5: "5. ГГ-ММ-ДД рождения подписчика",
-    6: "6. Место жительства: область, район, город, поселок",
-    7: "7. Действующая эл. почта подписчика",
-    8: "8. Мобильный телефон подписчика",
-    9: "9. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
-    10: "10. Cамая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
-    11: "11. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
-    12: "12. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
-    13: "13. Вы будете пассивным подписчиком в нашем ТГ сообществе для выполнения в контенте просмотров, реакций, комментариев, опросов? - Вы получаете по 1,0 бонусу-монете в месяц",
-    14: "14. Вы будете активным партнером - предпринимателем для развития и роста ТГ сообщества? - Вы получаете по 2,0 бонуса-монеты в месяц",
-    15: "15. Вы будете инвестором или биржевым трейдером по продажам цифровым активов в сообществе? - Вы получаете по 3,0 бонуса-монеты в месяц",
-    16: "16. У вас есть свое бизнес-предложение сотрудничества в сообществе? - Оцените здесь его полезность для вас в бонусах-монетах в месяц"
+    3: "1. Телеграм @username подписчика",
+    4: "2. ФИО и возраст подписчика",
+    6: "3. Место жительства: область, район, город, поселок",
+    7: "4. Действующая эл. почта подписчика",
+    9: "5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
+    10: "6. Cамая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
+    11: "7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
+    12: "8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
+    13: "9. Вы будете пассивным подписчиком в нашем ТГ сообществе для выполнения в контенте просмотров, реакций, комментариев, опросов? - Вы получаете по 1,0 бонусу-монете в месяц",
+    14: "10. Вы будете активным партнером - предпринимателем для развития и роста ТГ сообщества? - Вы получаете по 2,0 бонуса-монеты в месяц",
+    15: "11. Вы будете инвестором или биржевым трейдером по продажам цифровым активов в сообществе? - Вы получаете по 3,0 бонуса-монеты в месяц",
+    16: "12. У вас есть свое бизнес-предложение сотрудничества в сообществе? - Оцените здесь его полезность для вас в бонусах-монетах в месяц"
 }
 
 SURVEY_FINISH = """
@@ -132,8 +124,14 @@ async def start_survey(callback: CallbackQuery, state: FSMContext):
     if await check_blocked_user(callback):
         return
 
-    await state.set_state(SurveyStates.Q1)
-    await callback.message.answer(SURVEY_QUESTIONS[1])
+    await state.set_state(SurveyStates.Q3)
+    # Автоматически заполняем username если есть
+    if callback.from_user.username:
+        await state.update_data(q3=f"@{callback.from_user.username}")
+        await callback.message.answer(f"Ваш username: @{callback.from_user.username}\n\n{SURVEY_QUESTIONS[4]}")
+        await state.set_state(SurveyStates.Q4)
+    else:
+        await callback.message.answer(SURVEY_QUESTIONS[3])
     await callback.answer()
 
 from filters import IsBadWord
@@ -151,42 +149,9 @@ async def check_bad_words(message: Message, state: FSMContext) -> bool:
 
 
 
-@dp.message(SurveyStates.Q1)
-async def process_q1(message: Message, state: FSMContext):
-    if await check_bad_words(message, state):
-        return
-    try:
-        datetime.strptime(message.text, "%y-%m-%d")
-    except ValueError:
-        await message.answer("Пожалуйста, введите дату в формате ГГ-ММ-ДД (например, 90-05-15)")
-        return
 
-    if len(message.text) > 150:
-        await message.answer("Ответ должен содержать не более 150 символов.")
-        return
 
-    await state.update_data(q1=message.text)
-    await message.answer(SURVEY_QUESTIONS[2])
-    await state.set_state(SurveyStates.Q2)
 
-@dp.message(IsBadWord(), SurveyStates.Q2)
-async def process_q2_badword(message: Message, state: FSMContext):
-    await message.delete()
-    await message.answer("❌ Использование нецензурной лексики запрещено в нашем сообществе!")
-    return
-
-@dp.message(SurveyStates.Q2)
-async def process_q2(message: Message, state: FSMContext):
-    if len(message.text) > 150:
-        await message.answer("Ответ должен содержать не более 150 символов.")
-        return
-    if not message.text.isdigit():
-        await message.answer("Пожалуйста, введите числовой Telegram ID.")
-        return
-
-    await state.update_data(q2=message.text)
-    await message.answer(SURVEY_QUESTIONS[3])
-    await state.set_state(SurveyStates.Q3)
 
 @dp.message(IsBadWord(), SurveyStates.Q3)
 async def process_q3_badword(message: Message, state: FSMContext):
@@ -215,26 +180,10 @@ async def process_q4(message: Message, state: FSMContext):
         return
 
     await state.update_data(q4=message.text)
-    await message.answer(SURVEY_QUESTIONS[5])
-    await state.set_state(SurveyStates.Q5)
-
-@dp.message(SurveyStates.Q5)
-async def process_q5(message: Message, state: FSMContext):
-    if await check_bad_words(message, state):
-        return
-    try:
-        datetime.strptime(message.text, "%y-%m-%d")
-    except ValueError:
-        await message.answer("Пожалуйста, введите дату в формате ГГ-ММ-ДД (например, 90-05-15)")
-        return
-
-    if len(message.text) > 150:
-        await message.answer("Ответ должен содержать не более 150 символов.")
-        return
-
-    await state.update_data(q5=message.text)
     await message.answer(SURVEY_QUESTIONS[6])
     await state.set_state(SurveyStates.Q6)
+
+
 
 @dp.message(SurveyStates.Q6)
 async def process_q6(message: Message, state: FSMContext):
@@ -260,23 +209,10 @@ async def process_q7(message: Message, state: FSMContext):
         return
 
     await state.update_data(q7=message.text)
-    await message.answer(SURVEY_QUESTIONS[8])
-    await state.set_state(SurveyStates.Q8)
-
-@dp.message(SurveyStates.Q8)  # Телефон
-async def process_q8(message: Message, state: FSMContext):
-    if await check_bad_words(message, state):
-        return
-    if not is_valid_phone(message.text):
-        await message.answer("Пожалуйста, введите корректный номер телефона (например, +79991234567)")
-        return
-    if len(message.text) > 150:
-        await message.answer("Ответ должен содержать не более 150 символов.")
-        return
-
-    await state.update_data(q8=message.text)
     await message.answer(SURVEY_QUESTIONS[9])
     await state.set_state(SurveyStates.Q9)
+
+
 
 @dp.message(SurveyStates.Q9)
 async def process_q9(message: Message, state: FSMContext):
@@ -407,12 +343,12 @@ async def process_q16(message: Message, state: FSMContext):
                 data.get("last_name", ""),
                 1,
                 datetime.now().isoformat(),
-                data.get("q1", ""),
+                datetime.now().strftime("%Y-%m-%d"), # Автоматическая дата
                 data.get("q4", ""),
-                data.get("q5", ""),
+                "", # Дата рождения удалена
                 data.get("q6", ""),
                 data.get("q7", ""),
-                data.get("q8", ""),
+                "", # Телефон удален
                 data.get("q9", ""),
                 data.get("q10", ""),
                 data.get("q11", ""),
@@ -425,7 +361,7 @@ async def process_q16(message: Message, state: FSMContext):
         )
 
         # Сохраняем ответы на вопросы
-        for q_num in range(1, 17):
+        for q_num in [3, 4, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]:
             await db.execute(
                 "INSERT INTO survey_answers (user_id, question_id, answer_text, answered_at) VALUES (?, ?, ?, ?)",
                 (user_id, q_num, data.get(f"q{q_num}", ""), datetime.now().isoformat())

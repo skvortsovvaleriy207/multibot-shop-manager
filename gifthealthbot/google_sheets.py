@@ -125,6 +125,22 @@ async def sync_with_google_sheets():
                     continue
             
             for user_id, row in unique_rows.items():
+                # Check for recent local update to prevent overwrite
+                # If local data was updated less than 10 minutes ago, skip this sync cycle
+                try:
+                    cursor = await db.execute("SELECT updated_at FROM users WHERE user_id = ?", (user_id,))
+                    time_row = await cursor.fetchone()
+                    if time_row and time_row[0]:
+                        try:
+                            last_update = datetime.fromisoformat(time_row[0])
+                            if (datetime.now() - last_update).total_seconds() < 600: # 10 minutes
+                                logging.info(f"Skipping sync for user {user_id} due to recent local update ({time_row[0]})")
+                                continue
+                        except ValueError:
+                            pass # Invalid date format, proceed with sync
+                except Exception as e:
+                    logging.error(f"Error checking updated_at for user {user_id}: {e}")
+
                 cursor = await db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
                 db_user = await cursor.fetchone()
                 
@@ -191,6 +207,16 @@ async def sync_with_google_sheets():
                             }
                 try:
                     has_completed_survey = db_user_survey_status.get(user_id, 0)
+                    
+                    # Если статус 0 (новый или не прошел), проверяем наличие данных опроса в таблице
+                    if has_completed_survey == 0:
+                        has_survey_data = any([
+                            row.get('Финансовая проблема'),
+                            row.get('Социальная проблема'),
+                            row.get('Экологическая проблема')
+                        ])
+                        if has_survey_data:
+                            has_completed_survey = 1
                     user_data = {
                         "user_id": user_id,
                         "username": row.get('Username', ''),

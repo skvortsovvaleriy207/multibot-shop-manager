@@ -33,15 +33,34 @@ def init_unified_sheet():
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
 
         sheets_config = [
-            (SHEET_MAIN, 33,
-             ["ДД/ММ/ГГ проведения опроса", "Телеграм ID", "Телеграм @username", "ФИО подписчика", "ДД/ММ/ГГ рождения",
-              "Место жительства", "Email", "Мобильный телефон", "Текущая занятость", "Финансовая проблема",
-              "Социальная проблема", "Экологическая проблема", "Пассивный подписчик (1.0)", "Активный партнер (2.0)",
-              "Инвестор/трейдер (3.0)", "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
-              "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация", "ДД/ММ/ГГ партнерства", "Количество рефералов",
-              "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
-              "Иная информация магазин", "Статус в магазине", "Бизнес подписчика", "Заказы/Товары/Услуги",
-              "Статус аккаунта (Р/Б)"]),
+            (SHEET_MAIN, 27,
+             ["1. Имя Username подписчика в Телеграм",
+              "2. ФИО и возраст подписчика",
+              "3. Место жительства подписчика",
+              "4. Эл. почта подписчика",
+              "5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
+              "6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
+              "7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
+              "8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
+              "9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц",
+              "10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц",
+              "11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц",
+              "12. Свое предложение от подписчика",
+              "13. ИТОГО: сумма бонусов монет по графам 9+10+11+12",
+              "14. Добавление (+) / уменьшение (-) бонусов-монет админом, причина изменения",
+              "15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14",
+              "16. Иная информация для админа",
+              "17. Текущее количество рефералов у партнера",
+              "18. Бонусы партнеру за рефералов",
+              "19. ID подписчика в магазине",
+              "20. Количество заявок в магазине",
+              "21. Количество заказов товаров (Т), услуг (У), предложений (П)",
+              "22. Общая стоимость всех покупок в магазине",
+              "23. Общая стоимость всех продаж в магазине",
+              "24. Иная информация о подписчике в магазине",
+              "25. Свой бизнес (ООО, ИП, С/з, АО, НКО) у подписчика магазина",
+              "26. Статус подписчика",
+              "27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика"]),
             (SHEET_PARTNERS, 6,
              ["Тематика партнерства", "Команда партнера", "Активность партнера", "Каналы/чаты подписки",
               "Статус партнера", "Примечание"]),
@@ -132,10 +151,10 @@ async def sync_with_google_sheets():
                     db_fields = {
                         'username': str(db_user[1] or '').strip(),
                         'full_name': str(db_user[7] or '').strip(),
-                        'birth_date': str(db_user[8] or '').strip(),
+                        # 'birth_date': str(db_user[8] or '').strip(), # Removed
                         'location': str(db_user[9] or '').strip(),
                         'email': str(db_user[10] or '').strip(),
-                        'phone': str(db_user[11] or '').strip(),
+                        # 'phone': str(db_user[11] or '').strip(), # Removed
                         'employment': str(db_user[12] or '').strip(),
                         'financial_problem': str(db_user[13] or '').strip(),
                         'social_problem': str(db_user[14] or '').strip(),
@@ -149,22 +168,20 @@ async def sync_with_google_sheets():
                     }
                     
                     gsheet_fields = {
-                        'username': str(row.get('Username', '')).strip(),
-                        'full_name': str(row.get('ФИО', '')).strip(),
-                        'birth_date': str(row.get('Дата рождения', '')).strip(),
-                        'location': str(row.get('Место жительства', '')).strip(),
-                        'email': str(row.get('Email', '')).strip(),
-                        'phone': str(row.get('Телефон', '')).strip(),
-                        'employment': str(row.get('Занятость', '')).strip(),
-                        'financial_problem': str(row.get('Финансовая проблема', '')).strip(),
-                        'social_problem': str(row.get('Социальная проблема', '')).strip(),
-                        'ecological_problem': str(row.get('Экологическая проблема', '')).strip(),
-                        'passive_subscriber': str(row.get('Пассивный подписчик', '')).strip(),
-                        'active_partner': str(row.get('Активный партнер', '')).strip(),
-                        'investor_trader': str(row.get('Инвестор/трейдер', '')).strip(),
-                        'business_proposal': str(row.get('Бизнес-предложение', '')).strip(),
-                        'bonus_total': _safe_float(row.get('Сумма бонусов', 0)),
-                        'current_balance': _safe_float(row.get('Текущий баланс', 0))
+                        'username': str(row.get('1. Имя Username подписчика в Телеграм', '')).strip(),
+                        'full_name': str(row.get('2. ФИО и возраст подписчика', '')).strip(),
+                        'location': str(row.get('3. Место жительства подписчика', '')).strip(),
+                        'email': str(row.get('4. Эл. почта подписчика', '')).strip(),
+                        'employment': str(row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', '')).strip(),
+                        'financial_problem': str(row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', '')).strip(),
+                        'social_problem': str(row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', '')).strip(),
+                        'ecological_problem': str(row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', '')).strip(),
+                        'passive_subscriber': str(row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', '')).strip(),
+                        'active_partner': str(row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', '')).strip(),
+                        'investor_trader': str(row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', '')).strip(),
+                        'business_proposal': str(row.get('12. Свое предложение от подписчика', '')).strip(),
+                        'bonus_total': _safe_float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 0)),
+                        'current_balance': _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0))
                     }
 
                     for field in gsheet_fields:
@@ -193,25 +210,26 @@ async def sync_with_google_sheets():
                     has_completed_survey = db_user_survey_status.get(user_id, 0)
                     user_data = {
                         "user_id": user_id,
-                        "username": row.get('Username', ''),
-                        "full_name": row.get('ФИО', ''),
-                        "birth_date": row.get('Дата рождения', ''),
-                        "location": row.get('Место жительства', ''),
-                        "email": row.get('Email', ''),
-                        "phone": row.get('Телефон', ''),
-                        "employment": row.get('Занятость', ''),
-                        "financial_problem": row.get('Финансовая проблема', ''),
-                        "social_problem": row.get('Социальная проблема', ''),
-                        "ecological_problem": row.get('Экологическая проблема', ''),
-                        "passive_subscriber": row.get('Пассивный подписчик', ''),
-                        "active_partner": row.get('Активный партнер', ''),
-                        "investor_trader": row.get('Инвестор/трейдер', ''),
-                        "business_proposal": row.get('Бизнес-предложение', ''),
-                        "bonus_total": float(row.get('Сумма бонусов') or 0),
-                        "current_balance": float(row.get('Текущий баланс') or 0),
+                        "username": row.get('1. Имя Username подписчика в Телеграм', ''),
+                        "full_name": row.get('2. ФИО и возраст подписчика', ''),
+                        "birth_date": '',
+                        "location": row.get('3. Место жительства подписчика', ''),
+                        "email": row.get('4. Эл. почта подписчика', ''),
+                        "phone": '',
+                        "employment": row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', ''),
+                        "financial_problem": row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', ''),
+                        "social_problem": row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', ''),
+                        "ecological_problem": row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', ''),
+                        "passive_subscriber": row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', ''),
+                        "active_partner": row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', ''),
+                        "investor_trader": row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', ''),
+                        "business_proposal": row.get('12. Свое предложение от подписчика', ''),
+                        "bonus_total": float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12') or 0),
+                        "current_balance": float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14') or 0),
                         "updated_at": datetime.now().isoformat(),
                         "has_completed_survey": has_completed_survey,
-                        "account_status": row.get("Статус аккаунта", "Р")
+                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
+                        "notes": row.get("16. Иная информация для админа", "") 
                     }
                     full_name = user_data.get("full_name", "").split()
                     if len(full_name) > 0:
@@ -267,14 +285,10 @@ async def sync_db_to_google_sheets():
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
-                    sa1.answer_text as survey_date,
-                    u.user_id,
                     sa3.answer_text as username,
                     sa4.answer_text as full_name,
-                    sa5.answer_text as birth_date,
                     sa6.answer_text as location,
                     sa7.answer_text as email,
-                    sa8.answer_text as phone,
                     sa9.answer_text as employment,
                     sa10.answer_text as financial_problem,
                     sa11.answer_text as social_problem,
@@ -286,21 +300,17 @@ async def sync_db_to_google_sheets():
                     ub.bonus_total,
                     ub.bonus_adjustment,
                     ub.current_balance,
-                    u.problem_cost,
                     u.notes,
-                    u.partnership_date,
-                    COALESCE(u.total_referrals, u.referral_count, 0) as referral_count,
-                    COALESCE(u.referral_earnings, u.referral_payment, 0) as referral_payment,
-                    u.subscription_date,
-                    u.subscription_date,
+                    u.referral_count,
+                    u.referral_payment,
+                    CAST(u.user_id AS TEXT),
                     u.requests_text,
                     u.purchases,
                     u.sales,
                     u.requisites,
-                    u.shop_id,
                     u.business,
-                    u.products_services,
-                    u.account_status
+                    u.account_status,
+                    u.account_status -- Duplicate for 27th column if needed or just status
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
                 LEFT JOIN survey_answers sa1 ON u.user_id = sa1.user_id AND sa1.question_id = 1
@@ -325,20 +335,82 @@ async def sync_db_to_google_sheets():
             users = await cursor.fetchall()
 
         headers = [
-            "Дата опроса", "Telegram ID", "Username", "ФИО", "Дата рождения",
-            "Место жительства", "Email", "Телефон", "Занятость",
-            "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
-            "Пассивный подписчик", "Активный партнер", "Инвестор/трейдер",
-            "Бизнес-предложение", "Сумма бонусов", "Корректировка бонусов",
-            "Текущий баланс", "Стоимость проблем", "Примечания",
-            "Дата партнерства", "Количество рефералов", "Оплата за рефералов",
-            "Дата подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
-            "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
+            "1. Имя Username подписчика в Телеграм",
+            "2. ФИО и возраст подписчика",
+            "3. Место жительства подписчика",
+            "4. Эл. почта подписчика",
+            "5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
+            "6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
+            "7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
+            "8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
+            "9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц",
+            "10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц",
+            "11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц",
+            "12. Свое предложение от подписчика",
+            "13. ИТОГО: сумма бонусов монет по графам 9+10+11+12",
+            "14. Добавление (+) / уменьшение (-) бонусов-монет админом, причина изменения",
+            "15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14",
+            "16. Иная информация для админа",
+            "17. Текущее количество рефералов у партнера",
+            "18. Бонусы партнеру за рефералов",
+            "19. ID подписчика в магазине", # Telegram ID
+            "20. Количество заявок в магазине", # requests_text
+            "21. Количество заказов товаров (Т), услуг (У), предложений (П)", # purchases count + sales count? Or just purchase count? Let's use purchases split.
+            "22. Общая стоимость всех покупок в магазине", # purchases sum
+            "23. Общая стоимость всех продаж в магазине", # sales sum
+            "24. Иная информация о подписчике в магазине", # requisites
+            "25. Свой бизнес (ООО, ИП, С/з, АО, НКО) у подписчика магазина", # business
+            "26. Статус подписчика", # shop stuff?? Using account_status or shop_id? Let's use 'Статус аккаунта' if undefined.
+            "27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика" # account_status
         ]
 
         data = [headers]
         for user in users:
-            data.append(list(user))
+            # Parse purchases and sales strings "Count (на Sum)"
+            p_text = user[20] or ""
+            p_count = "0"
+            p_sum = "0"
+            if " (на " in p_text:
+                parts = p_text.split(" (на ")
+                p_count = parts[0]
+                p_sum = parts[1].replace(")", "")
+            
+            s_text = user[21] or ""
+            s_sum = "0"
+            if " (на " in s_text:
+                parts = s_text.split(" (на ")
+                s_sum = parts[1].replace(")", "")
+
+            row_data = [
+                user[0], # Username
+                user[1], # Full Name + Age
+                user[2], # Location
+                user[3], # Email
+                user[4], # Employment
+                user[5], # Financial Problem
+                user[6], # Social Problem
+                user[7], # Ecological Problem
+                user[8], # Passive
+                user[9], # Active
+                user[10], # Investor
+                user[11], # Proposal
+                user[12], # Bonus Total
+                user[13], # Bonus Adjustment
+                user[14], # Current Balance
+                user[15], # Notes (16)
+                user[16], # Referral Count (17)
+                user[17], # Referral Payment (18)
+                user[18], # ID (19)
+                user[19], # Requests (20)
+                p_count,  # Purchase Count (21)
+                p_sum,    # Purchase Sum (22)
+                s_sum,    # Sales Sum (23)
+                user[22], # Requisites -> Other info (24)
+                user[23], # Business (25)
+                "",       # Status subscriber (26) - Placeholder as no direct mapping found besides account_status
+                user[24]  # Account Status (27)
+            ]
+            data.append(row_data)
 
         sheet.clear()
         sheet.update('A1', data)
@@ -535,14 +607,10 @@ async def sync_db_to_main_survey_sheet():
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
-                    sa1.answer_text,
-                    CAST(u.user_id AS TEXT),
                     sa3.answer_text,
                     sa4.answer_text,
-                    sa5.answer_text,
                     sa6.answer_text,
                     sa7.answer_text,
-                    sa8.answer_text,
                     sa9.answer_text,
                     sa10.answer_text,
                     sa11.answer_text,
@@ -557,6 +625,7 @@ async def sync_db_to_main_survey_sheet():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
+                    CAST(u.user_id AS TEXT), # Moved user_id here
                     u.referral_count,
                     u.referral_payment,
                     u.subscription_date,
@@ -592,14 +661,14 @@ async def sync_db_to_main_survey_sheet():
             users = await cursor.fetchall()
 
         headers = [
-            "Дата опроса", "Telegram ID", "Username", "ФИО", "Дата рождения",
-            "Место жительства", "Email", "Телефон", "Занятость",
+            "Телеграм @username", "ФИО и возраст подписчика",
+            "Место жительства", "Email", "Текущая занятость",
             "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
-            "Пассивный подписчик", "Активный партнер", "Инвестор/трейдер",
-            "Бизнес-предложение", "Сумма бонусов", "Корректировка бонусов",
-            "Текущий баланс", "Стоимость проблем", "Примечания",
-            "Дата партнерства", "Количество рефералов", "Оплата за рефералов",
-            "Дата подписки", "Дата оплаты подписки", "Покупки", "Продажи",
+            "Пассивный подписчик (1.0)", "Активный партнер (2.0)", "Инвестор/трейдер (3.0)",
+            "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
+            "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация",
+            "ДД/ММ/ГГ партнерства", "Телеграм ID", "Количество рефералов",
+            "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Дата оплаты подписки", "Заказы-Покупки", "Заказы-Продажи",
             "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
         ]
 
