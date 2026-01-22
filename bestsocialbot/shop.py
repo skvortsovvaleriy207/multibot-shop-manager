@@ -326,13 +326,11 @@ async def my_profile(callback: CallbackQuery):
     )
 
     if answers:
-        profile_text += f"\n📅 {SURVEY_QUESTIONS[1]}\n{answers[0][0] or 'Не указано'}\n"
+        profile_text += f"\n📅 Дата прохождения\n{answers[0][0] or 'Не указано'}\n"
         profile_text += f"\n👤 {SURVEY_QUESTIONS[3]}\n{user_data[0] or 'Не указано'}\n"
         profile_text += f"\n📝 {SURVEY_QUESTIONS[4]}\n{answers[0][1] or 'Не указано'}\n"
-        profile_text += f"\n🎂 {SURVEY_QUESTIONS[5]}\n{answers[0][2] or 'Не указано'}\n"
         profile_text += f"\n📍 {SURVEY_QUESTIONS[6]}\n{answers[0][3] or 'Не указано'}\n"
         profile_text += f"\n📧 {SURVEY_QUESTIONS[7]}\n{answers[0][4] or 'Не указано'}\n"
-        profile_text += f"\n📱 {SURVEY_QUESTIONS[8]}\n{answers[0][5] or 'Не указано'}\n"
         profile_text += f"\n💼 {SURVEY_QUESTIONS[9]}\n{answers[0][6] or 'Не указано'}\n"
         profile_text += f"\n💰 {SURVEY_QUESTIONS[10]}\n{answers[0][7] or 'Не указано'}\n"
         profile_text += f"\n👥 {SURVEY_QUESTIONS[11]}\n{answers[0][8] or 'Не указано'}\n"
@@ -526,12 +524,11 @@ async def property_catalog(callback: CallbackQuery):
 
     # Получаем категории предложений из БД
     async with aiosqlite.connect("bot_database.db") as db:
-        # Для предложений (item_type = 'offer')
+        # Получаем категории из таблицы categories
         cursor = await db.execute("""
-            SELECT DISTINCT category FROM order_requests 
-            WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 
-            AND status IN ('active', 'approved')
-            ORDER BY category
+            SELECT name FROM categories 
+            WHERE catalog_type = 'offer'
+            ORDER BY name
         """)
         categories = await cursor.fetchall()
 
