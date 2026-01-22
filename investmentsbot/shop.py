@@ -289,7 +289,7 @@ async def my_profile(callback: CallbackQuery):
 
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute(
-            "SELECT username, first_name, last_name, created_at, full_name FROM users WHERE user_id = ?",
+            "SELECT username, first_name, last_name, created_at, full_name, user_status FROM users WHERE user_id = ?",
             (user_id,)
         )
         user_data = await cursor.fetchone()
@@ -321,18 +321,19 @@ async def my_profile(callback: CallbackQuery):
         f"👤 Никнейм: {user_data[0] or 'Не указано'}\n"
         f"📝 ФИО: {full_name_answer or 'Не указано'}\n"
         f"📅 Дата регистрации: {(datetime.fromisoformat(user_data[3]).strftime('%d.%m.%Y %H:%M') if isinstance(user_data[3], str) else 'Не указано')}\n"
-        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n\n"
+        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n"
+        f"🔰 Статус: {user_data[5] or 'Не указан'}\n\n"
         f"📊 **Ваши ответы на опрос:**\n"
     )
 
     if answers:
-        profile_text += f"\n📅 {SURVEY_QUESTIONS[1]}\n{answers[0][0] or 'Не указано'}\n"
+        profile_text += f"\n📅 Дата опроса\n{answers[0][0] or 'Не указано'}\n"
         profile_text += f"\n👤 {SURVEY_QUESTIONS[3]}\n{user_data[0] or 'Не указано'}\n"
         profile_text += f"\n📝 {SURVEY_QUESTIONS[4]}\n{answers[0][1] or 'Не указано'}\n"
-        profile_text += f"\n🎂 {SURVEY_QUESTIONS[5]}\n{answers[0][2] or 'Не указано'}\n"
+        # profile_text += f"\n🎂 {SURVEY_QUESTIONS[5]}\n{answers[0][2] or 'Не указано'}\n" # Removed
         profile_text += f"\n📍 {SURVEY_QUESTIONS[6]}\n{answers[0][3] or 'Не указано'}\n"
         profile_text += f"\n📧 {SURVEY_QUESTIONS[7]}\n{answers[0][4] or 'Не указано'}\n"
-        profile_text += f"\n📱 {SURVEY_QUESTIONS[8]}\n{answers[0][5] or 'Не указано'}\n"
+        # profile_text += f"\n📱 {SURVEY_QUESTIONS[8]}\n{answers[0][5] or 'Не указано'}\n" # Removed
         profile_text += f"\n💼 {SURVEY_QUESTIONS[9]}\n{answers[0][6] or 'Не указано'}\n"
         profile_text += f"\n💰 {SURVEY_QUESTIONS[10]}\n{answers[0][7] or 'Не указано'}\n"
         profile_text += f"\n👥 {SURVEY_QUESTIONS[11]}\n{answers[0][8] or 'Не указано'}\n"
@@ -528,18 +529,16 @@ async def property_catalog(callback: CallbackQuery):
     async with aiosqlite.connect("bot_database.db") as db:
         # Для предложений (item_type = 'offer')
         cursor = await db.execute("""
-            SELECT DISTINCT category FROM order_requests 
-            WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 
-            AND status IN ('active', 'approved')
-            ORDER BY category
+            SELECT name FROM categories WHERE catalog_type = 'offer' ORDER BY name
         """)
         categories = await cursor.fetchall()
 
     if categories:
         for cat_name in categories:
+            safe_name = cat_name[0]
             builder.add(types.InlineKeyboardButton(
-                text=f"🤝 {cat_name[0]}",
-                callback_data=f"pc_{cat_name[0]}"
+                text=f"🤝 {safe_name}",
+                callback_data=f"pc_{safe_name}"
             ))
     else:
         builder.add(types.InlineKeyboardButton(

@@ -1681,7 +1681,7 @@ async def product_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(
@@ -3140,7 +3140,7 @@ async def service_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(
@@ -4131,7 +4131,7 @@ async def offer_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(

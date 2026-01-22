@@ -287,9 +287,17 @@ async def my_profile(callback: CallbackQuery):
 
     user_id = callback.from_user.id
 
+    # Синхронизируем данные с Google Sheets перед отображением
+    try:
+        from google_sheets import sync_from_sheets_to_db
+        await callback.answer("🔄 Синхронизация...", show_alert=False)
+        await sync_from_sheets_to_db()
+    except Exception as e:
+        print(f"Ошибка синхронизации профиля: {e}")
+
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute(
-            "SELECT username, first_name, last_name, created_at, full_name FROM users WHERE user_id = ?",
+            "SELECT username, first_name, last_name, created_at, full_name, user_status FROM users WHERE user_id = ?",
             (user_id,)
         )
         user_data = await cursor.fetchone()
@@ -321,7 +329,8 @@ async def my_profile(callback: CallbackQuery):
         f"👤 Никнейм: {user_data[0] or 'Не указано'}\n"
         f"📝 ФИО: {full_name_answer or 'Не указано'}\n"
         f"📅 Дата регистрации: {(datetime.fromisoformat(user_data[3]).strftime('%d.%m.%Y %H:%M') if isinstance(user_data[3], str) else 'Не указано')}\n"
-        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n\n"
+        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n"
+        f"🔰 Статус: {user_data[5] or 'Не указан'}\n\n"
         f"📊 **Ваши ответы на опрос:**\n"
     )
 

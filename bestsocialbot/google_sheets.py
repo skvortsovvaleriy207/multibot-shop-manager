@@ -164,8 +164,15 @@ async def sync_with_google_sheets():
                         'investor_trader': str(db_user[18] or '').strip(),
                         'business_proposal': str(db_user[19] or '').strip(),
                         'bonus_total': float(db_user[20] or 0),
-                        'current_balance': float(db_user[22] or 0)
+                        'bonus_total': float(db_user[20] or 0),
+                        'current_balance': float(db_user[22] or 0),
+                        'user_status': str(db_user[-1] if db_user[-1] else '').strip() # Assuming user_status is last or handled
                     }
+                    
+                    # Need to verify db_user index for user_status. 
+                    # sync_with_google_sheets uses "SELECT * FROM users", so I need to know the index.
+                    # Since I added user_status at the end in db.py, it should be the last column.
+
                     
                     gsheet_fields = {
                         'username': str(row.get('1. Имя Username подписчика в Телеграм', '')).strip(),
@@ -181,7 +188,8 @@ async def sync_with_google_sheets():
                         'investor_trader': str(row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', '')).strip(),
                         'business_proposal': str(row.get('12. Свое предложение от подписчика', '')).strip(),
                         'bonus_total': _safe_float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 0)),
-                        'current_balance': _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0))
+                        'current_balance': _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0)),
+                        'user_status': str(row.get('26. Статус подписчика', '')).strip()
                     }
 
                     for field in gsheet_fields:
@@ -229,7 +237,10 @@ async def sync_with_google_sheets():
                         "updated_at": datetime.now().isoformat(),
                         "has_completed_survey": has_completed_survey,
                         "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
-                        "notes": row.get("16. Иная информация для админа", "") 
+                        "has_completed_survey": has_completed_survey,
+                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
+                        "notes": row.get("16. Иная информация для админа", ""),
+                        "user_status": row.get("26. Статус подписчика", "")
                     }
                     full_name = user_data.get("full_name", "").split()
                     if len(full_name) > 0:
@@ -310,7 +321,8 @@ async def sync_db_to_google_sheets():
                     u.requisites,
                     u.business,
                     u.account_status,
-                    u.account_status -- Duplicate for 27th column if needed or just status
+                    u.account_status, -- Duplicate for 27th column if needed or just status
+                    u.user_status
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
                 LEFT JOIN survey_answers sa1 ON u.user_id = sa1.user_id AND sa1.question_id = 1
@@ -407,7 +419,8 @@ async def sync_db_to_google_sheets():
                 s_sum,    # Sales Sum (23)
                 user[22], # Requisites -> Other info (24)
                 user[23], # Business (25)
-                "",       # Status subscriber (26) - Placeholder as no direct mapping found besides account_status
+                user[23], # Business (25)
+                user[25], # User Status (26)
                 user[24]  # Account Status (27)
             ]
             data.append(row_data)
@@ -464,13 +477,19 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                 try:
                     # Получаем ID пользователя (пробуем разные названия столбцов)
                     telegram_id = None
-
-                    if 'Telegram ID' in row:
-                        telegram_id = row['Telegram ID']
-                    elif 'User ID' in row:
-                        telegram_id = row['User ID']
-                    elif 'ID' in row:
-                        telegram_id = row['ID']
+                    
+                    # Порядок проверки ключей важен
+                    keys_to_check = [
+                        '19. ID подписчика в магазине',
+                        'Telegram ID',
+                        'User ID',
+                        'ID'
+                    ]
+                    
+                    for key in keys_to_check:
+                         if key in row and str(row[key]).strip():
+                             telegram_id = row[key]
+                             break
 
                     # Пропускаем строки без ID
                     if not telegram_id or str(telegram_id).strip() == '':
@@ -483,28 +502,30 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         continue
 
                     # Формируем данные пользователя для вставки/обновления
+                    # Используем нумерованные заголовки как в sync_with_google_sheets
                     user_data = {
                         "user_id": user_id,
-                        "username": row.get('Username', ''),
-                        "full_name": row.get('ФИО', ''),
-                        "birth_date": row.get('Дата рождения', ''),
-                        "location": row.get('Место жительства', ''),
-                        "email": row.get('Email', ''),
-                        "phone": row.get('Телефон', ''),
-                        "employment": row.get('Занятость', ''),
-                        "financial_problem": row.get('Финансовая проблема', ''),
-                        "social_problem": row.get('Социальная проблема', ''),
-                        "ecological_problem": row.get('Экологическая проблема', ''),
-                        "passive_subscriber": row.get('Пассивный подписчик', ''),
-                        "active_partner": row.get('Активный партнер', ''),
-                        "investor_trader": row.get('Инвестор/трейдер', ''),
-                        "business_proposal": row.get('Бизнес-предложение', ''),
-                        "bonus_total": _safe_float(row.get('Сумма бонусов', 0)),
-                        "current_balance": _safe_float(row.get('Текущий баланс', 0)),
-                        "problem_cost": row.get('Стоимость проблем', ''),
-                        "notes": row.get('Примечания', ''),
-                        "account_status": row.get('Статус аккаунта', 'Р'),
-                        "updated_at": datetime.now().isoformat()
+                        "username": row.get('1. Имя Username подписчика в Телеграм', ''),
+                        "full_name": row.get('2. ФИО и возраст подписчика', ''),
+                        "birth_date": '', 
+                        "location": row.get('3. Место жительства подписчика', ''),
+                        "email": row.get('4. Эл. почта подписчика', ''),
+                        "phone": '', 
+                        "employment": row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', ''),
+                        "financial_problem": row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', ''),
+                        "social_problem": row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', ''),
+                        "ecological_problem": row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', ''),
+                        "passive_subscriber": row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', ''),
+                        "active_partner": row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', ''),
+                        "investor_trader": row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', ''),
+                        "business_proposal": row.get('12. Свое предложение от подписчика', ''),
+                        "bonus_total": _safe_float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 0)),
+                        "current_balance": _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0)),
+                        "problem_cost": '',
+                        "notes": row.get('16. Иная информация для админа', ''),
+                        "account_status": row.get('27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика', 'Р'),
+                        "updated_at": datetime.now().isoformat(),
+                        "user_status": row.get('26. Статус подписчика', '')
                     }
 
                     # Извлекаем имя и фамилию из полного имени
@@ -564,6 +585,29 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
 
                         await db.execute(insert_query, list(user_data.values()))
                         logging.info(f"Добавлен пользователь {user_id}")
+
+                    # --- Sync User Bonuses ---
+                    # Важно обновить таблицу user_bonuses, так как shop.py берет баланс оттуда
+                    cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
+                    bonus_record = await cursor.fetchone()
+                    
+                    if bonus_record:
+                        await db.execute(
+                            """
+                            UPDATE user_bonuses 
+                            SET bonus_total = ?, current_balance = ?, updated_at = ?
+                            WHERE user_id = ?
+                            """,
+                            (user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"], user_id))
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO user_bonuses 
+                            (user_id, bonus_total, current_balance, updated_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
+                    # -------------------------
 
                     synced_count += 1
 
