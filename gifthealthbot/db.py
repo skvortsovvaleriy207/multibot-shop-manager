@@ -50,7 +50,8 @@ async def init_db():
                     business TEXT,
                     products_services TEXT,
                     account_status TEXT,
-                    requests_text TEXT
+                    requests_text TEXT,
+                    user_status TEXT
                 )
             """)
 
@@ -58,6 +59,13 @@ async def init_db():
             try:
                 await db.execute("ALTER TABLE users ADD COLUMN requests_text TEXT")
                 print("Added column requests_text to users table")
+            except Exception:
+                pass # Колонка уже существует
+
+            # Проверка и добавление колонки user_status если её нет (миграция)
+            try:
+                await db.execute("ALTER TABLE users ADD COLUMN user_status TEXT")
+                print("Added column user_status to users table")
             except Exception:
                 pass # Колонка уже существует
 

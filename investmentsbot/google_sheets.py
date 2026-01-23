@@ -145,52 +145,67 @@ async def sync_with_google_sheets():
                     continue
             
             for user_id, row in unique_rows.items():
-                cursor = await db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+                # Explicitly select needed columns to avoid index confusion
+                cursor = await db.execute("""
+                    SELECT username, full_name, birth_date, location, email, phone, 
+                           employment, financial_problem, social_problem, ecological_problem, 
+                           passive_subscriber, active_partner, investor_trader, business_proposal, 
+                           bonus_total, current_balance, user_status 
+                    FROM users WHERE user_id = ?
+                """, (user_id,))
                 db_user = await cursor.fetchone()
                 
                 if db_user:
+                    def get_val(keys):
+                        for k in keys:
+                            if k in row:
+                                return str(row[k]).strip()
+                        return ''
+
+                    def get_float_val(keys):
+                        for k in keys:
+                            if k in row:
+                                return _safe_float(row[k])
+                        return 0.0
+
                     db_fields = {
-                        'username': str(db_user[1] or '').strip(),
-                        'full_name': str(db_user[7] or '').strip(),
-                        # 'birth_date': str(db_user[8] or '').strip(), # Removed
-                        'location': str(db_user[9] or '').strip(),
-                        'email': str(db_user[10] or '').strip(),
-                        # 'phone': str(db_user[11] or '').strip(), # Removed
-                        'employment': str(db_user[12] or '').strip(),
-                        'financial_problem': str(db_user[13] or '').strip(),
-                        'social_problem': str(db_user[14] or '').strip(),
-                        'ecological_problem': str(db_user[15] or '').strip(),
-                        'passive_subscriber': str(db_user[16] or '').strip(),
-                        'active_partner': str(db_user[17] or '').strip(),
-                        'investor_trader': str(db_user[18] or '').strip(),
-                        'business_proposal': str(db_user[19] or '').strip(),
-                        'bonus_total': float(db_user[20] or 0),
-                        'bonus_total': float(db_user[20] or 0),
-                        'current_balance': float(db_user[22] or 0),
-                        'user_status': str(db_user[-1] if db_user[-1] else '').strip() # Assuming user_status is last or handled
+                        'username': str(db_user[0] or '').strip(),
+                        'full_name': str(db_user[1] or '').strip(),
+                        'birth_date': str(db_user[2] or '').strip(),
+                        'location': str(db_user[3] or '').strip(),
+                        'email': str(db_user[4] or '').strip(),
+                        'phone': str(db_user[5] or '').strip(),
+                        'employment': str(db_user[6] or '').strip(),
+                        'financial_problem': str(db_user[7] or '').strip(),
+                        'social_problem': str(db_user[8] or '').strip(),
+                        'ecological_problem': str(db_user[9] or '').strip(),
+                        'passive_subscriber': str(db_user[10] or '').strip(),
+                        'active_partner': str(db_user[11] or '').strip(),
+                        'investor_trader': str(db_user[12] or '').strip(),
+                        'business_proposal': str(db_user[13] or '').strip(),
+                        'bonus_total': float(db_user[14] or 0),
+                        'current_balance': float(db_user[15] or 0),
+                        'user_status': str(db_user[16] or '').strip()
                     }
                     
-                    # Need to verify db_user index for user_status. 
-                    # sync_with_google_sheets uses "SELECT * FROM users", so I need to know the index.
-                    # Since I added user_status at the end in db.py, it should be the last column.
-
-                    
                     gsheet_fields = {
-                        'username': str(row.get('1. Имя Username подписчика в Телеграм', '')).strip(),
-                        'full_name': str(row.get('2. ФИО и возраст подписчика', '')).strip(),
-                        'location': str(row.get('3. Место жительства подписчика', '')).strip(),
-                        'email': str(row.get('4. Эл. почта подписчика', '')).strip(),
-                        'employment': str(row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', '')).strip(),
-                        'financial_problem': str(row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', '')).strip(),
-                        'social_problem': str(row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', '')).strip(),
-                        'ecological_problem': str(row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', '')).strip(),
-                        'passive_subscriber': str(row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', '')).strip(),
-                        'active_partner': str(row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', '')).strip(),
-                        'investor_trader': str(row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', '')).strip(),
-                        'business_proposal': str(row.get('12. Свое предложение от подписчика', '')).strip(),
-                        'bonus_total': _safe_float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 0)),
-                        'current_balance': _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0)),
-                        'user_status': str(row.get('26. Статус подписчика', '')).strip()
+                        'username': get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
+                        'full_name': get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика']),
+                        'birth_date': get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
+                        'location': get_val(['Место жительства', '3. Место жительства подписчика']),
+                        'email': get_val(['Email', '4. Эл. почта подписчика']),
+                        'phone': get_val(['Телефон', 'Мобильный телефон']),
+                        'employment': get_val(['Занятость', '5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)']),
+                        'financial_problem': get_val(['Финансовая проблема', '6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)']),
+                        'social_problem': get_val(['Социальная проблема', '7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)']),
+                        'ecological_problem': get_val(['Экологическая проблема', '8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)']),
+                        'passive_subscriber': get_val(['Пассивный подписчик', '9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц']),
+                        'active_partner': get_val(['Активный партнер', '10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц']),
+                        'investor_trader': get_val(['Инвестор/трейдер', '11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц']),
+                        'business_proposal': get_val(['Бизнес-предложение', '12. Свое предложение от подписчика']),
+                        'bonus_total': get_float_val(['Сумма бонусов', 'ИТОГО бонусов', '13. ИТОГО: сумма бонусов монет по графам 9+10+11+12']),
+                        'current_balance': get_float_val(['Текущий баланс', 'ТЕКУЩИЙ БАЛАНС', '15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14']),
+                        'user_status': get_val(['Статус подписчика', '26. Статус подписчика', '26. Статус'])
                     }
 
                     for field in gsheet_fields:
@@ -505,29 +520,39 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
 
                     # Формируем данные пользователя для вставки/обновления
                     # Используем нумерованные заголовки как в sync_with_google_sheets
+                    def get_val(keys):
+                        for k in keys:
+                            if k in row:
+                                return row[k]
+                        return ''
+
+                    def get_float_val(keys):
+                        val = get_val(keys)
+                        return _safe_float(val)
+
                     user_data = {
                         "user_id": user_id,
-                        "username": row.get('1. Имя Username подписчика в Телеграм', ''),
-                        "full_name": row.get('2. ФИО и возраст подписчика', ''),
-                        "birth_date": '', 
-                        "location": row.get('3. Место жительства подписчика', ''),
-                        "email": row.get('4. Эл. почта подписчика', ''),
-                        "phone": '', 
-                        "employment": row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', ''),
-                        "financial_problem": row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', ''),
-                        "social_problem": row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', ''),
-                        "ecological_problem": row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', ''),
-                        "passive_subscriber": row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', ''),
-                        "active_partner": row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', ''),
-                        "investor_trader": row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', ''),
-                        "business_proposal": row.get('12. Свое предложение от подписчика', ''),
-                        "bonus_total": _safe_float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 0)),
-                        "current_balance": _safe_float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 0)),
-                        "problem_cost": '', 
-                        "notes": row.get('16. Иная информация для админа', ''),
-                        "account_status": row.get('27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика', 'Р'),
+                        "username": get_val(['1. Имя Username подписчика в Телеграм', 'Username', 'Телеграм @username']),
+                        "full_name": get_val(['2. ФИО и возраст подписчика', 'ФИО', 'ФИО и возраст подписчика']),
+                        "birth_date": get_val(['Дата рождения']),
+                        "location": get_val(['3. Место жительства подписчика', 'Место жительства']),
+                        "email": get_val(['4. Эл. почта подписчика', 'Email']),
+                        "phone": get_val(['Телефон']),
+                        "employment": get_val(['5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', 'Занятость', 'Текущая занятость']),
+                        "financial_problem": get_val(['6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', 'Финансовая проблема']),
+                        "social_problem": get_val(['7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', 'Социальная проблема']),
+                        "ecological_problem": get_val(['8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', 'Экологическая проблема']),
+                        "passive_subscriber": get_val(['9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', 'Пассивный подписчик', 'Пассивный подписчик (1.0)']),
+                        "active_partner": get_val(['10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', 'Активный партнер', 'Активный партнер (2.0)']),
+                        "investor_trader": get_val(['11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', 'Инвестор/трейдер', 'Инвестор/трейдер (3.0)']),
+                        "business_proposal": get_val(['12. Свое предложение от подписчика', 'Бизнес-предложение']),
+                        "bonus_total": get_float_val(['13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 'Сумма бонусов', 'ИТОГО бонусов']),
+                        "current_balance": get_float_val(['15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 'Текущий баланс', 'ТЕКУЩИЙ БАЛАНС']),
+                        "problem_cost": get_val(['Стоимость проблем']),
+                        "notes": get_val(['16. Иная информация для админа', 'Примечания', 'Иная информация']),
+                        "account_status": get_val(['27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика', 'Статус аккаунта', 'Account Status']) or 'Р',
                         "updated_at": datetime.now().isoformat(),
-                        "user_status": row.get('26. Статус подписчика', '')
+                        "user_status": get_val(['26. Статус подписчика', 'User Status'])
                     }
 
                     # Извлекаем имя и фамилию из полного имени
