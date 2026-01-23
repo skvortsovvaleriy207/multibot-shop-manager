@@ -458,14 +458,8 @@ import aiosqlite
 from config import BESTHOME_SURVEY_SHEET_URL, CREDENTIALS_FILE
 
 
-async def sync_from_sheets_to_db() -> Dict[str, Any]:
-    """
-    Загружает данные из Google Sheets в базу данных текущего бота
-    Только для Основной таблицы
-
-    Returns:
-        dict: Результат синхронизации
-    """
+def _fetch_sheet_data_sync():
+    """Синхронная функция для получения данных из Google Sheets (запускается в отдельном потоке)"""
     try:
         # Авторизация в Google Sheets
         client = gspread.service_account(filename=CREDENTIALS_FILE)
@@ -475,7 +469,39 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
         worksheet = spreadsheet.worksheet("Основная таблица")
 
         # Получаем все данные из таблицы
-        all_data = worksheet.get_all_records()
+        return worksheet.get_all_records()
+    except Exception as e:
+        logging.error(f"Error checking implementation details in _fetch_sheet_data_sync: {e}")
+        raise e
+
+
+async def sync_from_sheets_to_db() -> Dict[str, Any]:
+    """
+    Загружает данные из Google Sheets в базу данных текущего бота
+    Только для Основной таблицы.
+    Использует отдельный поток для сетевых запросов чтобы не блокировать event loop.
+    """
+    try:
+        # Запускаем блокирующую функцию получения данных в отдельном потоке с таймаутом
+        try:
+            all_data = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_sheet_data_sync),
+                timeout=20.0  # Таймаут 20 секунд
+            )
+        except asyncio.TimeoutError:
+            logging.error("Timeout checking implementation details for google sheets sync")
+            return {
+                "success": False,
+                "message": "Превышено время ожидания синхронизации (таймаут)",
+                "synced_count": 0
+            }
+        except Exception as e:
+            logging.error(f"Error in background thread for sync: {e}")
+            return {
+                "success": False,
+                "message": f"Ошибка соединения с таблицей: {str(e)}",
+                "synced_count": 0
+            }
 
         if not all_data:
             return {
@@ -556,6 +582,41 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         "updated_at": datetime.now().isoformat(),
                         "user_status": get_val(['26. Статус подписчика', 'User Status'])
                     }
+
+                    # Сохраняем пользователя
+                    columns = ", ".join(user_data.keys())
+                    placeholders = ", ".join([f":{key}" for key in user_data.keys()])
+                    
+                    # Разделяем ФИО
+                    full_name_parts = str(user_data.get("full_name", "")).split()
+                    if full_name_parts:
+                        user_data["first_name"] = full_name_parts[0]
+                        user_data["last_name"] = " ".join(full_name_parts[1:]) if len(full_name_parts) > 1 else ""
+
+                    await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
+                    
+                    # Обновляем таблицу бонусов
+                    cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
+                    bonus_record = await cursor.fetchone()
+                    
+                    if bonus_record:
+                        await db.execute(
+                            """
+                            UPDATE user_bonuses 
+                            SET bonus_total = ?, current_balance = ?, updated_at = ?
+                            WHERE user_id = ?
+                            """,
+                            (user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"], user_id))
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO user_bonuses 
+                            (user_id, bonus_total, current_balance, updated_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
+                            
+                    synced_count += 1
 
                 except Exception as e:
                     logging.error(f"Ошибка обработки строки: {e}")

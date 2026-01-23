@@ -102,12 +102,31 @@ def init_unified_sheet():
         return False
 
 
+def _fetch_sheet_data_sync_generic(sheet_url, worksheet_name):
+    """Синхронная функция для получения данных из Google Sheets (для запуска в thread)"""
+    try:
+        # Для надежности создаем новый клиент
+        client = gspread.service_account(filename=CREDENTIALS_FILE)
+        spreadsheet = client.open_by_url(sheet_url)
+        worksheet = spreadsheet.worksheet(worksheet_name)
+        return worksheet.get_all_records()
+    except Exception as e:
+        logging.error(f"Error in _fetch_sheet_data_sync_generic: {e}")
+        raise e
+
+
 async def sync_with_google_sheets():
     try:
-        client = get_google_sheets_client()
-        spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
-        sheet = spreadsheet.worksheet(SHEET_MAIN)
-        gsheet_data = sheet.get_all_records()
+        # Запускаем блокирующую операцию в отдельном потоке
+        try:
+            gsheet_data = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_sheet_data_sync_generic, UNIFIED_SHEET_URL, SHEET_MAIN),
+                timeout=30.0
+            )
+        except asyncio.TimeoutError:
+            logging.error("Timeout syncing with Google Sheets")
+            return None
+            
         logging.info(f"Fetched {len(gsheet_data)} rows from Google Sheets")
 
         # Повторные попытки при блокировке БД
@@ -463,15 +482,19 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
         dict: Результат синхронизации
     """
     try:
-        # Авторизация в Google Sheets
-        client = gspread.service_account(filename=CREDENTIALS_FILE)
-
-        # Открываем таблицу besthome
-        spreadsheet = client.open_by_url(BESTHOME_SURVEY_SHEET_URL)
-        worksheet = spreadsheet.worksheet("Основная таблица")
-
-        # Получаем все данные из таблицы
-        all_data = worksheet.get_all_records()
+        # Авторизация и получение данных в отдельном потоке
+        try:
+            all_data = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_sheet_data_sync_generic, BESTHOME_SURVEY_SHEET_URL, "Основная таблица"),
+                timeout=30.0
+            )
+        except asyncio.TimeoutError:
+            logging.error("Timeout fetching data from Google Sheets in sync_from_sheets_to_db")
+            return {
+                 "success": False,
+                 "message": "Timeout fetching data from Google Sheets",
+                 "synced_count": 0
+            }
 
         if not all_data:
             return {
