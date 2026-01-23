@@ -307,9 +307,42 @@ async def sync_with_google_sheets():
                         user_data["first_name"] = full_name[0]
                     if len(full_name) > 1:
                         user_data["last_name"] = " ".join(full_name[1:])
-                    columns = ", ".join(user_data.keys())
-                    placeholders = ", ".join([f":{key}" for key in user_data.keys()])
-                    await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
+
+                    # Проверяем существование пользователя
+                    cursor = await db.execute(
+                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    existing_user = await cursor.fetchone()
+
+                    if existing_user:
+                        # Сохраняем статус опроса если он уже был пройден
+                        if existing_user[1] == 1:
+                            user_data["has_completed_survey"] = 1
+                        
+                        # Обновляем существующего пользователя
+                        update_fields = []
+                        update_values = []
+
+                        for key, value in user_data.items():
+                            if key != "user_id":
+                                update_fields.append(f"{key} = ?")
+                                update_values.append(value)
+                        
+                        update_values.append(user_id)
+                        
+                        update_query = f"""
+                            UPDATE users 
+                            SET {', '.join(update_fields)}
+                            WHERE user_id = ?
+                        """
+                        
+                        await db.execute(update_query, update_values)
+                        
+                    else:
+                         columns = ", ".join(user_data.keys())
+                         placeholders = ", ".join([f":{key}" for key in user_data.keys()])
+                         await db.execute(f"INSERT INTO users ({columns}) VALUES ({placeholders})", user_data)
                     cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
                     bonus_record = await cursor.fetchone()
                     if bonus_record:
@@ -522,7 +555,7 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
         # Авторизация и получение данных в отдельном потоке
         try:
             all_data = await asyncio.wait_for(
-                asyncio.to_thread(_fetch_sheet_data_sync_generic, BESTHOME_SURVEY_SHEET_URL, "Основная таблица"),
+                asyncio.to_thread(_fetch_sheet_data_sync_generic, MAIN_SURVEY_SHEET_URL, "Основная таблица"),
                 timeout=30.0
             )
         except asyncio.TimeoutError:

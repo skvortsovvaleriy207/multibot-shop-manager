@@ -287,9 +287,47 @@ async def sync_with_google_sheets():
                         user_data["first_name"] = full_name[0]
                     if len(full_name) > 1:
                         user_data["last_name"] = " ".join(full_name[1:])
-                    columns = ", ".join(user_data.keys())
-                    placeholders = ", ".join([f":{key}" for key in user_data.keys()])
-                    await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
+                    
+                    # Проверяем существование пользователя
+                    cursor = await db.execute(
+                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    existing_user = await cursor.fetchone()
+
+                    if existing_user:
+                        # Сохраняем статус опроса если он уже был пройден
+                        if existing_user[1] == 1:
+                            user_data["has_completed_survey"] = 1
+                        
+                        # Сохраняем дату регистрации и другие важные поля, которых нет в таблице
+                        # Это предотвращает их затирание
+                        
+                        # Обновляем существующего пользователя
+                        update_fields = []
+                        update_values = []
+
+                        for key, value in user_data.items():
+                            if key != "user_id":  # user_id не обновляем
+                                update_fields.append(f"{key} = ?")
+                                update_values.append(value)
+                        
+                        # Добавляем user_id для WHERE
+                        update_values.append(user_id)
+                        
+                        update_query = f"""
+                            UPDATE users 
+                            SET {', '.join(update_fields)}
+                            WHERE user_id = ?
+                        """
+                        
+                        await db.execute(update_query, update_values)
+                        
+                    else:
+                        # Вставляем нового пользователя
+                        columns = ", ".join(user_data.keys())
+                        placeholders = ", ".join([f":{key}" for key in user_data.keys()])
+                        await db.execute(f"INSERT INTO users ({columns}) VALUES ({placeholders})", user_data)
                     cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
                     bonus_record = await cursor.fetchone()
                     if bonus_record:
@@ -486,7 +524,7 @@ from datetime import datetime
 import logging
 from typing import Dict, Any, Optional
 import aiosqlite
-from config import BESTHOME_SURVEY_SHEET_URL, CREDENTIALS_FILE
+from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, BESTHOME_SURVEY_SHEET_URL
 
 
 def _fetch_sheet_data_sync():
@@ -496,7 +534,11 @@ def _fetch_sheet_data_sync():
         client = gspread.service_account(filename=CREDENTIALS_FILE)
 
         # Открываем таблицу besthome
-        spreadsheet = client.open_by_url(BESTHOME_SURVEY_SHEET_URL)
+        # Открываем таблицу besthome (или MAIN_SURVEY_SHEET_URL если используем унификацию)
+        # UNIFIED_SHEET_URL определен выше как MAIN_SURVEY_SHEET_URL
+        # Чтобы исправить расхождение данных, используем MAIN_SURVEY_SHEET_URL
+        from config import MAIN_SURVEY_SHEET_URL
+        spreadsheet = client.open_by_url(MAIN_SURVEY_SHEET_URL)
         worksheet = spreadsheet.worksheet("Основная таблица")
 
         # Получаем все данные из таблицы
@@ -634,17 +676,76 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         "user_status": get_val(['26. Статус подписчика', 'User Status'])
                     }
 
-                    # Сохраняем пользователя
-                    columns = ", ".join(user_data.keys())
-                    placeholders = ", ".join([f":{key}" for key in user_data.keys()])
-                    
-                    # Разделяем ФИО
-                    full_name_parts = str(user_data.get("full_name", "")).split()
-                    if full_name_parts:
-                        user_data["first_name"] = full_name_parts[0]
-                        user_data["last_name"] = " ".join(full_name_parts[1:]) if len(full_name_parts) > 1 else ""
 
-                    await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
+                    # Извлекаем имя и фамилию из полного имени
+                    full_name = user_data.get("full_name", "").split()
+                    if len(full_name) > 0:
+                        user_data["first_name"] = full_name[0]
+                    if len(full_name) > 1:
+                        user_data["last_name"] = " ".join(full_name[1:])
+                    
+                    # Проверяем существование пользователя
+                    cursor = await db.execute(
+                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    existing_user = await cursor.fetchone()
+                    
+                    if existing_user:
+                        # Сохраняем статус опроса если он уже был пройден
+                        if existing_user[1] == 1:
+                            user_data["has_completed_survey"] = 1
+                        else:
+                            # Или определяем по наличию данных (как fallback)
+                            has_survey_data = any([
+                                user_data.get("financial_problem"),
+                                user_data.get("social_problem"),
+                                user_data.get("ecological_problem")
+                            ])
+                            if has_survey_data:
+                                user_data["has_completed_survey"] = 1
+                        
+                        # Обновляем существующего пользователя
+                        update_fields = []
+                        update_values = []
+
+                        for key, value in user_data.items():
+                            if key != "user_id":  # user_id не обновляем
+                                update_fields.append(f"{key} = ?")
+                                update_values.append(value)
+
+                        update_values.append(user_id)  # для WHERE условия
+
+                        update_query = f"""
+                            UPDATE users 
+                            SET {', '.join(update_fields)}
+                            WHERE user_id = ?
+                        """
+
+                        await db.execute(update_query, update_values)
+                        # logging.info(f"Обновлён пользователь {user_id}")
+                    else:
+                        # Вставляем нового пользователя
+                        # Определяем статус опроса для нового пользователя
+                        has_survey_data = any([
+                                user_data.get("financial_problem"),
+                                user_data.get("social_problem"),
+                                user_data.get("ecological_problem")
+                            ])
+                        if has_survey_data:
+                            user_data["has_completed_survey"] = 1
+
+                        columns = list(user_data.keys())
+                        placeholders = ", ".join(["?" for _ in columns])
+                        column_names = ", ".join(columns)
+
+                        insert_query = f"""
+                            INSERT INTO users ({column_names}) 
+                            VALUES ({placeholders})
+                        """
+
+                        await db.execute(insert_query, list(user_data.values()))
+                        logging.info(f"Добавлен пользователь {user_id}")
                     
                     # Обновляем таблицу бонусов
                     cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
