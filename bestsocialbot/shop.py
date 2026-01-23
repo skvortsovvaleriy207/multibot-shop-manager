@@ -11,7 +11,9 @@ from utils import check_blocked_user
 from captcha import send_captcha, CaptchaStates, process_captcha_selection
 from aiogram.fsm.context import FSMContext
 from cart import cart_order_start
-from google_sheets import sync_from_sheets_to_db
+from google_sheets import sync_from_sheets_to_db, sync_with_google_sheets
+from bot_instance import bot
+from notifications import send_user_notification
 
 SHOWCASE_TEXT = "ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕСТВА!"
 
@@ -86,91 +88,188 @@ async def main_shop_page(callback: CallbackQuery):
             text="ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
             reply_markup=builder.as_markup()
         )
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+
+# --- Dynamic Content Handlers ---
+
+async def show_dynamic_root(callback: CallbackQuery, catalog_type: str):
+    """Show root categories for a dynamic section"""
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Get root items (parent_id is NULL)
+        cursor = await db.execute(
+            "SELECT id, name FROM categories WHERE catalog_type = ? AND parent_id IS NULL", 
+            (catalog_type,)
+        )
+        root = await cursor.fetchone()
+        
+        if not root:
+             await callback.answer("Раздел пуст 🤷‍♂️", show_alert=True)
+             return
+             
+        root_id, root_name = root
+        await show_dynamic_category(callback, root_id, catalog_type)
+
+async def show_dynamic_category(callback: CallbackQuery, category_id: int, catalog_type: str):
+    """Show contents of a category (subcategories and posts)"""
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Get category name and parent
+        cursor = await db.execute("SELECT name, parent_id FROM categories WHERE id = ?", (category_id,))
+        cat_info = await cursor.fetchone()
+        if not cat_info:
+             await callback.answer("Категория не найдена", show_alert=True)
+             return
+        cat_name, parent_id = cat_info
+
+        # Get subcategories
+        cursor = await db.execute("SELECT id, name FROM categories WHERE parent_id = ? ORDER BY name", (category_id,))
+        subcats = await cursor.fetchall()
+        
+        # Get posts
+        cursor = await db.execute("SELECT id, title FROM shop_posts WHERE category_id = ? AND is_active = 1", (category_id,))
+        posts = await cursor.fetchall()
+    
+    builder = InlineKeyboardBuilder()
+    
+    # Icon Mapping
+    ICONS = {
+        # Promotions
+        "Покупки/Продажи": "📈",
+        "Мероприятия": "🎉",
+        "Прогнозы/Советы": "🔮",
+        "Аналитика": "📊",
+        "Образовательные материалы": "📚",
+        
+        # News
+        "Тематические новости": "📰",
+        "Факты/Ситуации": "💡",
+        "Объявления": "📢",
+        "Новости партнеров": "🤝",
+        "Новости инвесторов": "💼",
+        "Анонсы товаров/услуг": "📣",
+        "Успехи": "🏆",
+        "Отчеты": "📊",
+        "Отзывы": "💬",
+        "Оценки": "⭐",
+        
+        # Popular
+        "Хиты контента": "🔥",
+        "Тренды заявок": "📈",
+        "Плейлисты": "🎵",
+        "Познавательное": "🧠",
+        "Развлекательное": "🎭",
+        "Юмор-шоу": "😂",
+        "Реакции": "😲",
+        "Обзоры": "📝",
+        "Уроки": "🎓",
+        "Истории успехов": "📖"
+    }
+
+    # Subcategories
+    for sid, sname in subcats:
+        icon = ICONS.get(sname, "📁")
+        builder.add(types.InlineKeyboardButton(text=f"{icon} {sname}", callback_data=f"shop_cat:{sid}"))
+    
+    # Posts
+    for pid, ptitle in posts:
+        builder.add(types.InlineKeyboardButton(text=f"📄 {ptitle}", callback_data=f"shop_post:{pid}"))
+
+    # Back Button
+    if parent_id:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=f"shop_cat:{parent_id}"))
+    else:
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
+
+    builder.adjust(1)
+    
+    txt = f"📂 **{cat_name}**\n\nВыберите раздел или материал:"
+    if not subcats and not posts:
+        txt = f"📂 **{cat_name}**\n\n_(В этом разделе пока пусто)_"
+        
+    if callback.message.content_type == types.ContentType.TEXT:
+        await callback.message.edit_text(txt, reply_markup=builder.as_markup())
+    else:
+         await callback.message.edit_caption(caption=txt, reply_markup=builder.as_markup())
+    try:
+        await callback.answer()
+    except Exception:
+        pass
+
+@dp.callback_query(F.data.startswith("shop_cat:"))
+async def shop_cat_handler(callback: CallbackQuery):
+    cat_id = int(callback.data.split(":")[1])
+    # Need to know type? We can fetch it, but show_dynamic_category just needs ID
+    await show_dynamic_category(callback, cat_id, "unknown")
+
+@dp.callback_query(F.data.startswith("shop_post:"))
+async def shop_post_handler(callback: CallbackQuery):
+    pid = int(callback.data.split(":")[1])
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT title, content_text, media_file_id, media_type, category_id FROM shop_posts WHERE id = ?", (pid,))
+        row = await cursor.fetchone()
+        if not row:
+            await callback.answer("Пост не найден", show_alert=True)
+            return
+        
+        title, content, mid, mtype, cat_id = row
+        
+        txt = f"**{title}**\n\n{content}"
+        
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data=f"shop_cat:{cat_id}"))
+        
+        # If sending new media, we delete old message and send new one? 
+        # Or edit if possible? We can't edit media type easily causing mess.
+        # Best to send new message if media present, or edit if text only.
+        
+        if mid:
+            await callback.message.delete()
+            if mtype == 'photo':
+                await callback.message.answer_photo(mid, caption=txt, reply_markup=builder.as_markup())
+            elif mtype == 'video':
+                await callback.message.answer_video(mid, caption=txt, reply_markup=builder.as_markup())
+            else:
+                await callback.message.answer_document(mid, caption=txt, reply_markup=builder.as_markup())
+        else:
+            if callback.message.content_type == types.ContentType.TEXT:
+                 await callback.message.edit_text(txt, reply_markup=builder.as_markup())
+            else:
+                 # If previous was photo, we can't edit to text only easily without leaving photo?
+                 # Actually edit_caption works. But if we want to remove photo?
+                 # Standard practice: text menus use edit_text. 
+                 # If showing content, we might want to delete and send fresh to show media properly.
+                 await callback.message.delete()
+                 await callback.message.answer(txt, reply_markup=builder.as_markup())
+                 
     await callback.answer()
 
 @dp.callback_query(F.data == "promotions_menu")
 async def promotions_menu(callback: CallbackQuery):
-    """Меню Акции"""
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="📈 Покупки/Продажи", callback_data="promo_buy_sell"))
-    builder.add(types.InlineKeyboardButton(text="🎉 Мероприятия", callback_data="promo_events"))
-    builder.add(types.InlineKeyboardButton(text="🔮 Прогнозы/Советы", callback_data="promo_forecasts"))
-    builder.add(types.InlineKeyboardButton(text="📊 Аналитика", callback_data="promo_analytics"))
-    builder.add(types.InlineKeyboardButton(text="📚 Образовательные материалы", callback_data="promo_education"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
-    builder.adjust(1)
-    
-    text = "🏷️ **Раздел Акции**\n\nВыберите интересующую категорию:"
-    
-    if callback.message.content_type == types.ContentType.TEXT:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    else:
-        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
-    await callback.answer()
+    """Меню Акции (Динамическое)"""
+    await show_dynamic_root(callback, "promotions")
 
 @dp.callback_query(F.data == "news_menu")
 async def news_menu(callback: CallbackQuery):
-    """Меню Новости"""
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="📰 Тематические новости", callback_data="news_thematic"))
-    builder.add(types.InlineKeyboardButton(text="💡 Факты/Ситуации", callback_data="news_facts"))
-    builder.add(types.InlineKeyboardButton(text="📢 Объявления", callback_data="news_ads"))
-    builder.add(types.InlineKeyboardButton(text="🤝 Новости партнеров", callback_data="news_partners"))
-    builder.add(types.InlineKeyboardButton(text="💼 Новости инвесторов", callback_data="news_investors"))
-    builder.add(types.InlineKeyboardButton(text="📣 Анонсы товаров/услуг", callback_data="news_announcements"))
-    builder.add(types.InlineKeyboardButton(text="🏆 Успехи", callback_data="news_success"))
-    builder.add(types.InlineKeyboardButton(text="📊 Отчеты", callback_data="news_reports"))
-    builder.add(types.InlineKeyboardButton(text="💬 Отзывы", callback_data="news_reviews"))
-    builder.add(types.InlineKeyboardButton(text="⭐ Оценки", callback_data="news_ratings"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
-    builder.adjust(1)
-    
-    text = "📰 **Раздел Новости**\n\nВыберите интересующую категорию:"
-    
-    if callback.message.content_type == types.ContentType.TEXT:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    else:
-        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
-    try:
-        await callback.answer()
-    except Exception:
-        pass
+    """Меню Новости (Динамическое)"""
+    await show_dynamic_root(callback, "news")
 
 @dp.callback_query(F.data == "popular_menu")
 async def popular_menu(callback: CallbackQuery):
-    """Меню Популярное"""
-    builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="🔥 Хиты контента", callback_data="pop_hits"))
-    builder.add(types.InlineKeyboardButton(text="📈 Тренды заявок", callback_data="pop_trends"))
-    builder.add(types.InlineKeyboardButton(text="🎵 Плейлисты", callback_data="pop_playlists"))
-    builder.add(types.InlineKeyboardButton(text="🧠 Познавательное", callback_data="pop_cognitive"))
-    builder.add(types.InlineKeyboardButton(text="🎭 Развлекательное", callback_data="pop_entertainment"))
-    builder.add(types.InlineKeyboardButton(text="😂 Юмор-шоу", callback_data="pop_humor"))
-    builder.add(types.InlineKeyboardButton(text="😲 Реакции", callback_data="pop_reactions"))
-    builder.add(types.InlineKeyboardButton(text="📝 Обзоры", callback_data="pop_reviews"))
-    builder.add(types.InlineKeyboardButton(text="🎓 Уроки", callback_data="pop_lessons"))
-    builder.add(types.InlineKeyboardButton(text="📖 Истории успехов", callback_data="pop_stories"))
-    builder.add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="main_shop_page"))
-    builder.adjust(1)
-    
-    text = "⭐ **Раздел Популярное**\n\nВыберите интересующую категорию:"
-    
-    if callback.message.content_type == types.ContentType.TEXT:
-        await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    else:
-        await callback.message.edit_caption(caption=text, reply_markup=builder.as_markup())
-    try:
-        await callback.answer()
-    except Exception:
-        pass
+    """Меню Популярное (Динамическое)"""
+    await show_dynamic_root(callback, "popular")
 
+# Stub for legacy buttons to avoid crashes if users click old buttons
 @dp.callback_query(F.data.in_({"promo_buy_sell", "promo_events", "promo_forecasts", "promo_analytics", "promo_education",
                                "news_thematic", "news_facts", "news_ads", "news_partners", "news_investors",
                                "news_announcements", "news_success", "news_reports", "news_reviews", "news_ratings",
                                "pop_hits", "pop_trends", "pop_playlists", "pop_cognitive", "pop_entertainment",
                                "pop_humor", "pop_reactions", "pop_reviews", "pop_lessons", "pop_stories"}))
 async def section_stub(callback: CallbackQuery):
-    await callback.answer("Раздел в разработке 🛠", show_alert=True)
+    await callback.answer("Этот раздел был обновлен. Пожалуйста, вернитесь в главное меню.", show_alert=True)
+
 
 @dp.callback_query(F.data == "all_catalogs")
 async def all_catalogs(callback: CallbackQuery):
@@ -233,7 +332,20 @@ async def personal_account(callback: CallbackQuery):
         return
 
     user_id = callback.from_user.id
+    user_id = callback.from_user.id
     is_admin = user_id == ADMIN_ID
+
+    # Синхронизируем и проверяем изменения для уведомления
+    try:
+        await callback.answer("🔄 Синхронизация...", show_alert=False)
+        changes = await sync_with_google_sheets()
+        if changes and user_id in changes:
+             try:
+                 await send_user_notification(bot, user_id, changes[user_id])
+             except Exception as notify_error:
+                 print(f"Ошибка отправки уведомления из личного кабинета: {notify_error}")
+    except Exception as e:
+        print(f"Ошибка синхронизации в личном кабинете: {e}")
 
     builder = InlineKeyboardBuilder()
 

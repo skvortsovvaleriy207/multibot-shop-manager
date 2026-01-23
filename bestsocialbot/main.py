@@ -146,6 +146,7 @@ from survey import *
 from shop import *
 # Основные модули
 from admin import *
+from admin_content import *
 from partner_handlers import router as partner_router
 from automarket import *
 from add_items import *
@@ -254,45 +255,7 @@ from google_sheets import sync_with_google_sheets, sync_requests_from_sheets_to_
 import asyncio
 from aiogram import Bot
 from datetime import datetime
-async def send_user_notification(bot: Bot, user_id: int, changes: dict):
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("""
-            SELECT 
-                username, full_name, birth_date, location, email, phone, employment,
-                financial_problem, social_problem, ecological_problem, passive_subscriber,
-                active_partner, investor_trader, business_proposal, bonus_total, current_balance
-            FROM users 
-            WHERE user_id = ?
-        """, (user_id,))
-        user_data = await cursor.fetchone()
-    if not user_data:
-        return
-    field_names = {
-        'username': 'Никнейм',
-        'full_name': 'ФИО',
-        'birth_date': 'Дата рождения',
-        'location': 'Место жительства',
-        'email': 'Email',
-        'phone': 'Телефон',
-        'employment': 'Занятость',
-        'financial_problem': 'Финансовая проблема',
-        'social_problem': 'Социальная проблема',
-        'ecological_problem': 'Экологическая проблема',
-        'passive_subscriber': 'Статус пассивного подписчика',
-        'active_partner': 'Статус активного партнера',
-        'investor_trader': 'Статус инвестора/трейдера',
-        'business_proposal': 'Бизнес-предложение',
-        'bonus_total': 'Общая сумма бонусов',
-        'current_balance': 'Текущий баланс'
-    }
-    message = "🔔 Ваш профиль был обновлен. Текущие данные:\n\n"
-    for i, (field, name) in enumerate(field_names.items()):
-        value = user_data[i] if user_data[i] is not None else 'Не указано'
-        message += f"▪️ {name}: {value}\n"
-    try:
-        await bot.send_message(user_id, message)
-    except Exception as e:
-        logging.error(f"Failed to send notification to user {user_id}: {e}")
+from notifications import send_user_notification
 async def periodic_sync():
     while True:
         try:

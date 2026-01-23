@@ -568,6 +568,55 @@ async def init_db():
                 pass
 
 
+
+            # Таблица постов для контента
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS shop_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER,
+                    title TEXT,
+                    content_text TEXT,
+                    media_file_id TEXT,
+                    media_type TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TEXT,
+                    FOREIGN KEY(category_id) REFERENCES categories(id)
+                )
+            """)
+            
+            # Миграция: created_at для categories
+            try:
+                await db.execute("ALTER TABLE categories ADD COLUMN created_at TEXT")
+            except Exception:
+                pass
+            
+            # Предзаполнение категорий контента
+            content_sections = {
+                'news': ['Тематические новости', 'Факты/Ситуации', 'Объявления', 'Новости партнеров', 'Новости инвесторов', 'Анонсы товаров/услуг', 'Успехи', 'Отчеты', 'Отзывы', 'Оценки'],
+                'promotions': ['Покупки/Продажи', 'Мероприятия', 'Прогнозы/Советы', 'Аналитика', 'Образовательные материалы'],
+                'popular': ['Хиты контента', 'Тренды заявок', 'Плейлисты', 'Познавательное', 'Развлекательное', 'Юмор-шоу', 'Реакции', 'Обзоры', 'Уроки', 'Истории успехов'],
+                'new_items': []
+            }
+            
+            for root_key, subcats in content_sections.items():
+                cursor = await db.execute("SELECT id FROM categories WHERE catalog_type = ? AND parent_id IS NULL", (root_key,))
+                row = await cursor.fetchone()
+                if not row:
+                    root_name_map = {'news': 'Новости', 'promotions': 'Акции', 'popular': 'Популярное', 'new_items': 'Новинки'}
+                    await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, NULL, datetime('now'))", 
+                                     (root_key, root_name_map.get(root_key, root_key)))
+                    await db.commit()
+                    cursor = await db.execute("SELECT last_insert_rowid()")
+                    root_id = (await cursor.fetchone())[0]
+                else:
+                    root_id = row[0]
+                
+                for sub in subcats:
+                    cursor = await db.execute("SELECT id FROM categories WHERE parent_id = ? AND name = ?", (root_id, sub))
+                    if not await cursor.fetchone():
+                        await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, ?, datetime('now'))",
+                                         (root_key, sub, root_id))
+
             await db.commit()
 
 async def check_channel_subscription(bot, user_id: int, channel_id: int) -> bool:

@@ -514,6 +514,12 @@ async def init_db():
                 await db.execute("ALTER TABLE categories ADD COLUMN catalog_type TEXT DEFAULT 'product'")
             except Exception:
                 pass
+            
+            # Миграция: добавляем created_at в categories
+            try:
+                await db.execute("ALTER TABLE categories ADD COLUMN created_at TEXT")
+            except Exception:
+                pass
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS cart_order (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -561,11 +567,70 @@ async def init_db():
                 )
             """)
 
-            # Миграция: добавляем sub_category в shop_sections
-            try:
-                await db.execute("ALTER TABLE shop_sections ADD COLUMN sub_category TEXT")
-            except Exception:
-                pass
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS shop_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL,
+                    title TEXT,
+                    content_text TEXT,
+                    media_file_id TEXT,
+                    media_type TEXT, -- 'photo', 'video', 'document'
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    is_active INTEGER DEFAULT 1,
+                    FOREIGN KEY (category_id) REFERENCES categories (id)
+                )
+            """)
+
+            # Pre-populate Categories for News, Promo, Popular if empty
+            async with aiosqlite.connect(DB_FILE) as db_check:
+                cursor = await db_check.execute("SELECT COUNT(*) FROM categories WHERE catalog_type IN ('news', 'promotions', 'popular', 'new_items')")
+                count = (await cursor.fetchone())[0]
+                if count == 0:
+                     # Root categories
+                    root_cats = {
+                        'news': 'Новости',
+                        'promotions': 'Акции',
+                        'popular': 'Популярное',
+                        'new_items': 'Новинки'
+                    }
+                    for c_type, c_name in root_cats.items():
+                        await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, NULL, datetime('now'))", (c_type, c_name))
+                    
+                    # Fetch IDs
+                    cat_ids = {}
+                    cursor = await db.execute("SELECT catalog_type, id FROM categories WHERE parent_id IS NULL")
+                    rows = await cursor.fetchall()
+                    for r_type, r_id in rows:
+                        cat_ids[r_type] = r_id
+                    
+                    # Subcategories (based on shop.py)
+                    # News
+                    news_subs = [
+                        "Тематические новости", "Факты/Ситуации", "Объявления", 
+                        "Новости партнеров", "Новости инвесторов", "Анонсы товаров/услуг",
+                        "Успехи", "Отчеты", "Отзывы", "Оценки"
+                    ]
+                    for name in news_subs:
+                        await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, ?, datetime('now'))", ('news', name, cat_ids['news']))
+
+                    # Promotions
+                    promo_subs = [
+                        "Покупки/Продажи", "Мероприятия", "Прогнозы/Советы",
+                        "Аналитика", "Образовательные материалы"
+                    ]
+                    for name in promo_subs:
+                        await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, ?, datetime('now'))", ('promotions', name, cat_ids['promotions']))
+                    
+                    # Popular
+                    pop_subs = [
+                        "Хиты контента", "Тренды заявок", "Плейлисты",
+                        "Познавательное", "Развлекательное", "Юмор-шоу",
+                        "Реакции", "Обзоры", "Уроки", "Истории успехов"
+                    ]
+                    for name in pop_subs:
+                        await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, ?, datetime('now'))", ('popular', name, cat_ids['popular']))
+
 
 
             await db.commit()

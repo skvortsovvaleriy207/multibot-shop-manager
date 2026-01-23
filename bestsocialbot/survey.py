@@ -12,6 +12,7 @@ from db import check_channel_subscription
 from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
 from bot_instance import bot
+from notifications import send_user_notification
 from filters import is_valid_email, is_valid_phone
 from utils import check_blocked_user
 from handler_integration import handle_besthome_integration_callback, handle_autoavia_integration_callback
@@ -373,6 +374,12 @@ async def process_q16(message: Message, state: FSMContext):
             (user_id, bonus_total, bonus_total, datetime.now().isoformat())
         )
         await db.commit()
+
+    try:
+        # Отправляем уведомление о создании/обновлении профиля
+        await send_user_notification(bot, user_id, {})
+    except Exception as e:
+        print(f"Ошибка отправки уведомления о профиле: {e}")
 
     from google_sheets import sync_db_to_google_sheets
     asyncio.create_task(sync_db_to_google_sheets())

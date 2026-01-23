@@ -166,6 +166,7 @@ except ImportError as e:
 from order_request_system import *
 import admin_catalog_manager
 import admin_posts  # New module for admin content management
+import admin_content
 import user_posts   # New module for user content viewing
 from admin_order_processing import *
 # Категории объединены в category_manager.py
@@ -291,6 +292,15 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict):
         message += f"▪️ {name}: {value}\n"
     try:
         await bot.send_message(user_id, message)
+        
+        # Save to database (Inbox)
+        async with aiosqlite.connect("bot_database.db") as db:
+            await db.execute("""
+                INSERT INTO messages (recipient_id, subject, message_text, sent_at, is_read)
+                VALUES (?, ?, ?, datetime('now'), 0)
+            """, (user_id, "Обновление профиля", message))
+            await db.commit()
+            
     except Exception as e:
         logging.error(f"Failed to send notification to user {user_id}: {e}")
 async def periodic_sync():
