@@ -133,12 +133,37 @@ async def sync_with_google_sheets():
             changes = defaultdict(dict)
             # Дедупликация данных из Google Sheets
             unique_rows = {}
+            username_map = {} # Для поиска по username если ID нет
+            
+            # Сначала собираем мапу username -> user_id из БД для lookup
+            cursor = await db.execute("SELECT username, user_id FROM users WHERE user_id != 0 AND username IS NOT NULL AND username != ''")
+            db_username_rows = await cursor.fetchall()
+            for uname, uid in db_username_rows:
+                clean_uname = str(uname).strip().lower().replace('@', '')
+                if clean_uname:
+                    username_map[clean_uname] = uid
+
             for row in gsheet_data:
-                user_id_raw = row.get('Telegram ID') or row.get('User ID')
-                if not user_id_raw or str(user_id_raw).strip() == '':
+                user_id = None
+                
+                # 1. Пробуем найти по явному ID
+                user_id_raw = row.get('19. ID подписчика в магазине') or row.get('Telegram ID') or row.get('User ID')
+                if user_id_raw and str(user_id_raw).strip().isdigit():
+                     user_id = int(str(user_id_raw).strip())
+                
+                # 2. Если ID нет, пробуем найти по Username
+                if not user_id:
+                    username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
+                    if username_raw:
+                        clean_uname = str(username_raw).strip().lower().replace('@', '')
+                        if clean_uname in username_map:
+                            user_id = username_map[clean_uname]
+                            # logging.info(f"Resolved user_id {user_id} by username {username_raw}")
+
+                if not user_id:
                     continue
+                
                 try:
-                    user_id = int(str(user_id_raw).strip())
                     unique_rows[user_id] = row
                 except ValueError:
                     continue
@@ -299,6 +324,12 @@ async def sync_with_google_sheets():
 
 async def sync_db_to_google_sheets():
     try:
+        # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
+        try:
+             await sync_from_sheets_to_db()
+        except Exception as sync_err:
+             logging.error(f"Pre-sync failed in sync_db_to_google_sheets: {sync_err}")
+
         # Сначала агрегируем статистику
         from data_aggregator import aggregate_user_statistics
         await aggregate_user_statistics()
@@ -536,11 +567,31 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                     if synced_count == 0:
                         logging.info(f"DEBUG: First row keys from Sheet: {list(row.keys())}")
                     
-                    # Пропускаем строки без ID
-                    if not telegram_id or str(telegram_id).strip() == '':
-                        continue
+                    # Логика определения ID
+                    user_id = None
+                    if telegram_id and str(telegram_id).strip().isdigit():
+                        user_id = int(str(telegram_id).strip())
+                    
+                    # Fallback: поиск по Username (если ID нет)
+                    if not user_id:
+                        username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
+                        if username_raw:
+                             # Пробуем найти в БД по username
+                             clean_uname_sheet = str(username_raw).strip().lower().replace('@', '')
+                             cursor_u = await db.execute("SELECT user_id FROM users WHERE username IS NOT NULL AND lower(replace(username, '@', '')) = ?", (clean_uname_sheet,))
+                             res_u = await cursor_u.fetchone()
+                             if res_u:
+                                 user_id = res_u[0]
+                                 # logging.info(f"Resolved user_id {user_id} in manual sync by username {username_raw}")
 
-                    user_id = int(str(telegram_id).strip())
+                    if not user_id:
+                        continue
+                        
+                    # Пропускаем строки без ID (если и fallback не сработал)
+                    # if not telegram_id or str(telegram_id).strip() == '':
+                    #    continue
+                    
+                    # user_id = int(str(telegram_id).strip()) # Already handled above
 
                     # Пропускаем нулевой ID (служебная запись)
                     if user_id == 0:
