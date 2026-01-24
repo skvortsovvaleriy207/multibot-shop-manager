@@ -344,7 +344,7 @@ async def periodic_sync():
                         await send_user_notification(bot, user_id, user_changes)
         except Exception as e:
             logging.error(f"Error in periodic sync: {e}")
-        await asyncio.sleep(60)
+        await asyncio.sleep(21600)
 async def periodic_update_invite_table():
     from admin import update_invite_table_with_channel_subs
     while True:
