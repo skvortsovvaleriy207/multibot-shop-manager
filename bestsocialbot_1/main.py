@@ -42,24 +42,40 @@ async def get_showcase_keyboard(user_id: int):
         cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
         user_exists = await cursor.fetchone()
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
-        survey_status = await cursor.fetchone()
+        survey_status_row = await cursor.fetchone()
+        has_survey = survey_status_row and survey_status_row[0]
+
     builder = InlineKeyboardBuilder()
     if user_exists:
         builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
-        builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"))
+        if has_survey:
+            builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="shop"))
+        else:
+            builder.add(types.InlineKeyboardButton(text="🔒 Магазин (пройдите опрос)", callback_data="shop_locked"))
     else:
         builder.add(types.InlineKeyboardButton(text="📝 Опрос (недоступно)", callback_data="disabled"))
         builder.add(types.InlineKeyboardButton(text="🏪 Магазин (недоступно)", callback_data="disabled"))
     
-    builder.adjust(2)
+    builder.adjust(1)
     
     return builder.as_markup()
 
 @dp.message(Command("start_shop"))
-async def cmd_start_shop(message: types.Message ):
+async def cmd_start_shop(message: types.Message):
     """Главная страница магазина (первый экран после входа)"""
 
     user_id = message.chat.id
+
+    # Check survey status
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
+        survey_status_row = await cursor.fetchone()
+        has_survey = survey_status_row and survey_status_row[0]
+    
+    if not has_survey:
+        keyboard = await get_showcase_keyboard(user_id)
+        await message.answer("⚠️ Доступ к магазину открывается после прохождения опроса.", reply_markup=keyboard)
+        return
 
     # Sync not imported yet, do it in main flow or inside function
     # await sync_from_sheets_to_db()
@@ -80,6 +96,10 @@ async def cmd_start_shop(message: types.Message ):
         "ДОБРО ПОЖАЛОВАТЬ В МАГАЗИН СООБЩЕСТВА!",
         reply_markup=builder.as_markup()
     )
+
+@dp.callback_query(F.data == "shop_locked")
+async def shop_locked_handler(callback: types.CallbackQuery):
+    await callback.answer("⚠️ Сначала пройдите опрос, чтобы получить доступ к магазину!", show_alert=True)
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext, command: CommandObject):
