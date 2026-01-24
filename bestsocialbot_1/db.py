@@ -590,7 +590,7 @@ async def init_db():
             except Exception:
                 pass
             
-            # Предзаполнение категорий контента
+            # Pre-populate Categories for News, Promo, Popular if empty
             content_sections = {
                 'news': ['Тематические новости', 'Факты/Ситуации', 'Объявления', 'Новости партнеров', 'Новости инвесторов', 'Анонсы товаров/услуг', 'Успехи', 'Отчеты', 'Отзывы', 'Оценки'],
                 'promotions': ['Покупки/Продажи', 'Мероприятия', 'Прогнозы/Советы', 'Аналитика', 'Образовательные материалы'],
@@ -598,18 +598,17 @@ async def init_db():
                 'new_items': []
             }
             
-            for root_key, subcats in content_sections.items():
-                cursor = await db.execute("SELECT id FROM categories WHERE catalog_type = ? AND parent_id IS NULL", (root_key,))
-                row = await cursor.fetchone()
-                if not row:
+            # Check if any of the main content categories exist
+            cursor = await db.execute("SELECT COUNT(*) FROM categories WHERE catalog_type IN ('news', 'promotions', 'popular', 'new_items')")
+            count = (await cursor.fetchone())[0]
+
+            if count == 0: # Only pre-populate if categories are completely empty
+                for root_key, subcats in content_sections.items():
                     root_name_map = {'news': 'Новости', 'promotions': 'Акции', 'popular': 'Популярное', 'new_items': 'Новинки'}
                     await db.execute("INSERT INTO categories (catalog_type, name, parent_id, created_at) VALUES (?, ?, NULL, datetime('now'))", 
                                      (root_key, root_name_map.get(root_key, root_key)))
-                    await db.commit()
                     cursor = await db.execute("SELECT last_insert_rowid()")
                     root_id = (await cursor.fetchone())[0]
-                else:
-                    root_id = row[0]
                 
                 for sub in subcats:
                     cursor = await db.execute("SELECT id FROM categories WHERE parent_id = ? AND name = ?", (root_id, sub))

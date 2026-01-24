@@ -33,8 +33,9 @@ def init_unified_sheet():
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
 
         sheets_config = [
-            (SHEET_MAIN, 27,
-             ["1. Имя Username подписчика в Телеграм",
+            (SHEET_MAIN, 28,
+             ["0. Дата опроса/подписки",
+              "1. Имя Username подписчика в Телеграм",
               "2. ФИО и возраст подписчика",
               "3. Место жительства подписчика",
               "4. Эл. почта подписчика",
@@ -380,6 +381,8 @@ async def sync_db_to_google_sheets():
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
+                    u.survey_date,
+                    u.created_at,
                     sa3.answer_text as username,
                     sa4.answer_text as full_name,
                     sa6.answer_text as location,
@@ -431,6 +434,7 @@ async def sync_db_to_google_sheets():
             users = await cursor.fetchall()
 
         headers = [
+            "0. Дата опроса/подписки",
             "1. Имя Username подписчика в Телеграм",
             "2. ФИО и возраст подписчика",
             "3. Место жительства подписчика",
@@ -463,7 +467,7 @@ async def sync_db_to_google_sheets():
         data = [headers]
         for user in users:
             # Parse purchases and sales strings "Count (на Sum)"
-            p_text = user[20] or ""
+            p_text = user[22] or ""
             p_count = "0"
             p_sum = "0"
             if " (на " in p_text:
@@ -471,41 +475,56 @@ async def sync_db_to_google_sheets():
                 p_count = parts[0]
                 p_sum = parts[1].replace(")", "")
             
-            s_text = user[21] or ""
+            s_text = user[23] or ""
             s_sum = "0"
             if " (на " in s_text:
                 parts = s_text.split(" (на ")
                 s_sum = parts[1].replace(")", "")
+            
+            # Determine Survey/Subscription Date
+            # Use survey_date or fallback to created_at
+            # user[0] is survey_date, user[1] is created_at
+            survey_date = user[0] if user[0] else (user[1] if user[1] else "")
+            
+            # Format date if possible to ensure readability
+            formatted_date = survey_date
+            try:
+                # Try parsing standard ISO format if applicable
+                dt = datetime.fromisoformat(survey_date)
+                formatted_date = dt.strftime("%d.%m.%Y")
+            except (ValueError, TypeError):
+                # If parsing fails or already in desired format, keep as is
+                 pass
 
             row_data = [
-                user[0], # Username
-                user[1], # Full Name + Age
-                user[2], # Location
-                user[3], # Email
-                user[4], # Employment
-                user[5], # Financial Problem
-                user[6], # Social Problem
-                user[7], # Ecological Problem
-                user[8], # Passive
-                user[9], # Active
-                user[10], # Investor
-                user[11], # Proposal
-                user[12], # Bonus Total
-                user[13], # Bonus Adjustment
-                user[14], # Current Balance
-                user[15], # Notes (16)
-                user[16], # Referral Count (17)
-                user[17], # Referral Payment (18)
-                user[18], # ID (19)
-                user[19], # Requests (20)
-                p_count,  # Purchase Count (21)
-                p_sum,    # Purchase Sum (22)
-                s_sum,    # Sales Sum (23)
-                user[22], # Requisites -> Other info (24)
-                user[23], # Business (25)
-                user[23], # Business (25)
-                user[25], # User Status (26)
-                user[24]  # Account Status (27)
+                formatted_date, # 0. Дата опроса/подписки
+                user[2], # 1. Username
+                user[3], # 2. Full Name + Age
+                user[4], # 3. Location
+                user[5], # 4. Email
+                user[6], # 5. Employment
+                user[7], # 6. Financial Problem
+                user[8], # 7. Social Problem
+                user[9], # 8. Ecological Problem
+                user[10], # 9. Passive
+                user[11], # 10. Active
+                user[12], # 11. Investor
+                user[13], # 12. Proposal
+                user[14], # 13. Bonus Total
+                user[15], # 14. Bonus Adjustment
+                user[16], # 15. Current Balance
+                user[17], # 16. Notes (16)
+                user[18], # 17. Referral Count (17)
+                user[19], # 18. Referral Payment (18)
+                user[20], # 19. ID (19)
+                user[21], # 20. Requests (20)
+                p_count,  # 21. Purchase Count (21)
+                p_sum,    # 22. Purchase Sum (22)
+                s_sum,    # 23. Sales Sum (23)
+                user[24], # 24. Requisites -> Other info (24)
+                user[25], # 25. Business (25)
+                user[27], # 26. User Status (26)
+                user[26]  # 27. Account Status (27)
             ]
             data.append(row_data)
 

@@ -13,6 +13,30 @@ PROPOSAL_STATUSES = [
     "В производстве", "В реализации", "В развитии", "Выполнено", "Отменено"
 ]
 
+def is_valid_proposal(text: str) -> bool:
+    """Проверка валидности предложения"""
+    if not text or len(text) < 2:
+        return False
+        
+    invalid_patterns = [
+        "нет", "no", "не имею", "отсутствует", "none", "n/a", 
+        "минус", "-", "—", "не хочу", "не буду"
+    ]
+    
+    cleaned_text = text.lower().strip()
+    
+    # Полное совпадение
+    if cleaned_text in invalid_patterns:
+        return False
+        
+    # Частичное совпадение для коротких фраз
+    if len(cleaned_text) < 10:
+        for pattern in invalid_patterns:
+            if pattern == cleaned_text:
+                return False
+                
+    return True
+
 async def export_initiatives_to_sheets():
     """Выгрузка инициатив в таблицу планов и отчетов"""
     try:
@@ -42,11 +66,13 @@ async def export_initiatives_to_sheets():
         # Данные
         data = [headers]
         for initiative in initiatives:
-            data.append([
-                initiative[0], initiative[1] or "", initiative[2] or "",
-                initiative[3], initiative[4], initiative[5] or "", 
-                initiative[6] or "", "Новое предложение", "", ""
-            ])
+            proposal_text = initiative[3]
+            if is_valid_proposal(proposal_text):
+                data.append([
+                    initiative[0], initiative[1] or "", initiative[2] or "",
+                    proposal_text, initiative[4], initiative[5] or "", 
+                    initiative[6] or "", "Новое предложение", "", ""
+                ])
         
         sheet.clear()
         sheet.update('A1', data)
@@ -71,6 +97,9 @@ async def notify_initiators():
             initiators = await cursor.fetchall()
         
         for user_id, username, full_name, proposal in initiators:
+            if not is_valid_proposal(proposal):
+                continue
+
             try:
                 message = f"""
 🚀 **Ваша инициатива на рассмотрении**

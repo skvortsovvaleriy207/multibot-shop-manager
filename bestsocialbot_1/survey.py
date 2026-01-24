@@ -15,6 +15,7 @@ from bot_instance import bot
 from filters import is_valid_email, is_valid_phone
 from utils import check_blocked_user
 from handler_integration import handle_besthome_integration_callback, handle_autoavia_integration_callback
+from initiatives_system import is_valid_proposal
 
 class SurveyStates(StatesGroup):
     START = State()
@@ -352,7 +353,7 @@ async def process_q16(message: Message, state: FSMContext):
                 data.get("q9", ""),
                 data.get("q10", ""),
                 data.get("q11", ""),
-                data.get("q12", ""),
+                data.get("q12", "") if is_valid_proposal(data.get("q12", "")) else "",
                 data.get("q13", ""),
                 data.get("q14", ""),
                 data.get("q15", ""),

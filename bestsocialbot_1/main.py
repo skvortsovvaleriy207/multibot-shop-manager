@@ -594,6 +594,16 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
                                 (user_id, username, first_name, last_name, "Р")
                             )
                             await db.commit()
+
+                    # Отправляем сообщение о создании профиля
+                    try:
+                        await send_system_message(
+                            user_id,
+                            "Создание профиля", 
+                            "Ваш профиль успешно создан! Добро пожаловать."
+                        )
+                    except Exception as e:
+                        print(f"Ошибка отправки сообщения о создании профиля: {e}")
                     # Обрабатываем реферала если есть
                     referrer_id = data.get("referrer_id")
                     if referrer_id:
