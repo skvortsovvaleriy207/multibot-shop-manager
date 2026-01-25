@@ -376,6 +376,15 @@ async def process_q16(message: Message, state: FSMContext):
         )
         await db.commit()
 
+    # Process referral
+    referrer_id = data.get("referrer_id")
+    if referrer_id:
+        try:
+             from referral_system import process_referral
+             await process_referral(user_id, referrer_id)
+        except Exception as e:
+             print(f"Error processing referral in survey: {e}")
+
     try:
         # Отправляем уведомление о создании/обновлении профиля
         await send_user_notification(bot, user_id, {})

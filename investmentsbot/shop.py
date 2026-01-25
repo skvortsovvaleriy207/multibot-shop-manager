@@ -329,6 +329,10 @@ async def personal_account(callback: CallbackQuery):
         return
 
     user_id = callback.from_user.id
+    # Проверяем, прошел ли пользователь опрос (на случай прямого вызова или обхода)
+    if not await check_survey_completed(user_id):
+        await callback.answer("Для доступа к личному кабинету необходимо пройти опрос.", show_alert=True)
+        return
     is_admin = user_id == ADMIN_ID
 
     builder = InlineKeyboardBuilder()
@@ -408,6 +412,12 @@ async def my_profile(callback: CallbackQuery):
             (user_id,)
         )
         balance = await cursor.fetchone()
+
+
+
+    if not user_data:
+        await callback.answer("Профиль не найден. Пожалуйста, пройдите опрос.", show_alert=True)
+        return
 
     full_name_answer = answers[0][1] if answers and answers[0][1] else 'Не указано'
 

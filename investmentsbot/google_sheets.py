@@ -379,10 +379,15 @@ async def sync_with_google_sheets():
 async def sync_db_to_google_sheets():
     try:
         # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
+        # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
         try:
-             await sync_from_sheets_to_db()
+             sync_result = await sync_from_sheets_to_db()
+             if sync_result and not sync_result.get("success", False):
+                 logging.error(f"Pre-sync failed: {sync_result.get('message')}. Aborting export to prevent data loss.")
+                 return False
         except Exception as sync_err:
-             logging.error(f"Pre-sync failed in sync_db_to_google_sheets: {sync_err}")
+             logging.error(f"Pre-sync failed with exception in sync_db_to_google_sheets: {sync_err}")
+             return False
 
         # Сначала агрегируем статистику
         from data_aggregator import aggregate_user_statistics
@@ -587,7 +592,9 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
 
         if not all_data:
             return {
-                "success": False,
+                # Empty sheet is not a failure, just nothing to sync. 
+                # Proceeding allows export to populate an empty sheet.
+                "success": True, 
                 "message": "В таблице нет данных",
                 "synced_count": 0
             }
@@ -609,6 +616,7 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         'ID'
                     ]
                     
+                    found_key = None
                     for key in keys_to_check:
                          if key in row and str(row[key]).strip():
                              telegram_id = row[key]
@@ -784,6 +792,8 @@ def _safe_float(value) -> float:
     if value is None:
         return 0.0
     try:
+        if isinstance(value, str):
+            value = value.replace(',', '.')
         return float(value)
     except (ValueError, TypeError):
         return 0.0

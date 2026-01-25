@@ -81,7 +81,7 @@ TELETHON_PHONE_NUMBER=ваш_номер_телефона
 2.  Создайте и активируйте виртуальное окружение:
     ```bash
     python3 -m venv venv
-    source venv/bin/activate  # Для Linux/macOS
+     # Для Linux/macOS
     # или
     # venv\Scripts\activate   # Для Windows
     ```
@@ -93,7 +93,7 @@ TELETHON_PHONE_NUMBER=ваш_номер_телефона
 
 4.  Запустите бота:
     ```bash
-    python main.py
+   
     ```
 
 ## 📂 Структура данных

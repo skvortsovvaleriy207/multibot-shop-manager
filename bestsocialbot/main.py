@@ -46,6 +46,7 @@ async def get_showcase_keyboard(user_id: int):
         has_survey = survey_status_row and survey_status_row[0]
 
     builder = InlineKeyboardBuilder()
+    builder = InlineKeyboardBuilder()
     if user_exists:
         builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
         if has_survey:
@@ -53,10 +54,12 @@ async def get_showcase_keyboard(user_id: int):
         else:
             builder.add(types.InlineKeyboardButton(text="🔒 Магазин (пройдите опрос)", callback_data="shop_locked"))
     else:
-        builder.add(types.InlineKeyboardButton(text="📝 Опрос (недоступно)", callback_data="disabled"))
-        builder.add(types.InlineKeyboardButton(text="🏪 Магазин (недоступно)", callback_data="disabled"))
+        # User passed captcha but not yet in DB (survey not started/finished)
+        # Allow survey, but lock shop
+        builder.add(types.InlineKeyboardButton(text="📝 Опрос", callback_data="survey"))
+        builder.add(types.InlineKeyboardButton(text="🔒 Магазин (пройдите опрос)", callback_data="shop_locked"))
     
-    builder.adjust(1)
+    builder.adjust(1) 
     
     return builder.as_markup()
 
@@ -551,93 +554,54 @@ async def captcha_callback(callback: CallbackQuery, state: FSMContext):
                 await state.update_data(captcha_attempt_count=attempt_count)
                 await send_captcha(callback.message, state)
             else:
-                await state.clear()
                 user_id = callback.from_user.id
-                username = callback.from_user.username or ""
-                first_name = callback.from_user.first_name or ""
-                last_name = callback.from_user.last_name or ""
+                
+                # CRITICAL Fix: Don't just clear state, we must PERSIST that captcha is passed!
+                referrer_id = data.get("referrer_id")
+                shop_pending = data.get("shop_captcha_pending")
+                
+                await state.clear()
+                
+                # Mark captcha as passed so user isn't asked again
+                await state.update_data(shop_captcha_passed=True)
+
+                if referrer_id:
+                     # Restore referrer_id for survey
+                     await state.update_data(referrer_id=referrer_id)
+                
+                # If they were trying to enter shop, keep that context (optional, but good for tracking)
+                if shop_pending:
+                    await state.update_data(shop_captcha_pending=True)
+
+                # Если пользователь инициировал вход в магазин, сразу открываем ГЛАВНУЮ СТРАНИЦУ МАГАЗИНА
+                if data.get("shop_captcha_pending"):
+                     pass 
+                
+                # Только теперь формируем клавиатуру
+                keyboard = await get_showcase_keyboard(user_id)
+                
                 try:
-                    import aiosqlite
-                    async with aiosqlite.connect("bot_database.db") as db:
-                        cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-                        exists = await cursor.fetchone()
-                        if not exists:
-                            await db.execute(
-                                "INSERT INTO users (user_id, username, first_name, last_name, created_at, account_status) VALUES (?, ?, ?, ?, datetime('now'), ?)",
-                                (user_id, username, first_name, last_name, "Р")
-                            )
-                            await db.commit()
-
-                    # Отправляем сообщение о создании профиля
-                    try:
-                        await send_system_message(
-                            user_id,
-                            "Создание профиля", 
-                            "Ваш профиль успешно создан! Добро пожаловать."
-                        )
-                    except Exception as e:
-                        print(f"Ошибка отправки сообщения о создании профиля: {e}")
-                    # Обрабатываем реферала если есть
-                    referrer_id = data.get("referrer_id")
-                    if referrer_id:
-                        from referral_system import process_referral
-                        await process_referral(user_id, referrer_id)
-
-                    # Если пользователь инициировал вход в магазин, сразу открываем ГЛАВНУЮ СТРАНИЦУ МАГАЗИНА
-                    if data.get("shop_captcha_pending"):
-                        from aiogram.types import CallbackQuery
-                        from shop import main_shop_page
-                        fake_callback = CallbackQuery(
-                            id=callback.id,
-                            from_user=callback.from_user,
-                            chat_instance=callback.chat_instance,
-                            message=callback.message,
-                            data="main_shop_page"
-                        )
-                        # Fix identifying: Mount the fake callback to the bot instance
-                        if callback.bot:
-                            fake_callback.as_(callback.bot)
-                        
-                        await main_shop_page(fake_callback)
+                    # Попытка 1: через message.answer (самый стандартный способ)
+                    if callback.message:
+                        await callback.message.answer("✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
                     else:
-                        # Только теперь формируем клавиатуру
-                        keyboard = await get_showcase_keyboard(user_id)
-                        
-                        try:
-                            # Попытка 1: через message.answer (самый стандартный способ)
-                            if callback.message:
-                                await callback.message.answer("✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
-                            else:
-                                raise Exception("Message object is missing")
-                        except Exception as e1:
-                            print(f"Failed to use message.answer: {e1}")
-                            # Попытка 2: через callback.bot (гарантированно привязанный бот)
-                            if callback.bot:
-                                await callback.bot.send_message(
-                                    chat_id=user_id,
-                                    text="✅ Капча пройдена! Добро пожаловать!",
-                                    reply_markup=keyboard
-                                )
-                            else:
-                                print("CRITICAL: callback.bot is None!")
-                                # Попытка 3: глобальный бот (крайний случай)
-                                from bot_instance import bot as global_bot
-                                await global_bot.send_message(user_id, "✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
+                        raise Exception("Message object is missing")
+                except Exception as e1:
+                    print(f"Failed to use message.answer: {e1}")
+                    # Попытка 2: через callback.bot (гарантированно привязанный бот)
+                    if callback.bot:
+                        await callback.bot.send_message(
+                            chat_id=user_id,
+                            text="✅ Капча пройдена! Добро пожаловать!",
+                            reply_markup=keyboard
+                        )
+                    else:
+                        print("CRITICAL: callback.bot is None!")
+                        # Попытка 3: глобальный бот (крайний случай)
+                        from bot_instance import bot as global_bot
+                        await global_bot.send_message(user_id, "✅ Капча пройдена! Добро пожаловать!", reply_markup=keyboard)
 
-                    print("SYNC CALL")
-                    try:
-                        from google_sheets import sync_db_to_google_sheets
-                        await sync_db_to_google_sheets()
-                    except Exception as sync_e:
-                        print(f"⚠️ Warning: Background sync failed: {sync_e}")
-                        # Don't fail the user interaction because of background sync
-                except Exception as send_msg_error:
-                    print(f"Ошибка при отправке сообщения: {send_msg_error}")
-                    import traceback
-                    traceback.print_exc()
-        else:
-            await state.update_data(captcha_attempt_count=0)
-            await send_captcha(callback.message, state)
+                # No sync call needed since no DB change
         try:
             await callback.answer()
         except Exception as callback_answer_error:
