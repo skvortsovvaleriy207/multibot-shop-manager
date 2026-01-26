@@ -18,7 +18,7 @@ async def manage_product_categories(callback: CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, name FROM categories 
             WHERE parent_id = 1
@@ -48,7 +48,7 @@ async def manage_service_categories(callback: CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, name FROM categories 
             WHERE parent_id = 2
@@ -79,7 +79,7 @@ async def manage_offer_categories(callback: CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, name FROM categories 
             WHERE catalog_type = 'offer'
@@ -152,7 +152,7 @@ async def process_add_category(message: Message, state: FSMContext):
     
     category_name = message.text.strip()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute(
             "INSERT INTO categories (name, parent_id, catalog_type) VALUES (?, ?, ?)",
             (category_name, parent_id, catalog_type)
@@ -185,7 +185,7 @@ async def edit_category(callback: CallbackQuery):
     cat_type = parts[2]  # tech или service
     cat_id = int(parts[3])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM categories WHERE id = ?", (cat_id,))
         category = await cursor.fetchone()
     
@@ -239,7 +239,7 @@ async def process_rename_category(message: Message, state: FSMContext):
     cat_type = data.get('category_type')
     new_name = message.text.strip()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("UPDATE categories SET name = ? WHERE id = ?", (new_name, cat_id))
         await db.commit()
     
@@ -270,7 +270,7 @@ async def delete_category(callback: CallbackQuery):
     cat_id = int(parts[3])
     
     # Проверяем, есть ли товары/услуги в этой категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         if cat_type == 'tech':
             cursor = await db.execute("SELECT COUNT(*) FROM auto_products WHERE category_id = ?", (cat_id,))
         elif cat_type == 'offer':

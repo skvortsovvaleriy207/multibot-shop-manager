@@ -2,7 +2,7 @@
 import sqlite3
 
 def inspect():
-    with sqlite3.connect("bot_database.db") as db:
+    with sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         print("--- ORDERS Table ---")
         cursor = db.execute("SELECT * FROM orders ORDER BY id DESC LIMIT 5")
         for row in cursor:

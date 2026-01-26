@@ -34,7 +34,7 @@ async def search_products_start(callback: CallbackQuery, state: FSMContext):
 async def search_products_process(message: Message, state: FSMContext):
     search_query = message.text.lower()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT ap.id, ap.title, ap.price, ap.description, ap.specifications, 
                    u.username, ac.name as category_name
@@ -107,7 +107,7 @@ async def search_services_start(callback: CallbackQuery, state: FSMContext):
 async def search_services_process(message: Message, state: FSMContext):
     search_query = message.text.lower()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT as_.id, as_.title, as_.price, as_.description, as_.location,
                    u.username, ac.name as category_name
@@ -203,7 +203,7 @@ async def filter_price_max(message: Message, state: FSMContext):
             return
         
         # Выполняем поиск по цене
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             if filter_type == 'products':
                 cursor = await db.execute("""
                     SELECT ap.id, ap.title, ap.price, u.username, ac.name as category_name

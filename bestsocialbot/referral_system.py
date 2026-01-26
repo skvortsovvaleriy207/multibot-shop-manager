@@ -10,13 +10,14 @@ from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dispatcher import dp
 from utils import check_blocked_user
+from db import DB_FILE
 
 # Бонус за реферала согласно ТЗ
 REFERRAL_BONUS = 0.1
 
 async def init_referral_system():
     """Инициализация реферальной системы"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Таблица рефералов
         await db.execute("""
             CREATE TABLE IF NOT EXISTS referrals (
@@ -48,7 +49,7 @@ async def generate_referral_link(user_id: int) -> str:
     link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     
     # Сохраняем ссылку в БД
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(
             "UPDATE users SET referral_link = ? WHERE user_id = ?",
             (link, user_id)
@@ -60,7 +61,7 @@ async def generate_referral_link(user_id: int) -> str:
 async def process_referral(referred_id: int, referrer_id: int):
     """Обработка реферала"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Проверяем, не является ли пользователь уже рефералом
             cursor = await db.execute(
                 "SELECT 1 FROM referrals WHERE referred_id = ?", (referred_id,)
@@ -100,7 +101,7 @@ async def process_referral(referred_id: int, referrer_id: int):
 async def calculate_monthly_referral_bonuses():
     """Расчет ежемесячных бонусов за рефералов"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Получаем активных рефералов за месяц
             cursor = await db.execute("""
                 SELECT r.referrer_id, COUNT(*) as active_referrals
@@ -153,7 +154,7 @@ async def export_referral_data():
 
 async def get_referral_stats(user_id: int):
     """Получение статистики рефералов пользователя"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT total_referrals, referral_earnings, referral_link
             FROM users WHERE user_id = ?
@@ -220,7 +221,7 @@ async def referral_system_handler(callback: CallbackQuery):
             referral_link = await generate_referral_link(user_id)
     
     # Получаем список рефералов
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT u.username, u.full_name, r.created_at
             FROM referrals r

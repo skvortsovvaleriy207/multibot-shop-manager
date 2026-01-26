@@ -2,7 +2,7 @@
 import sqlite3
 
 def check_schema():
-    conn = sqlite3.connect("bot_database.db")
+    conn = sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db")
     cursor = conn.cursor()
     
     cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")

@@ -2,7 +2,7 @@ import gspread
 from datetime import datetime
 import logging
 import aiosqlite
-from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
+from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, BOT_ID
 import asyncio
 from collections import defaultdict
 
@@ -26,6 +26,8 @@ def get_google_sheets_client():
 def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
+
+from db import DB_FILE
 
 def init_unified_sheet():
     try:
@@ -118,7 +120,7 @@ async def sync_with_google_sheets():
         # Повторные попытки при блокировке БД
         for attempt in range(3):
             try:
-                async with aiosqlite.connect("bot_database.db", timeout=30) as db:
+                async with aiosqlite.connect(DB_FILE, timeout=30) as db:
                     break
             except Exception as e:
                 if "database is locked" in str(e) and attempt < 2:
@@ -126,7 +128,7 @@ async def sync_with_google_sheets():
                     continue
                 raise
 
-        async with aiosqlite.connect("bot_database.db", timeout=30) as db:
+        async with aiosqlite.connect(DB_FILE, timeout=30) as db:
             cursor = await db.execute("SELECT user_id, has_completed_survey FROM users WHERE user_id != 0")
             db_users = await cursor.fetchall()
             db_user_ids = {user[0] for user in db_users}
@@ -256,7 +258,7 @@ async def sync_with_google_sheets():
                                 'new': val_sheet
                             }
                 try:
-                    has_completed_survey = db_user_survey_status.get(user_id, 0)
+                    has_completed_survey = 1 # User in sheet means they passed the survey
                     user_data = {
                         "user_id": user_id,
                         "username": row.get('1. Имя Username подписчика в Телеграм', ''),
@@ -276,8 +278,6 @@ async def sync_with_google_sheets():
                         "bonus_total": float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12') or 0),
                         "current_balance": float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14') or 0),
                         "updated_at": datetime.now().isoformat(),
-                        "has_completed_survey": has_completed_survey,
-                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
                         "has_completed_survey": has_completed_survey,
                         "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
                         "notes": row.get("16. Иная информация для админа", ""),
@@ -383,7 +383,7 @@ async def sync_db_to_google_sheets():
         sheet = spreadsheet.worksheet(SHEET_MAIN)
 
         # Получаем данные из базы данных
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
                     u.survey_date,
@@ -432,10 +432,11 @@ async def sync_db_to_google_sheets():
                 LEFT JOIN survey_answers sa14 ON u.user_id = sa14.user_id AND sa14.question_id = 14
                 LEFT JOIN survey_answers sa15 ON u.user_id = sa15.user_id AND sa15.question_id = 15
                 LEFT JOIN survey_answers sa16 ON u.user_id = sa16.user_id AND sa16.question_id = 16
-                WHERE u.user_id != 0
+                JOIN bot_subscriptions bs ON u.user_id = bs.user_id
+                WHERE u.user_id != 0 AND bs.bot_id = ?
                 GROUP BY u.user_id
                 ORDER BY MAX(ub.updated_at) DESC
-            """)
+            """, (BOT_ID,))
             users = await cursor.fetchall()
 
         headers = [
@@ -609,7 +610,7 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
             }
 
         # Подключаемся к базе данных
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             synced_count = 0
 
             for row in all_data:
@@ -793,6 +794,12 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                             """,
                             (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
                             
+                    # Ensure subscription exists when importing/syncing
+                    try:
+                        await db.execute("INSERT OR IGNORE INTO bot_subscriptions (user_id, bot_id) VALUES (?, ?)", (user_id, BOT_ID))
+                    except Exception as e:
+                        logging.error(f"Error saving subscription in sync: {e}")
+
                     synced_count += 1
 
                 except Exception as e:
@@ -828,16 +835,18 @@ def _safe_float(value) -> float:
     except (ValueError, TypeError):
         return 0.0
 
+
 async def sync_db_to_main_survey_sheet():
     try:
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
         sheet = spreadsheet.worksheet(SHEET_MAIN)
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
-                    sa3.answer_text,
+                    COALESCE(u.survey_date, bs.subscribed_at, u.created_at),
+                    u.username,
                     sa4.answer_text,
                     sa6.answer_text,
                     sa7.answer_text,
@@ -855,7 +864,7 @@ async def sync_db_to_main_survey_sheet():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
-                    CAST(u.user_id AS TEXT), # Moved user_id here
+                    CAST(u.user_id AS TEXT),
                     u.referral_count,
                     u.referral_payment,
                     u.subscription_date,
@@ -869,13 +878,10 @@ async def sync_db_to_main_survey_sheet():
                     u.account_status
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
-                LEFT JOIN survey_answers sa1 ON u.user_id = sa1.user_id AND sa1.question_id = 1
-                LEFT JOIN survey_answers sa3 ON u.user_id = sa3.user_id AND sa3.question_id = 3
+                JOIN bot_subscriptions bs ON u.user_id = bs.user_id
                 LEFT JOIN survey_answers sa4 ON u.user_id = sa4.user_id AND sa4.question_id = 4
-                LEFT JOIN survey_answers sa5 ON u.user_id = sa5.user_id AND sa5.question_id = 5
                 LEFT JOIN survey_answers sa6 ON u.user_id = sa6.user_id AND sa6.question_id = 6
                 LEFT JOIN survey_answers sa7 ON u.user_id = sa7.user_id AND sa7.question_id = 7
-                LEFT JOIN survey_answers sa8 ON u.user_id = sa8.user_id AND sa8.question_id = 8
                 LEFT JOIN survey_answers sa9 ON u.user_id = sa9.user_id AND sa9.question_id = 9
                 LEFT JOIN survey_answers sa10 ON u.user_id = sa10.user_id AND sa10.question_id = 10
                 LEFT JOIN survey_answers sa11 ON u.user_id = sa11.user_id AND sa11.question_id = 11
@@ -884,13 +890,19 @@ async def sync_db_to_main_survey_sheet():
                 LEFT JOIN survey_answers sa14 ON u.user_id = sa14.user_id AND sa14.question_id = 14
                 LEFT JOIN survey_answers sa15 ON u.user_id = sa15.user_id AND sa15.question_id = 15
                 LEFT JOIN survey_answers sa16 ON u.user_id = sa16.user_id AND sa16.question_id = 16
-                WHERE u.user_id != 0
+                WHERE u.user_id != 0 AND bs.bot_id = ?
                 GROUP BY u.user_id
                 ORDER BY MAX(ub.updated_at) DESC
-            """)
+            """, (BOT_ID,))
             users = await cursor.fetchall()
+            print(f"[DEBUG] sync_db_to_main_survey_sheet: Fetched {len(users)} users from DB")
+
+        if not users:
+            print("⚠️ [EXPORT] No users found to export. Skipping sheet clear to prevent data loss.")
+            return True
 
         headers = [
+            "0. Дата опроса/подписки",
             "Телеграм @username", "ФИО и возраст подписчика",
             "Место жительства", "Email", "Текущая занятость",
             "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
@@ -920,7 +932,7 @@ async def sync_sheets_to_db():
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             products_sheet = spreadsheet.worksheet(SHEET_PRODUCTS)
             products_data = products_sheet.get_all_records()
 
@@ -1003,7 +1015,7 @@ async def sync_order_requests_to_sheets():
         # Получаем все данные из базы данных для товаров и предложений
         all_requests = []
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # 1. Получаем заявки на товары и предложения
             cursor = await db.execute("""
                 SELECT 
@@ -1117,7 +1129,7 @@ async def sync_order_requests_to_sheets():
 async def auto_fill_cart_from_orders(user_id: int):
     """Автоматическое заполнение корзины из активных заявок пользователя"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Проверяем, не заполнена ли уже корзина
             cursor = await db.execute("""
                 SELECT COUNT(*) FROM cart_order WHERE user_id = ?
@@ -1182,7 +1194,7 @@ async def auto_fill_cart_from_orders(user_id: int):
                         "",  # Без опций по умолчанию
                         price or "0",
                         datetime.now().isoformat(),
-                        source_table  # Сохраняем источник для корректного удаления
+                        source_table
                     ))
                     added_count += 1
                     print(f"✅ Заявка {order_id} ({item_type}) добавлена в корзину пользователя {user_id}")
@@ -1205,7 +1217,7 @@ async def auto_fill_cart_from_orders(user_id: int):
 async def auto_add_to_cart_from_requests():
     """Автоматическое добавление новых активных заявок в корзину для всех пользователей"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Получаем новые активные заявки всех пользователей
             all_new_requests = []
 
@@ -1260,8 +1272,8 @@ async def auto_add_to_cart_from_requests():
                         user_id,
                         "order_request",
                         request_id,
-                        1,  # Количество по умолчанию
-                        "",  # Без опций
+                        1,
+                        "",
                         price or "0",
                         datetime.now().isoformat(),
                         source_table
@@ -1307,7 +1319,7 @@ async def sync_requests_from_sheets_to_db():
             print("ℹ️ В Google Sheets нет данных для импорта")
             return False
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             added_count = 0
             updated_count = 0
             skipped_count = 0
@@ -1723,7 +1735,7 @@ async def sync_all_sheets(bidirectional=False):
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             partners_sheet = spreadsheet.worksheet(SHEET_PARTNERS)
             cursor = await db.execute(
                 "SELECT specialization, partner_name, 'Активен', contact_info, status, '' FROM auto_tech_partners UNION ALL SELECT services, partner_name, 'Активен', contact_info, status, '' FROM auto_service_partners")
@@ -1821,7 +1833,7 @@ async def sync_orders_to_sheets():
             print(f"✅ Лист '{SHEET_REAL_ORDERS}' создан с заголовками")
 
         # Получаем данные из orders
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT 
                     o.id,

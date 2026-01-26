@@ -32,7 +32,7 @@ async def my_balance(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT bonus_total, current_balance, bonus_adjustment
             FROM users 
@@ -89,7 +89,7 @@ async def payment_history(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем историю из user_bonuses
         cursor = await db.execute("""
             SELECT bonus_total, bonus_adjustment, current_balance, adjustment_reason, updated_at

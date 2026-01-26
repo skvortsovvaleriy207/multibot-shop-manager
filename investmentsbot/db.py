@@ -2,7 +2,7 @@ import aiosqlite
 import os
 from datetime import datetime
 
-DB_FILE = "bot_database.db"
+DB_FILE = "/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db"
 
 async def init_db():
     async with aiosqlite.connect(DB_FILE) as db:
@@ -10,6 +10,19 @@ async def init_db():
             await db.execute("PRAGMA synchronous=NORMAL")
             await db.commit()
             
+            # --- Shared Schema Tables ---
+
+            # New Table for Bot Subscriptions
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS bot_subscriptions (
+                    user_id INTEGER,
+                    bot_id TEXT,
+                    subscribed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, bot_id),
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
+                )
+            """)
+
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
@@ -623,7 +636,7 @@ async def check_channel_subscription(bot, user_id: int, channel_id: int) -> bool
         return False
 
 async def check_account_status(user_id: int) -> bool:
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
         status = await cursor.fetchone()
         return status and status[0] == "Р" 

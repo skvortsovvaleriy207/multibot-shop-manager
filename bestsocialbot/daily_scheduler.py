@@ -6,6 +6,7 @@ import asyncio
 import logging
 from datetime import datetime, time
 import pytz
+from db import DB_FILE
 
 async def start_daily_scheduler():
     """Запуск ежедневного планировщика синхронизации в 17:00 МСК"""
@@ -106,7 +107,7 @@ async def export_business_proposals():
         from config import CREDENTIALS_FILE
         
         # Получаем предложения из БД
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT user_id, username, full_name, business_proposal, created_at
                 FROM users 
@@ -169,7 +170,7 @@ async def notify_proposal_initiators():
         import aiosqlite
         from bot_instance import bot
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT user_id, business_proposal
                 FROM users 
@@ -202,7 +203,7 @@ async def notify_proposal_initiators():
                 await bot.send_message(user_id, message)
                 
                 # Обновляем дату уведомления
-                async with aiosqlite.connect("bot_database.db") as db:
+                async with aiosqlite.connect(DB_FILE) as db:
                     await db.execute(
                         "UPDATE users SET last_proposal_notification = datetime('now') WHERE user_id = ?",
                         (user_id,)
@@ -254,7 +255,7 @@ async def calculate_referral_bonuses():
     try:
         import aiosqlite
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Получаем активных рефералов за месяц
             cursor = await db.execute("""
                 SELECT referrer_id, COUNT(*) as active_referrals
@@ -277,6 +278,13 @@ async def calculate_referral_bonuses():
                             COALESCE((SELECT current_balance FROM user_bonuses WHERE user_id = ?), 0) + ?,
                             datetime('now'))
                 """, (referrer_id, referrer_id, bonus, referrer_id, bonus))
+                
+                # Обновляем общую таблицу пользователей
+                await db.execute("""
+                    UPDATE users 
+                    SET bonus_total = bonus_total + ?, current_balance = current_balance + ?
+                    WHERE user_id = ?
+                """, (bonus, bonus, referrer_id))
             
             await db.commit()
             logging.info(f"Начислены реферальные бонусы {len(referrals)} пользователям")

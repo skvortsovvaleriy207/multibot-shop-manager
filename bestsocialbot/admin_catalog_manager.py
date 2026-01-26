@@ -4,6 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import aiosqlite
+from db import DB_FILE
 from dispatcher import dp
 from config import ADMIN_ID
 
@@ -101,7 +102,7 @@ async def manage_taxonomy_table(callback: CallbackQuery, state: FSMContext):
     # Store context
     await state.update_data(current_table=table_name, current_title=title)
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(f"SELECT id, name FROM {table_name} ORDER BY name")
         items = await cursor.fetchall()
 
@@ -152,7 +153,7 @@ async def select_item(callback: CallbackQuery, state: FSMContext):
     table_name = data.get("current_table")
     title = data.get("current_title")
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(f"SELECT name FROM {table_name} WHERE id = ?", (item_id,))
         res = await cursor.fetchone()
         
@@ -212,7 +213,7 @@ async def delete_item_confirm(callback: CallbackQuery, state: FSMContext):
     item_id = data.get("selected_item_id")
     item_name = data.get("selected_item_name")
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute(f"DELETE FROM {table_name} WHERE id = ?", (item_id,))
         await db.commit()
         
@@ -223,7 +224,7 @@ async def delete_item_confirm(callback: CallbackQuery, state: FSMContext):
     # Easier to just re-render list.
     
     # Re-fetch items
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(f"SELECT id, name FROM {table_name} ORDER BY name")
         items = await cursor.fetchall()
         
@@ -269,7 +270,7 @@ async def process_taxonomy_input(message: Message, state: FSMContext):
     table_name = data.get("current_table")
     title = data.get("current_title")
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         if action == "add":
             await db.execute(f"INSERT INTO {table_name} (name) VALUES (?)", (text,))
             await message.answer(f"✅ Успешно добавлено: {text}")

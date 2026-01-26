@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-DB_FILE = "bot_database.db"
+from db import DB_FILE
 USER_ID = 1138646732
 
 def delete_user_data(user_id):

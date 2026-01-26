@@ -1,7 +1,8 @@
 import sqlite3
 
 def delete_order():
-    db_path = "bot_database.db"
+    from db import DB_FILE
+    db_path = DB_FILE
     try:
         with sqlite3.connect(db_path) as db:
             cursor = db.cursor()

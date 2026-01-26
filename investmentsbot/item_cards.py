@@ -14,7 +14,7 @@ async def show_tech_card_DISABLED(callback: CallbackQuery):
     
     item_id = int(callback.data.split("_")[2])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT ap.*, u.username, u.phone, c.name as category_name
             FROM auto_products ap
@@ -116,7 +116,7 @@ async def show_service_card_DISABLED(callback: CallbackQuery):
     
     item_id = int(callback.data.split("_")[2])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT as_.*, u.username, u.phone, c.name as category_name
             FROM auto_services as_
@@ -215,7 +215,7 @@ async def show_reviews(callback: CallbackQuery):
     item_type = parts[1]  # tech или service
     item_id = int(parts[2])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем название товара/услуги
         if item_type == "tech":
             cursor = await db.execute("SELECT title FROM auto_products WHERE id = ?", (item_id,))
@@ -273,7 +273,7 @@ async def contact_seller(callback: CallbackQuery):
     
     seller_id = int(callback.data.split("_")[1])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT username, phone FROM users WHERE user_id = ?", (seller_id,))
         seller = await cursor.fetchone()
     

@@ -3,7 +3,7 @@ import asyncio
 import aiosqlite
 
 async def check_db():
-    async with aiosqlite.connect('bot_database.db') as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         print('--- Product Purposes Table ---')
         try:
             async with db.execute('SELECT * FROM product_purposes') as cursor:

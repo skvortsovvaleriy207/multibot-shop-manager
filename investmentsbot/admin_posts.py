@@ -110,7 +110,7 @@ async def admin_subcategory_view(callback: types.CallbackQuery, state: FSMContex
     sub_category = callback.data.replace("admin_sub_", "")
     await state.update_data(current_sub_category=sub_category)
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title FROM shop_sections 
             WHERE sub_category = ? AND is_active = 1
@@ -172,7 +172,7 @@ async def finalize_post_creation(message: types.Message, state: FSMContext, imag
     sub_category = data['current_sub_category']
     section_type = data['current_section_type']
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("""
             INSERT INTO shop_sections (section_type, sub_category, title, content, image_url, created_at)
             VALUES (?, ?, ?, ?, ?, datetime('now'))
@@ -189,7 +189,7 @@ async def finalize_post_creation(message: types.Message, state: FSMContext, imag
 async def admin_post_view(callback: types.CallbackQuery):
     post_id = int(callback.data.split("_")[3])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT title, content, image_url FROM shop_sections WHERE id = ?", (post_id,))
         post = await cursor.fetchone()
         
@@ -214,7 +214,7 @@ async def admin_post_view(callback: types.CallbackQuery):
 async def admin_post_delete(callback: types.CallbackQuery):
     post_id = int(callback.data.split("_")[3])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("UPDATE shop_sections SET is_active = 0 WHERE id = ?", (post_id,))
         await db.commit()
         

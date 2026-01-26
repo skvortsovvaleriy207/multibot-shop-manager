@@ -91,7 +91,7 @@ async def show_catalog_section(callback: CallbackQuery, state: FSMContext):
 
     section_name = section_names.get(section, section)
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Проверяем, существует ли таблица
         cursor = await db.execute(f"""
             SELECT name FROM sqlite_master 

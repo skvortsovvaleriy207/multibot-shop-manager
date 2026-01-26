@@ -93,7 +93,7 @@ async def generic_contact_handler(message: types.Message, state: FSMContext):
     images_json = json.dumps(images_data, ensure_ascii=False)
 
     if item_type == 'product':
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             await db.execute("""
                 INSERT INTO auto_products (user_id, category_id, title, description, price, contact_info, status, created_at, purpose_id, type_id, class_id, view_id, images)
                 VALUES (?, 1, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
@@ -102,7 +102,7 @@ async def generic_contact_handler(message: types.Message, state: FSMContext):
         await message.answer("✅ Товар успешно добавлен!")
         
     elif item_type == 'service':
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             await db.execute("""
                 INSERT INTO auto_services (user_id, category_id, title, description, price, contact_info, status, created_at, purpose_id, type_id, class_id, view_id, images)
                 VALUES (?, 2, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
@@ -119,7 +119,7 @@ async def generic_contact_handler(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "add_product")
 async def add_product_start(callback: CallbackQuery, state: FSMContext):
     await state.update_data(item_type="product")
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM product_purposes ORDER BY id")
         purposes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -139,7 +139,7 @@ async def add_product_start(callback: CallbackQuery, state: FSMContext):
 async def add_product_purpose(callback: CallbackQuery, state: FSMContext):
     purpose_id = int(callback.data.split("_")[-1])
     await state.update_data(purpose_id=purpose_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM product_types ORDER BY id")
         types_list = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -156,7 +156,7 @@ async def add_product_purpose(callback: CallbackQuery, state: FSMContext):
 async def add_product_type(callback: CallbackQuery, state: FSMContext):
     type_id = int(callback.data.split("_")[-1])
     await state.update_data(type_id=type_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM product_classes ORDER BY id")
         classes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -174,7 +174,7 @@ async def add_product_type(callback: CallbackQuery, state: FSMContext):
 async def add_product_class(callback: CallbackQuery, state: FSMContext):
     class_id = int(callback.data.split("_")[-1])
     await state.update_data(class_id=class_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM product_views ORDER BY id")
         views = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -302,7 +302,7 @@ async def add_product_additional_photos(message: types.Message, state: FSMContex
 @dp.callback_query(F.data == "add_service")
 async def add_service_start(callback: CallbackQuery, state: FSMContext):
     await state.update_data(item_type="service")
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM service_purposes ORDER BY id")
         purposes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -322,7 +322,7 @@ async def add_service_start(callback: CallbackQuery, state: FSMContext):
 async def add_service_purpose(callback: CallbackQuery, state: FSMContext):
     purpose_id = int(callback.data.split("_")[-1])
     await state.update_data(purpose_id=purpose_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM service_types ORDER BY id")
         types_list = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -339,7 +339,7 @@ async def add_service_purpose(callback: CallbackQuery, state: FSMContext):
 async def add_service_type(callback: CallbackQuery, state: FSMContext):
     type_id = int(callback.data.split("_")[-1])
     await state.update_data(type_id=type_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM service_classes ORDER BY id")
         classes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -357,7 +357,7 @@ async def add_service_type(callback: CallbackQuery, state: FSMContext):
 async def add_service_class(callback: CallbackQuery, state: FSMContext):
     class_id = int(callback.data.split("_")[-1])
     await state.update_data(class_id=class_id)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT id, name FROM service_views ORDER BY id")
         views = await cursor.fetchall()
     builder = InlineKeyboardBuilder()

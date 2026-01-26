@@ -16,7 +16,7 @@ async def automarket_stats(callback: CallbackQuery):
         await callback.answer("Доступ запрещен.", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Статистика по товарам
         cursor = await db.execute("SELECT COUNT(*) FROM auto_products WHERE status = 'active'")
         active_products = (await cursor.fetchone())[0]

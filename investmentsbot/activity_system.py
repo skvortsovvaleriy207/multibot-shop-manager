@@ -21,7 +21,7 @@ ACTIVITY_TYPES = {
 
 async def init_activity_system():
     """Инициализация системы активности"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Таблица активности пользователей
         await db.execute("""
             CREATE TABLE IF NOT EXISTS user_activity (
@@ -71,7 +71,7 @@ async def init_activity_system():
 async def track_activity(user_id: int, activity_type: str, points: float = 0.01):
     """Отслеживание активности пользователя"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             # Проверяем дневной лимит
             today = datetime.now().date().isoformat()
             cursor = await db.execute("""
@@ -108,7 +108,7 @@ async def save_user_activity_report(user_id: int, report_data: dict):
     try:
         today = datetime.now().date().isoformat()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             await db.execute("""
                 INSERT OR REPLACE INTO user_activity_reports 
                 (user_id, report_date, orders_plus, orders_minus, auctions_plus, auctions_minus,
@@ -134,7 +134,7 @@ async def save_user_activity_report(user_id: int, report_data: dict):
 async def calculate_activity_score(user_id: int):
     """Расчет общего балла активности"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             # Автоматически отслеженная активность
             cursor = await db.execute("""
                 SELECT activity_type, SUM(points) 
@@ -187,7 +187,7 @@ async def calculate_activity_score(user_id: int):
 async def export_activity_data():
     """Выгрузка данных активности в Google Sheets"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT u.user_id, u.username, u.full_name, 
                        u.daily_activity_points, u.monthly_activity_points,
@@ -255,7 +255,7 @@ async def scheduled_activity_sync():
             logging.info("Starting scheduled activity sync at 17:00 MSK")
             
             # Рассчитываем активность для всех пользователей
-            async with aiosqlite.connect("bot_database.db") as db:
+            async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
                 cursor = await db.execute("SELECT user_id FROM users WHERE user_id != 0")
                 users = await cursor.fetchall()
                 

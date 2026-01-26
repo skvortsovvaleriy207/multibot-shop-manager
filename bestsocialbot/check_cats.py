@@ -1,8 +1,9 @@
 import aiosqlite
+from db import DB_FILE
 import asyncio
 
 async def check_categories():
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         async with db.execute("SELECT * FROM categories") as cursor:
             rows = await cursor.fetchall()
             print(f"Total categories: {len(rows)}")

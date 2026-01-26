@@ -3,7 +3,7 @@ import sqlite3
 
 def debug_cart():
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db")
         cursor = conn.cursor()
         
         print("--- All rows in cart_order ---")

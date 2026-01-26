@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 import aiosqlite
 import json
 from datetime import datetime
+from db import DB_FILE
 from dispatcher import dp
 from utils import check_blocked_user
 
@@ -35,7 +36,7 @@ async def products_catalog(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT ap.id, ap.title, ap.price, u.username
             FROM auto_products ap
@@ -82,7 +83,7 @@ async def services_catalog(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT as_.id, as_.title, as_.price, u.username
             FROM auto_services as_
@@ -135,7 +136,7 @@ async def view_item_DISABLED(callback: CallbackQuery):
     item_type = parts[1]  # 'tech' или 'service'
     item_id = int(parts[2])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         if item_type == 'tech':
             cursor = await db.execute("""
                 SELECT ap.*, u.username, u.phone, ac.name as category_name
@@ -219,7 +220,7 @@ async def add_to_cart(callback: CallbackQuery):
     item_id = int(parts[3])
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Проверяем, нет ли уже в корзине
         cursor = await db.execute(
             "SELECT id FROM cart WHERE user_id = ? AND item_type = ? AND item_id = ?",
@@ -265,7 +266,7 @@ async def view_cart(callback: CallbackQuery):
 
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT c.id, c.item_type, c.item_id, c.added_at,
                    CASE 
@@ -369,7 +370,7 @@ async def remove_from_cart(callback: CallbackQuery):
     if len(parts) > 3:
         source = parts[3]
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("DELETE FROM cart WHERE id = ?", (cart_id,))
         await db.commit()
     
@@ -403,7 +404,7 @@ async def clear_cart(callback: CallbackQuery):
     elif "_account" in callback.data:
         source = "account"
         
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("DELETE FROM cart WHERE user_id = ?", (user_id,))
         await db.commit()
     
@@ -423,7 +424,7 @@ async def checkout(callback: CallbackQuery):
     
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Получаем товары из корзины
         cursor = await db.execute("""
             SELECT c.item_type, c.item_id,

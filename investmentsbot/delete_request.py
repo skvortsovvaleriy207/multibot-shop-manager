@@ -1,7 +1,7 @@
 import sqlite3
 
 def delete_order():
-    db_path = "bot_database.db"
+    db_path = "/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db"
     try:
         with sqlite3.connect(db_path) as db:
             cursor = db.cursor()

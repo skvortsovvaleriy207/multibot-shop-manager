@@ -2,8 +2,9 @@ from aiogram import F, types
 from aiogram.types import CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
+from db import DB_FILE
 from config import ADMIN_ID, HOUSING_CATEGORIES
-from db import check_channel_subscription
+from db import check_channel_subscription, DB_FILE
 from dispatcher import dp
 from datetime import *
 from survey import SURVEY_QUESTIONS
@@ -18,7 +19,7 @@ SHOWCASE_TEXT = "ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕС
 
 async def check_survey_completed(user_id: int) -> bool:
     """Проверка, прошел ли пользователь опрос"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
             "SELECT has_completed_survey FROM users WHERE user_id = ?",
             (user_id,)
@@ -96,7 +97,7 @@ async def main_shop_page(callback: CallbackQuery):
 
 async def show_dynamic_root(callback: CallbackQuery, catalog_type: str):
     """Show root categories for a dynamic section"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Get root items (parent_id is NULL)
         cursor = await db.execute(
             "SELECT id, name FROM categories WHERE catalog_type = ? AND parent_id IS NULL", 
@@ -113,7 +114,7 @@ async def show_dynamic_root(callback: CallbackQuery, catalog_type: str):
 
 async def show_dynamic_category(callback: CallbackQuery, category_id: int, catalog_type: str):
     """Show contents of a category (subcategories and posts)"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Get category name and parent
         cursor = await db.execute("SELECT name, parent_id FROM categories WHERE id = ?", (category_id,))
         cat_info = await cursor.fetchone()
@@ -205,7 +206,7 @@ async def shop_cat_handler(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("shop_post:"))
 async def shop_post_handler(callback: CallbackQuery):
     pid = int(callback.data.split(":")[1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT title, content_text, media_file_id, media_type, category_id FROM shop_posts WHERE id = ?", (pid,))
         row = await cursor.fetchone()
         if not row:
@@ -387,7 +388,7 @@ async def my_profile(callback: CallbackQuery):
 
     user_id = callback.from_user.id
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute(
             "SELECT username, first_name, last_name, created_at, full_name, user_status FROM users WHERE user_id = ?",
             (user_id,)
@@ -521,7 +522,7 @@ async def product_catalog(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     # Получаем категории товаров из БД
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, name FROM product_purposes
         """)
@@ -576,7 +577,7 @@ async def service_catalog(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     # Получаем категории услуг из таблицы service_purposes
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, name FROM service_purposes
         """)
@@ -632,7 +633,7 @@ async def property_catalog(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     # Получаем категории предложений из БД
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Для предложений (item_type = 'offer')
         cursor = await db.execute("""
             SELECT name FROM categories WHERE catalog_type = 'offer' ORDER BY name
@@ -695,7 +696,7 @@ async def show_product_category_items(callback: CallbackQuery):
 
     # Получаем имя категории по ID
     category_name = None
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (category_id,))
         row = await cursor.fetchone()
         if row:
@@ -782,7 +783,7 @@ async def show_service_category_items(callback: CallbackQuery):
 
     # Получаем имя категории по ID
     category_name = None
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (category_id,))
         row = await cursor.fetchone()
         if row:
@@ -865,7 +866,7 @@ async def show_property_category_items(callback: CallbackQuery):
     category_name = callback.data.replace("pc_", "")
 
     # Получаем предложения из этой категории из таблицы order_requests
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, title, price, additional_info 
             FROM order_requests 
@@ -978,7 +979,7 @@ async def show_new_products(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Берем из order_requests
         cursor = await db.execute("""
             SELECT id, title, price 
@@ -1025,7 +1026,7 @@ async def show_new_services(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, title, price 
             FROM order_requests 
@@ -1071,7 +1072,7 @@ async def show_new_offers(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Для предложений используем order_requests
         cursor = await db.execute("""
             SELECT id, title, price 
@@ -1128,7 +1129,7 @@ async def show_req_product_details(callback: CallbackQuery):
 
     is_new = "new" in parts
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT title, additional_info, price, category, contact, user_id, images
             FROM order_requests 
@@ -1143,7 +1144,7 @@ async def show_req_product_details(callback: CallbackQuery):
     title, description, price, category, contact, user_id, images_json = item
     
     username = None
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
         user_row = await cursor.fetchone()
         if user_row:
@@ -1216,7 +1217,7 @@ async def show_req_service_details(callback: CallbackQuery):
 
     is_new = "new" in parts
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT title, additional_info, price, category, contact, user_id, images
             FROM order_requests 
@@ -1231,7 +1232,7 @@ async def show_req_service_details(callback: CallbackQuery):
     title, description, price, category, contact, user_id, images_json = item
     
     username = None
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
         user_row = await cursor.fetchone()
         if user_row:
@@ -1297,7 +1298,7 @@ async def show_offer_details(callback: CallbackQuery):
 
     item_id = int(callback.data.split("_")[-1])
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT title, additional_info, price, category, contact, user_id, images
             FROM order_requests 
@@ -1313,7 +1314,7 @@ async def show_offer_details(callback: CallbackQuery):
     
     # Пытаемся получить username
     username = None
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT username FROM users WHERE user_id = ?", (user_id,))
         user_row = await cursor.fetchone()
         if user_row:

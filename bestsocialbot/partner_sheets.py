@@ -1,5 +1,6 @@
 import gspread
 import aiosqlite
+from db import DB_FILE
 from datetime import datetime
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
@@ -33,7 +34,7 @@ async def sync_partners_tech_to_sheet():
             "Текущая активность", "Состояние аккаунта"
         ]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT u.user_id, u.username, u.full_name, u.email, u.phone,
                        u.business, u.products_services, u.account_status, u.created_at,
@@ -127,7 +128,7 @@ async def sync_partners_services_to_sheet():
             "ID в магазине", "Контакты", "Активность", "Состояние"
         ]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT DISTINCT u.user_id, u.username, u.full_name, u.email, u.phone,
                        u.business, u.products_services, u.account_status,
@@ -195,7 +196,7 @@ async def sync_investors_to_sheet():
             "Контакты", "Состояние аккаунта"
         ]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT u.user_id, u.username, u.full_name, u.email, u.phone,
                        u.business, u.products_services, u.account_status,
@@ -240,7 +241,7 @@ async def sync_users_from_sheets():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).sheet1
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 user_id = row.get('Telegram ID')
                 if not user_id:
@@ -293,7 +294,7 @@ async def sync_partners_tech_from_sheet():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 user_id = row.get('Telegram ID')
                 if not user_id:
@@ -325,7 +326,7 @@ async def sync_partners_services_from_sheet():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 user_id = row.get('Telegram ID')
                 if not user_id:
@@ -357,7 +358,7 @@ async def sync_investors_from_sheet():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 user_id = row.get('Telegram ID инвестора')
                 if not user_id:
@@ -439,7 +440,7 @@ async def sync_tech_partners_to_product_cards():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         partner_data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for partner in partner_data:
                 user_id = partner.get('Telegram ID')
                 if not user_id:
@@ -474,7 +475,7 @@ async def sync_service_partners_to_service_cards():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         partner_data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for partner in partner_data:
                 user_id = partner.get('Telegram ID')
                 if not user_id:
@@ -509,7 +510,7 @@ async def sync_investor_data_to_profiles():
         sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
         investor_data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for investor in investor_data:
                 user_id = investor.get('Telegram ID инвестора')
                 if not user_id:

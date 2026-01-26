@@ -1,6 +1,7 @@
 
 import aiosqlite
 import logging
+from db import DB_FILE
 
 async def aggregate_user_statistics():
     """
@@ -8,7 +9,7 @@ async def aggregate_user_statistics():
     и обновляет таблицу users для последующей выгрузки в Google Sheets.
     """
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             print("Начинаем агрегацию статистики пользователей...")
 
             # 1. Агрегация рефералов (если referral_system.py не обновил)

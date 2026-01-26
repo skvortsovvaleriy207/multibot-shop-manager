@@ -4,12 +4,13 @@
 
 import aiosqlite
 from aiogram import types
+from db import DB_FILE
 
 async def check_blocked_user(callback: types.CallbackQuery) -> bool:
     """Проверка заблокирован ли пользователь"""
     try:
         user_id = callback.from_user.id
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             
@@ -33,7 +34,7 @@ async def has_active_process(user_id: int) -> bool:
         if user_id == ADMIN_ID:
             return False
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Проверка заявок
             cursor = await db.execute("""
                 SELECT 1 FROM order_requests 
@@ -66,7 +67,7 @@ async def get_active_process_details(user_id: int) -> str:
         if user_id == ADMIN_ID:
             return "Администратор (тест)"
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Проверка заявок
             cursor = await db.execute("""
                 SELECT id, title, status, item_type FROM order_requests 

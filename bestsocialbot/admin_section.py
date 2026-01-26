@@ -4,6 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
+from db import DB_FILE
 from dispatcher import dp
 from utils import check_blocked_user
 from config import ADMIN_ID
@@ -91,7 +92,7 @@ async def show_catalog_section(callback: CallbackQuery, state: FSMContext):
 
     section_name = section_names.get(section, section)
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Проверяем, существует ли таблица
         cursor = await db.execute(f"""
             SELECT name FROM sqlite_master 

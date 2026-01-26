@@ -2,7 +2,7 @@ import aiosqlite
 import asyncio
 
 async def main():
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         print("--- CART ---")
         async with db.execute("SELECT * FROM cart WHERE user_id = 1138646732") as cursor:
             rows = await cursor.fetchall()

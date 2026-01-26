@@ -76,7 +76,7 @@ async def inbox(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, sender_id, subject, message_text, sent_at, is_read
             FROM messages 
@@ -121,7 +121,7 @@ async def outbox(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, recipient_id, subject, message_text, sent_at
             FROM messages 

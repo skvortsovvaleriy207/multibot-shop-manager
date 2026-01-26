@@ -2,7 +2,7 @@ import aiosqlite
 import asyncio
 
 async def check_categories():
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
             WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 

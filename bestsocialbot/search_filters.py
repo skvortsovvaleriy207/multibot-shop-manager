@@ -4,6 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 import aiosqlite
+from db import DB_FILE
 from dispatcher import dp
 from utils import check_blocked_user
 
@@ -34,7 +35,7 @@ async def search_products_start(callback: CallbackQuery, state: FSMContext):
 async def search_products_process(message: Message, state: FSMContext):
     search_query = message.text.lower()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT ap.id, ap.title, ap.price, ap.description, ap.specifications, 
                    u.username, ac.name as category_name
@@ -107,7 +108,7 @@ async def search_services_start(callback: CallbackQuery, state: FSMContext):
 async def search_services_process(message: Message, state: FSMContext):
     search_query = message.text.lower()
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT as_.id, as_.title, as_.price, as_.description, as_.location,
                    u.username, ac.name as category_name
@@ -203,7 +204,7 @@ async def filter_price_max(message: Message, state: FSMContext):
             return
         
         # Выполняем поиск по цене
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             if filter_type == 'products':
                 cursor = await db.execute("""
                     SELECT ap.id, ap.title, ap.price, u.username, ac.name as category_name

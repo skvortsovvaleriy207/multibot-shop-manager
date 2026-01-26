@@ -1,7 +1,7 @@
 import sqlite3
 
 def inspect():
-    conn = sqlite3.connect("bot_database.db")
+    conn = sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db")
     cursor = conn.execute("PRAGMA table_info(users)")
     columns = cursor.fetchall()
     print("Columns in users table:")

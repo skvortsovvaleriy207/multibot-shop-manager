@@ -2,7 +2,7 @@ import asyncio
 import aiosqlite
 
 async def run():
-    async with aiosqlite.connect('bot_database.db') as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         c1 = await db.execute('SELECT COUNT(*) FROM auto_products')
         print('auto_products:', (await c1.fetchone())[0])
         

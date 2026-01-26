@@ -4,7 +4,7 @@ import sys
 def check_active_processes(user_id):
     print(f"Checking for user {user_id}...")
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db")
         cursor = conn.cursor()
         
         print("\n--- Order Requests (NOT approved/rejected) ---")

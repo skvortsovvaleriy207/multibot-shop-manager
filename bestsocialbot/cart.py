@@ -4,10 +4,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import aiosqlite
+from db import DB_FILE
 from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
 from messages_system import send_system_message
+from db import DB_FILE
 
 
 
@@ -33,7 +35,7 @@ async def add_to_cart_from_shop(callback: CallbackQuery):
         user_id = callback.from_user.id
         
         # Определяем тип для базы данных
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # 1. Проверяем существование товара и получаем цену
             cursor = await db.execute("""
                 SELECT title, price FROM order_requests WHERE id = ?
@@ -102,7 +104,7 @@ async def add_to_cart_from_shop(callback: CallbackQuery):
 
 async def auto_fill_cart_from_orders(user_id: int):
     """Автоматическое заполнение корзины из заявок пользователя"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Проверяем, не заполнена ли уже корзина
         cursor = await db.execute("""
             SELECT COUNT(*) FROM cart_order WHERE user_id = ?
@@ -159,7 +161,7 @@ async def auto_fill_cart_from_orders(user_id: int):
 
 async def get_cart_items_paginated(user_id: int, page: int = 1, items_per_page: int = 3):
     """Получить заявки из корзины с пагинацией"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Общее количество заявок
         cursor = await db.execute("""
             SELECT COUNT(*) FROM cart_order WHERE user_id = ?
@@ -450,7 +452,7 @@ async def cart_edit_item(callback: CallbackQuery, state: FSMContext):
         user_id = callback.from_user.id
 
         # Получаем информацию о заявке
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT c.quantity, c.price, c.selected_options,
                        o.title, o.category, o.operation, o.item_type, 
@@ -535,7 +537,7 @@ async def cart_change_quantity(callback: CallbackQuery):
         page = int(parts[4])
         user_id = callback.from_user.id
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Получаем текущее количество
             cursor = await db.execute("""
                 SELECT quantity FROM cart_order 
@@ -610,7 +612,7 @@ async def cart_remove_item(callback: CallbackQuery):
         page = int(parts[3])
         user_id = callback.from_user.id
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             await db.execute("""
                 DELETE FROM cart_order 
                 WHERE user_id = ? AND item_id = ? AND item_type IN ('order_request', 'товар', 'product', 'offer')
@@ -649,7 +651,7 @@ async def cart_order_checkout(callback: CallbackQuery):
         return
 
     # Проверяем, есть ли товары в корзине
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT COUNT(*) FROM cart_order WHERE user_id = ?
         """, (user_id,))
@@ -681,7 +683,7 @@ async def cart_order_confirm(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     # Получаем товары из корзины
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT c.item_id, c.quantity, c.selected_options, c.price,
                    o.title, o.operation, o.item_type, o.category,
@@ -843,7 +845,7 @@ async def cart_order_clear_confirm(callback: CallbackQuery):
     """Подтверждение очистки корзины"""
     user_id = callback.from_user.id
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("DELETE FROM cart_order WHERE user_id = ?", (user_id,))
         await db.commit()
 

@@ -59,7 +59,7 @@ async def select_catalog_type(callback: CallbackQuery, state: FSMContext):
     await state.update_data(catalog_type=catalog_type)
 
     # Получаем существующие категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, name, parent_id FROM categories 
             WHERE catalog_type = ? 
@@ -152,7 +152,7 @@ async def process_category_name(message: Message, state: FSMContext):
     catalog_type = data.get('catalog_type')
 
     # Сохраняем категорию в БД
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("""
             INSERT INTO categories (catalog_type, name, created_at) 
             VALUES (?, ?, ?)
@@ -187,7 +187,7 @@ async def add_subcategory_start(callback: CallbackQuery, state: FSMContext):
     catalog_type = data.get('catalog_type')
 
     # Получаем родительские категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, name FROM categories 
             WHERE catalog_type = ? AND parent_id IS NULL
@@ -227,7 +227,7 @@ async def select_parent_category(callback: CallbackQuery, state: FSMContext):
     await state.update_data(parent_id=parent_id)
 
     # Получаем информацию о родительской категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT name, catalog_type FROM categories WHERE id = ?
         """, (parent_id,))
@@ -259,7 +259,7 @@ async def edit_category_start(callback: CallbackQuery, state: FSMContext):
     category_id = int(callback.data.split("_")[-1])
 
     # Получаем информацию о категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT name, catalog_type FROM categories WHERE id = ?
         """, (category_id,))
@@ -303,7 +303,7 @@ async def delete_category(callback: CallbackQuery):
     category_id = int(callback.data.split("_")[-1])
 
     # Получаем информацию о категории
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT name, catalog_type FROM categories WHERE id = ?
         """, (category_id,))

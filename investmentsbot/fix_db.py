@@ -3,7 +3,7 @@ import asyncio
 
 async def fix_database():
     print("Connecting to database...")
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         print("Creating offer_purposes...")
         await db.execute("CREATE TABLE IF NOT EXISTS offer_purposes (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
         print("Creating offer_classes...")

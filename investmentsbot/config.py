@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BOT_TOKEN = os.getenv("MAIN_BOT_TOKEN")
+BOT_ID = "investmentsbot"
 CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1002160822750"))
 CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/avto_avia_club")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))

@@ -55,7 +55,7 @@ async def content_root_view(callback: CallbackQuery):
         'new_items': 'Новинки'
     }
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Get root categories for this type (or the root category itself if it exists?)
         # My seeding created a Root Category for each type with parent_id=NULL
         # So I should find that root ID first to list its children?
@@ -73,7 +73,7 @@ async def content_root_view(callback: CallbackQuery):
 
 async def show_category_contents(callback: CallbackQuery, category_id: int, catalog_type: str):
     """Show subcategories and posts within a category"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Get subcategories
         cursor = await db.execute("SELECT id, name FROM categories WHERE parent_id = ? ORDER BY name", (category_id,))
         subcats = await cursor.fetchall()
@@ -156,7 +156,7 @@ async def edit_category_start(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data.startswith("del_cat:"))
 async def delete_category_start(callback: CallbackQuery, state: FSMContext):
     cat_id = int(callback.data.split(":")[1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Check for children
         cursor = await db.execute("SELECT COUNT(*) FROM categories WHERE parent_id = ?", (cat_id,))
         count_c = (await cursor.fetchone())[0]
@@ -168,7 +168,7 @@ async def delete_category_start(callback: CallbackQuery, state: FSMContext):
         return
 
     # Delete
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
         await db.commit()
     
@@ -204,7 +204,7 @@ async def category_name_submitted(message: Message, state: FSMContext):
     action = data.get("action")
     name = message.text
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         if action == "add_cat":
             parent_id = data.get("parent_id")
             # Get catalog_type from parent
@@ -272,7 +272,7 @@ async def post_media_submitted(message: Message, state: FSMContext):
         media_id = message.document.file_id
         media_type = "document"
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("""
             INSERT INTO shop_posts (category_id, title, content_text, media_file_id, media_type)
             VALUES (?, ?, ?, ?, ?)
@@ -281,7 +281,7 @@ async def post_media_submitted(message: Message, state: FSMContext):
     
     
     # Get catalog_type for the back button
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT catalog_type FROM categories WHERE id = ?", (cat_id,))
         row = await cursor.fetchone()
         c_type = row[0] if row else "news" # Fallback
@@ -297,7 +297,7 @@ async def delete_post_handler(callback: CallbackQuery):
     pid = int(callback.data.split(":")[1])
     # Need to get parent to refresh view? 
     # We will just delete and say deleted. Refreshing list dynamically is better.
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Get parent id first
         cursor = await db.execute("SELECT category_id, media_type FROM shop_posts WHERE id = ?", (pid,))
         row = await cursor.fetchone()
@@ -312,7 +312,7 @@ async def delete_post_handler(callback: CallbackQuery):
     await callback.answer("Пост удален")
     # Refresh logic: call show_category_contents again
     # We need catalog_type too.
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
          cursor = await db.execute("SELECT catalog_type FROM categories WHERE id = ?", (cat_id,))
          row = await cursor.fetchone()
          c_type = row[0]
@@ -322,7 +322,7 @@ async def delete_post_handler(callback: CallbackQuery):
 @dp.callback_query(F.data.startswith("view_post:"))
 async def view_post_handler(callback: CallbackQuery):
     pid = int(callback.data.split(":")[1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT title, content_text, media_file_id, media_type FROM shop_posts WHERE id = ?", (pid,))
         row = await cursor.fetchone()
         if not row:

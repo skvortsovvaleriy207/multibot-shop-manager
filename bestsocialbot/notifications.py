@@ -1,5 +1,6 @@
 import logging
 import aiosqlite
+from db import DB_FILE
 from aiogram import Bot
 
 async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
@@ -7,7 +8,14 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
     Отправляет уведомление пользователю о состоянии его профиля.
     changes: словарь изменений (не используется для формирования текста, но может быть полезен для логирования)
     """
-    async with aiosqlite.connect("bot_database.db") as db:
+    logging.info(f"Attempting notification for {user_id} using DB: {DB_FILE}")
+    import os
+    if os.path.exists(DB_FILE):
+        logging.info(f"DB File exists. Size: {os.path.getsize(DB_FILE)}")
+    else:
+        logging.error("DB FILE DOES NOT EXIST")
+
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT 
                 username, full_name, birth_date, location, email, phone, employment,
@@ -49,7 +57,7 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
     # 1. Сохраняем сообщение в БД (для внутреннего ящика)
     try:
         from datetime import datetime
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                 VALUES (NULL, ?, ?, ?, ?, 0)

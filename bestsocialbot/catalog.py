@@ -3,6 +3,7 @@ from aiogram import types, F
 from aiogram.types import CallbackQuery, InputMediaPhoto, InputMediaVideo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
+from db import DB_FILE
 from dispatcher import dp
 from utils import check_blocked_user
 
@@ -14,7 +15,7 @@ async def show_product_details(callback: CallbackQuery):
     parts = callback.data.split("_")
     item_id = int(parts[2])
     is_new = len(parts) > 3 and parts[3] == "new"
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT ap.title, ap.description, ap.price, ap.category_id, ap.user_id, ap.contact_info, u.username, c.name, ap.images FROM auto_products ap LEFT JOIN users u ON ap.user_id = u.user_id LEFT JOIN categories c ON ap.category_id = c.id WHERE ap.id = ?", (item_id,))
         item = await cursor.fetchone()
     if not item:
@@ -94,7 +95,7 @@ async def show_service_details(callback: CallbackQuery):
     parts = callback.data.split("_")
     item_id = int(parts[2])
     is_new = len(parts) > 3 and parts[3] == "new"
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT as_.title, as_.description, as_.price, as_.category_id, as_.user_id, as_.contact_info, u.username, c.name, as_.images FROM auto_services as_ LEFT JOIN users u ON as_.user_id = u.user_id LEFT JOIN categories c ON as_.category_id = c.id WHERE as_.id = ?", (item_id,))
         item = await cursor.fetchone()
     if not item:
@@ -165,7 +166,7 @@ async def show_service_details(callback: CallbackQuery):
 async def catalog_tech(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT id, name FROM product_purposes ORDER BY id")
         purposes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -188,7 +189,7 @@ async def catalog_tech_purpose(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     purpose_id = int(callback.data.split("_")[-1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (purpose_id,))
         purpose = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM product_types ORDER BY id")
@@ -212,7 +213,7 @@ async def catalog_tech_type(callback: CallbackQuery):
     parts = callback.data.split("_")
     purpose_id = int(parts[2])
     type_id = int(parts[3])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM product_types WHERE id = ?", (type_id,))
         ptype = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM product_classes ORDER BY id")
@@ -237,7 +238,7 @@ async def catalog_tech_class(callback: CallbackQuery):
     purpose_id = int(parts[2])
     type_id = int(parts[3])
     class_id = int(parts[4])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM product_classes WHERE id = ?", (class_id,))
         pclass = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM product_views ORDER BY id")
@@ -263,7 +264,7 @@ async def catalog_tech_view(callback: CallbackQuery):
     type_id = int(parts[3])
     class_id = int(parts[4])
     view_id = int(parts[5])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM product_views WHERE id = ?", (view_id,))
         pview = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM product_other_chars ORDER BY id")
@@ -288,7 +289,7 @@ async def show_tech_items(callback: CallbackQuery):
     type_id = int(parts[3])
     class_id = int(parts[4])
     view_id = int(parts[5])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT ap.id, ap.title, ap.price, u.username FROM auto_products ap JOIN users u ON ap.user_id = u.user_id WHERE ap.status = 'active' AND ap.purpose_id = ? AND ap.type_id = ? AND ap.class_id = ? AND ap.view_id = ? ORDER BY ap.created_at DESC LIMIT 20", (purpose_id, type_id, class_id, view_id))
         items = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -313,7 +314,7 @@ async def show_tech_items(callback: CallbackQuery):
 async def catalog_services(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT id, name FROM service_purposes ORDER BY id")
         purposes = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -336,7 +337,7 @@ async def catalog_service_purpose(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     purpose_id = int(callback.data.split("_")[-1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (purpose_id,))
         purpose = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM service_types ORDER BY id")
@@ -360,7 +361,7 @@ async def catalog_service_type(callback: CallbackQuery):
     parts = callback.data.split("_")
     purpose_id = int(parts[2])
     type_id = int(parts[3])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM service_types WHERE id = ?", (type_id,))
         ptype = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM service_classes ORDER BY id")
@@ -385,7 +386,7 @@ async def catalog_service_class(callback: CallbackQuery):
     purpose_id = int(parts[2])
     type_id = int(parts[3])
     class_id = int(parts[4])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM service_classes WHERE id = ?", (class_id,))
         pclass = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM service_views ORDER BY id")
@@ -411,7 +412,7 @@ async def catalog_service_view(callback: CallbackQuery):
     type_id = int(parts[3])
     class_id = int(parts[4])
     view_id = int(parts[5])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT name FROM service_views WHERE id = ?", (view_id,))
         pview = await cursor.fetchone()
         cursor = await db.execute("SELECT id, name FROM service_other_chars ORDER BY id")
@@ -436,7 +437,7 @@ async def show_service_items(callback: CallbackQuery):
     type_id = int(parts[3])
     class_id = int(parts[4])
     view_id = int(parts[5])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT as_.id, as_.title, as_.price, u.username FROM auto_services as_ JOIN users u ON as_.user_id = u.user_id WHERE as_.status = 'active' AND as_.purpose_id = ? AND as_.type_id = ? AND as_.class_id = ? AND as_.view_id = ? ORDER BY as_.created_at DESC LIMIT 20", (purpose_id, type_id, class_id, view_id))
         items = await cursor.fetchall()
     builder = InlineKeyboardBuilder()
@@ -462,7 +463,7 @@ async def show_product_details(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     item_id = int(callback.data.split("_")[-1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT ap.title, ap.description, ap.price, ap.category_id, ap.user_id, ap.contact_info, u.username, c.name FROM auto_products ap LEFT JOIN users u ON ap.user_id = u.user_id LEFT JOIN categories c ON ap.category_id = c.id WHERE ap.id = ?", (item_id,))
         item = await cursor.fetchone()
     if not item:
@@ -485,7 +486,7 @@ async def show_service_details(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
     item_id = int(callback.data.split("_")[-1])
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT as_.title, as_.description, as_.price, as_.category_id, as_.user_id, as_.contact_info, u.username, c.name FROM auto_services as_ LEFT JOIN users u ON as_.user_id = u.user_id LEFT JOIN categories c ON as_.category_id = c.id WHERE as_.id = ?", (item_id,))
         item = await cursor.fetchone()
     if not item:

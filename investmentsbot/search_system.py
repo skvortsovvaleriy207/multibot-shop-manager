@@ -150,7 +150,7 @@ async def search_offers_by_category_start(callback: CallbackQuery):
     """Поиск предложений по категории"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем категории из order_requests для предложений
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
@@ -199,7 +199,7 @@ async def search_offers_by_category_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     category = None
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Find category by hash
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
@@ -315,7 +315,7 @@ async def search_offers_by_class_start(callback: CallbackQuery):
     """Поиск предложений по классу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем классы из order_requests для предложений
         cursor = await db.execute("""
             SELECT DISTINCT item_class FROM order_requests 
@@ -363,7 +363,7 @@ async def search_offers_by_class_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     item_class = None
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Resolve hash
         cursor = await db.execute("""
             SELECT DISTINCT item_class FROM order_requests 
@@ -476,7 +476,7 @@ async def search_offers_by_type_start(callback: CallbackQuery):
     """Поиск предложений по типу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем типы из order_requests для предложений
         cursor = await db.execute("""
             SELECT DISTINCT item_type_detail FROM order_requests 
@@ -524,7 +524,7 @@ async def search_offers_by_type_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     item_type_detail = None
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Resolve hash
         cursor = await db.execute("""
             SELECT DISTINCT item_type_detail FROM order_requests 
@@ -637,7 +637,7 @@ async def search_offers_by_kind_start(callback: CallbackQuery):
     """Поиск предложений по виду"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Получаем виды из order_requests для предложений
         cursor = await db.execute("""
             SELECT DISTINCT item_kind FROM order_requests 
@@ -687,7 +687,7 @@ async def search_offers_by_kind_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     item_kind = None
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Resolve hash
         cursor = await db.execute("""
             SELECT DISTINCT item_kind FROM order_requests 
@@ -831,7 +831,7 @@ async def process_search_in_offers(message: Message, state: FSMContext):
     search_by_id = state_data.get("search_by_id", False)
 
     # Сохраняем историю поиска
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute(
             "INSERT INTO search_history (user_id, search_query, search_type, catalog_type, created_at) VALUES (?, ?, ?, ?, ?)",
             (user_id, search_query, "quick", "offers", datetime.now().isoformat())
@@ -939,7 +939,7 @@ async def perform_search_in_catalog(search_query: str, item_type: str, user_id: 
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         if item_type == "product":
             # Поиск в auto_products
             cursor = await db.execute("""
@@ -1043,7 +1043,7 @@ async def search_products_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 item_id_int = int(item_id)
@@ -1086,7 +1086,7 @@ async def search_services_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 item_id_int = int(item_id)
@@ -1129,7 +1129,7 @@ async def search_offers_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 cursor = await db.execute("""
@@ -1176,7 +1176,7 @@ async def search_services_by_category_start(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     # Получаем категории из auto_services (через auto_categories)
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT ac.name 
             FROM auto_services asv
@@ -1235,7 +1235,7 @@ async def search_services_by_category_execute(callback: CallbackQuery):
     # Выполняем поиск по категории в обеих таблицах
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Поиск в auto_services
         cursor = await db.execute("""
             SELECT asv.id, asv.title, asv.price, ac.name as category, asv.operation_type, asv.description
@@ -1336,7 +1336,7 @@ async def search_services_by_class_start(callback: CallbackQuery):
     """Поиск услуг по классу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM service_classes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -1403,7 +1403,7 @@ async def search_services_by_class_execute(callback: CallbackQuery):
     # Выполняем поиск по классу в обеих таблицах
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Поиск в auto_services (через service_classes)
         cursor = await db.execute("""
             SELECT asv.id, asv.title, asv.price, ac.name as category, asv.operation_type, asv.description
@@ -1506,7 +1506,7 @@ async def all_orders_request_search(callback: CallbackQuery):
     # Выполняем поиск по классу в обеих таблицах
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
 
         # Поиск в order_requests
         cursor = await db.execute("""
@@ -1592,7 +1592,7 @@ async def all_orders_search(callback: CallbackQuery):
     # Выполняем поиск по классу в обеих таблицах
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
 
         # Поиск в order_requests
         cursor = await db.execute("""
@@ -1665,7 +1665,7 @@ async def perform_search_in_catalog(search_query: str, item_type: str, user_id: 
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         if item_type == "product":
             # Поиск в auto_products
             cursor = await db.execute("""
@@ -1769,7 +1769,7 @@ async def search_products_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 item_id_int = int(item_id)
@@ -1812,7 +1812,7 @@ async def search_services_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 item_id_int = int(item_id)
@@ -1855,7 +1855,7 @@ async def search_offers_by_id(search_query: str, user_id: int) -> list:
 
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         for item_id in id_list:
             try:
                 cursor = await db.execute("""
@@ -1925,7 +1925,7 @@ async def perform_advanced_search_in_catalog(filters: dict, user_id: int) -> lis
     # Формируем SQL запрос
     where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute(f"""
             SELECT id, title, price, category, operation
             FROM order_requests 
@@ -2025,7 +2025,7 @@ async def view_search_result_item(callback: CallbackQuery):
         return
 
     # Получаем информацию о товаре
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT 
                 id, user_id, operation, item_type, category, item_class, item_kind,
@@ -2254,7 +2254,7 @@ async def view_item_gallery(callback: CallbackQuery):
     item_type = data_parts[2]
     item_id = data_parts[3]
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT images FROM order_requests WHERE id = ? AND item_type = ?", (item_id, item_type))
         row = await cursor.fetchone()
 
@@ -2298,7 +2298,7 @@ async def add_search_result_to_cart(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     # Проверяем, существует ли товар
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price FROM order_requests 
             WHERE id = ? AND item_type = ? AND status IN ('new', 'active', 'approved', 'processing')
@@ -2398,7 +2398,7 @@ async def search_products_by_category_start(callback: CallbackQuery):
     """Поиск товаров по категории"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
             WHERE item_type = 'product' AND category IS NOT NULL AND category != '' 
@@ -2442,7 +2442,7 @@ async def search_products_by_category_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, NULL as operation, NULL as description
             FROM order_requests 
@@ -2512,7 +2512,7 @@ async def search_products_by_class_start(callback: CallbackQuery):
     """Поиск товаров по классу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_class FROM order_requests 
             WHERE item_type = 'product' AND item_class IS NOT NULL AND item_class != '' 
@@ -2542,7 +2542,7 @@ async def search_products_by_class_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, NULL as operation, NULL as description
             FROM order_requests 
@@ -2599,7 +2599,7 @@ async def search_products_by_type_start(callback: CallbackQuery):
     """Поиск товаров по типу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_type_detail FROM order_requests 
             WHERE item_type = 'product' AND item_type_detail IS NOT NULL AND item_type_detail != '' 
@@ -2629,7 +2629,7 @@ async def search_products_by_type_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, NULL as operation, NULL as description
             FROM order_requests 
@@ -2683,7 +2683,7 @@ async def search_products_by_kind_start(callback: CallbackQuery):
     """Поиск товаров по виду"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_kind FROM order_requests 
             WHERE item_type = 'product' AND item_kind IS NOT NULL AND item_kind != '' 
@@ -2713,7 +2713,7 @@ async def search_products_by_kind_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, NULL as operation, NULL as description
             FROM order_requests 
@@ -2771,7 +2771,7 @@ async def search_services_by_type_start(callback: CallbackQuery):
     """Поиск услуг по типу"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_type_detail FROM order_requests 
             WHERE item_type = 'service' AND item_type_detail IS NOT NULL AND item_type_detail != '' 
@@ -2801,7 +2801,7 @@ async def search_services_by_type_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, operation, NULL as description
             FROM order_requests 
@@ -2855,7 +2855,7 @@ async def search_services_by_kind_start(callback: CallbackQuery):
     """Поиск услуг по виду"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_kind FROM order_requests 
             WHERE item_type = 'service' AND item_kind IS NOT NULL AND item_kind != '' 
@@ -2885,7 +2885,7 @@ async def search_services_by_kind_execute(callback: CallbackQuery):
     user_id = callback.from_user.id
     results = []
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT id, title, price, category, operation, NULL as description
             FROM order_requests 
@@ -2985,7 +2985,7 @@ async def process_search_in_products(message: Message, state: FSMContext):
     results = await perform_search_in_catalog(search_query, "product", message.from_user.id)
     
     # Сохраняем в историю
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute(
             "INSERT INTO search_history (user_id, search_query, search_type, catalog_type, created_at) VALUES (?, ?, ?, ?, ?)",
             (message.from_user.id, search_query, "text", "products", datetime.now().isoformat())
@@ -3038,7 +3038,7 @@ async def process_search_in_services(message: Message, state: FSMContext):
 
     results = await perform_search_in_catalog(search_query, "service", message.from_user.id)
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute(
             "INSERT INTO search_history (user_id, search_query, search_type, catalog_type, created_at) VALUES (?, ?, ?, ?, ?)",
             (message.from_user.id, search_query, "text", "services", datetime.now().isoformat())
@@ -3075,7 +3075,7 @@ async def process_search_in_services(message: Message, state: FSMContext):
 # Инициализация таблицы истории поиска
 async def init_search_history_table():
     """Инициализация таблицы истории поиска"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS search_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3253,7 +3253,7 @@ async def execute_advanced_search_offers(callback: CallbackQuery, state: FSMCont
 @dp.callback_query(F.data == "filter_category_offers")
 async def filter_category_offers(callback: CallbackQuery, state: FSMContext):
     """Filter by category for offers"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
             WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 
@@ -3288,7 +3288,7 @@ async def set_filter_category_offers(callback: CallbackQuery, state: FSMContext)
     cat_hash = callback.data.split(":")[1]
     category = None
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT category FROM order_requests 
             WHERE item_type = 'offer' AND category IS NOT NULL AND category != '' 
@@ -3313,7 +3313,7 @@ async def set_filter_category_offers(callback: CallbackQuery, state: FSMContext)
 @dp.callback_query(F.data == "filter_class_offers")
 async def filter_class_offers(callback: CallbackQuery, state: FSMContext):
     """Filter by class for offers"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_class FROM order_requests 
             WHERE item_type = 'offer' AND item_class IS NOT NULL AND item_class != '' 
@@ -3348,7 +3348,7 @@ async def set_filter_class_offers(callback: CallbackQuery, state: FSMContext):
     cls_hash = callback.data.split(":")[1]
     item_class = None
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT DISTINCT item_class FROM order_requests 
             WHERE item_type = 'offer' AND item_class IS NOT NULL AND item_class != '' 

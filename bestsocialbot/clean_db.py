@@ -2,7 +2,7 @@
 import aiosqlite
 import asyncio
 
-DB_FILE = "bot_database.db"
+from db import DB_FILE
 
 async def clean_database():
     async with aiosqlite.connect(DB_FILE) as db:

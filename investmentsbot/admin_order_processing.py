@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 import aiosqlite
 from datetime import datetime
 from config import ADMIN_ID
+from db import DB_FILE
 from dispatcher import dp
 from messages_system import send_system_message
 import json
@@ -157,7 +158,7 @@ async def process_new_photo(message: Message, state: FSMContext):
     table_name = "order_requests"
     
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             await db.execute(f"UPDATE {table_name} SET images = ? WHERE id = ?", (images_json, request_id))
             await db.commit()
             
@@ -198,7 +199,7 @@ async def process_new_value(message: Message, state: FSMContext):
     table_name = "order_requests" # Using order_requests for all types as per recent migration
     
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Проверяем, существует ли колонка (simple check)
             # В реальном проекте лучше использовать безопасный маппинг
             allowed_fields = [
@@ -286,7 +287,7 @@ async def process_reject_reason(message: Message, state: FSMContext):
     # Обновляем статус в БД
     table_name = "order_requests"
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         # Проверяем существование записи
         cursor = await db.execute(f"SELECT user_id, title FROM {table_name} WHERE id = ?", (request_id,))
         row = await cursor.fetchone()
@@ -348,7 +349,7 @@ async def approve_request_start(callback: CallbackQuery, state: FSMContext):
 async def approve_cart_order(message: Message, request_id: int):
     """Одобрение заказа из корзины (смена статуса на confirmed/completed) + создание заказов"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # Получаем данные
             cursor = await db.execute("SELECT user_id, title, additional_info FROM order_requests WHERE id = ?", (request_id,))
             row = await cursor.fetchone()
@@ -460,7 +461,7 @@ async def approve_and_add_to_catalog(request_id, item_type, supplier_id):
         if item_type == "offer":
             target_table = None  # Offers don't go into auto_products or auto_services
 
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             # 1. Получаем данные заявки
             cursor = await db.execute(f"SELECT * FROM {source_table} WHERE id = ?", (request_id,))
             row = await cursor.fetchone()

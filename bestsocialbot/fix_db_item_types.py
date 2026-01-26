@@ -3,7 +3,7 @@ import sqlite3
 
 def fix_cart_types():
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db")
         cursor = conn.cursor()
         
         print("Checking for 'товар' entries in cart_order...")

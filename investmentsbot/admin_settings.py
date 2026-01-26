@@ -13,7 +13,7 @@ class AdminSettingsStates(StatesGroup):
 # Функция для получения ID админа для поддержки
 async def get_support_admin_id() -> int:
     """Получить ID админа для получения сообщений от подписчиков"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT value FROM settings WHERE key = 'support_admin_id'")
         result = await cursor.fetchone()
         if result:
@@ -23,7 +23,7 @@ async def get_support_admin_id() -> int:
 # Функция для установки ID админа для поддержки
 async def set_support_admin_id(admin_id: int):
     """Установить ID админа для получения сообщений от подписчиков"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         await db.execute("""
             INSERT OR REPLACE INTO settings (key, value) 
             VALUES ('support_admin_id', ?)

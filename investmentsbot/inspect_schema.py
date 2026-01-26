@@ -2,7 +2,7 @@
 import sqlite3
 
 def check_schema():
-    with sqlite3.connect("bot_database.db") as db:
+    with sqlite3.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         print("--- product_purposes ---")
         cursor = db.execute("PRAGMA table_info(product_purposes)")
         for col in cursor:

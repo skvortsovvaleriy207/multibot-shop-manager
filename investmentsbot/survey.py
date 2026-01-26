@@ -7,8 +7,9 @@ from aiogram.fsm.context import FSMContext
 import aiosqlite
 import asyncio
 from integration import *
+from db import DB_FILE
 from datetime import datetime
-from db import check_channel_subscription
+from db import check_channel_subscription, DB_FILE
 from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
 from bot_instance import bot
@@ -103,7 +104,7 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
     #    await callback.answer()
     #    return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
         user = await cursor.fetchone()
 
@@ -326,7 +327,7 @@ async def process_q16(message: Message, state: FSMContext):
     except Exception:
         pass
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Обновляем информацию о прохождении опроса
         await db.execute(
             """
@@ -373,6 +374,14 @@ async def process_q16(message: Message, state: FSMContext):
             "INSERT INTO user_bonuses (user_id, bonus_total, current_balance, updated_at) VALUES (?, ?, ?, ?)",
             (user_id, bonus_total, bonus_total, datetime.now().isoformat())
         )
+        
+        # Save Bot Subscription
+        try:
+            from config import BOT_ID
+            await db.execute("INSERT OR IGNORE INTO bot_subscriptions (user_id, bot_id) VALUES (?, ?)", (user_id, BOT_ID))
+        except Exception as e:
+            print(f"Error saving subscription in survey: {e}")
+
         await db.commit()
 
     # Process referral

@@ -1,7 +1,8 @@
 import sqlite3
 import os
 
-DB_NAME = "bot_database.db"
+from db import DB_FILE
+DB_NAME = DB_FILE
 
 def update_schema():
     if not os.path.exists(DB_NAME):

@@ -49,7 +49,7 @@ async def my_activity(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     # Получаем текущую активность
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("""
             SELECT daily_activity_points, monthly_activity_points, current_activity
             FROM users WHERE user_id = ?

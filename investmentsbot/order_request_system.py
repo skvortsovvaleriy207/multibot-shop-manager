@@ -156,7 +156,7 @@ async def check_daily_limit(user_id: int) -> bool:
     if user_id == ADMIN_ID:
         return True
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         today = datetime.now().date()
         cursor = await db.execute("""
             SELECT COUNT(*) FROM order_requests 
@@ -197,7 +197,7 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
             val = callback.data.split("|")[1]
             if val.isdigit():
                  # Resolve ID to name
-                 async with aiosqlite.connect("bot_database.db") as db:
+                 async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
                      cursor = await db.execute("SELECT name FROM product_purposes WHERE id = ?", (int(val),))
                      row = await cursor.fetchone()
                      if row:
@@ -270,7 +270,7 @@ async def show_product_category_selection(message: Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
 
     # Получаем категории из базы данных
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM product_purposes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -368,7 +368,7 @@ async def process_product_category_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM product_purposes WHERE name = ?", (category,))
                 exists = await cursor.fetchone()
@@ -444,7 +444,7 @@ async def show_product_class_selection(message: Message, state: FSMContext):
     await state.set_state(ProductCardStates.waiting_class)
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM product_classes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -540,7 +540,7 @@ async def process_product_class_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM product_classes WHERE name = ?", (item_class,))
                 exists = await cursor.fetchone()
@@ -615,7 +615,7 @@ async def show_product_type_selection(message: Message, state: FSMContext):
     await state.set_state(ProductCardStates.waiting_item_type)
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM product_types ORDER BY name")
         items = await cursor.fetchall()
 
@@ -710,7 +710,7 @@ async def process_product_type_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM product_types WHERE name = ?", (item_type,))
                 exists = await cursor.fetchone()
@@ -785,7 +785,7 @@ async def show_product_view_selection(message: Message, state: FSMContext):
     await state.set_state(ProductCardStates.waiting_item_kind)
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM product_views ORDER BY name")
         items = await cursor.fetchall()
 
@@ -876,7 +876,7 @@ async def process_product_view_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM product_views WHERE name = ?", (item_kind,))
                 exists = await cursor.fetchone()
@@ -1613,7 +1613,7 @@ async def product_process_contact(message: Message, state: FSMContext):
 
     # Сохраняем заявку в базу данных
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             cursor = await db.execute("""
                 INSERT INTO order_requests 
                 (user_id, operation, item_type, category, item_class, item_type_detail, item_kind,
@@ -1741,7 +1741,7 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
             val = callback.data.split("|")[1]
             if val.isdigit():
                  # Resolve ID to name
-                 async with aiosqlite.connect("bot_database.db") as db:
+                 async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
                      cursor = await db.execute("SELECT name FROM service_purposes WHERE id = ?", (int(val),))
                      row = await cursor.fetchone()
                      if row:
@@ -1819,7 +1819,7 @@ async def show_service_category_selection(message: Message, state: FSMContext):
     """Показать выбор категории услуги"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM service_purposes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -1886,7 +1886,7 @@ async def show_service_class_selection(message: Message, state: FSMContext):
     """Показать выбор класса услуги"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM service_classes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -1966,7 +1966,7 @@ async def process_service_category_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM service_purposes WHERE name = ?", (category,))
                 exists = await cursor.fetchone()
@@ -2073,7 +2073,7 @@ async def process_service_class_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM service_classes WHERE name = ?", (item_class,))
                 exists = await cursor.fetchone()
@@ -2154,7 +2154,7 @@ async def show_service_type_selection(message: Message, state: FSMContext):
     """Показать выбор типа услуги"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM service_types ORDER BY name")
         items = await cursor.fetchall()
 
@@ -2250,7 +2250,7 @@ async def process_service_type_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM service_types WHERE name = ?", (item_type,))
                 exists = await cursor.fetchone()
@@ -2323,7 +2323,7 @@ async def show_service_view_selection(message: Message, state: FSMContext):
     """Показать выбор вида услуги"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM service_views ORDER BY name")
         items = await cursor.fetchall()
 
@@ -2419,7 +2419,7 @@ async def process_service_view_input(message: Message, state: FSMContext):
         is_admin = True
         # Автоматическое добавление для администратора
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 # Проверяем существование
                 cursor = await db.execute("SELECT 1 FROM service_views WHERE name = ?", (item_kind,))
                 exists = await cursor.fetchone()
@@ -3085,7 +3085,7 @@ async def service_process_contact(message: Message, state: FSMContext):
 
     # Сохраняем заявку в базу данных
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             cursor = await db.execute("""
             INSERT INTO order_requests 
                 (user_id, operation, category, item_class, item_type, item_kind,
@@ -3273,7 +3273,7 @@ async def show_offer_category_selection(message: Message, state: FSMContext):
     """Показать выбор категории предложения"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM categories WHERE catalog_type = 'offer' ORDER BY name")
         items = await cursor.fetchall()
 
@@ -3354,7 +3354,7 @@ async def show_offer_class_selection(message: Message, state: FSMContext):
     """Показать выбор класса предложения"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM offer_classes ORDER BY name")
         items = await cursor.fetchall()
 
@@ -3422,7 +3422,7 @@ async def process_offer_category_input(message: Message, state: FSMContext):
     if user_id == ADMIN_ID:
         is_admin = True
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 cursor = await db.execute("SELECT 1 FROM categories WHERE name = ? AND catalog_type = 'offer'", (category,))
                 exists = await cursor.fetchone()
                 if not exists:
@@ -3530,7 +3530,7 @@ async def process_offer_class_input(message: Message, state: FSMContext):
     if user_id == ADMIN_ID:
         is_admin = True
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 cursor = await db.execute("SELECT 1 FROM offer_classes WHERE name = ?", (item_class,))
                 exists = await cursor.fetchone()
                 if not exists:
@@ -3609,7 +3609,7 @@ async def show_offer_type_selection(message: Message, state: FSMContext):
     """Показать выбор типа предложения"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM offer_types ORDER BY name")
         items = await cursor.fetchall()
 
@@ -3704,7 +3704,7 @@ async def process_offer_type_input(message: Message, state: FSMContext):
     if user_id == ADMIN_ID:
         is_admin = True
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 cursor = await db.execute("SELECT 1 FROM offer_types WHERE name = ?", (item_type,))
                 exists = await cursor.fetchone()
                 if not exists:
@@ -3776,7 +3776,7 @@ async def show_offer_view_selection(message: Message, state: FSMContext):
     """Показать выбор вида предложения"""
     builder = InlineKeyboardBuilder()
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
         cursor = await db.execute("SELECT name FROM offer_views ORDER BY name")
         items = await cursor.fetchall()
 
@@ -3871,7 +3871,7 @@ async def process_offer_view_input(message: Message, state: FSMContext):
     if user_id == ADMIN_ID:
         is_admin = True
         try:
-             async with aiosqlite.connect("bot_database.db", timeout=20.0) as db:
+             async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db", timeout=20.0) as db:
                 cursor = await db.execute("SELECT 1 FROM offer_views WHERE name = ?", (item_kind,))
                 exists = await cursor.fetchone()
                 if not exists:
@@ -4073,7 +4073,7 @@ async def offer_process_contact(message: Message, state: FSMContext):
 
     # Сохраняем заявку в базу данных (аналогично товару)
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect("/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/shared_storage/bot_database.db") as db:
             cursor = await db.execute("""
                 INSERT INTO order_requests 
                 (user_id, operation, item_type, category, item_class, item_type_detail, item_kind,

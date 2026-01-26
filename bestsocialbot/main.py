@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from config import BOT_TOKEN, SHOWCASE_INTERVAL, CHANNEL_ID, ADMIN_ID, MAIN_SURVEY_SHEET_URL, SHOWCASE_IMAGE_URL
-from db import init_db
+from db import init_db, DB_FILE
 from dispatcher import dp
 from aiogram import types, F
 from aiogram.filters import Command, CommandObject
@@ -16,7 +16,7 @@ async def check_blocked_user(callback):
     """Проверка заблокированных пользователей"""
     try:
         user_id = callback.from_user.id
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             
@@ -30,7 +30,7 @@ async def check_blocked_user(callback):
 
 async def get_showcase_keyboard(user_id: int):
     from config import ADMIN_ID
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
         row = await cursor.fetchone()
         if row and row[0] == 'О':
@@ -70,7 +70,7 @@ async def cmd_start_shop(message: types.Message):
     user_id = message.chat.id
 
     # Check survey status
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
         survey_status_row = await cursor.fetchone()
         has_survey = survey_status_row and survey_status_row[0]
@@ -127,10 +127,27 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             except ValueError:
                 pass
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
         user_exists = await cursor.fetchone()
         print(f"DEBUG: user_exists query result: {user_exists}")
+
+        if user_exists:
+            try:
+                from config import BOT_ID
+                cursor = await db.execute("INSERT OR IGNORE INTO bot_subscriptions (user_id, bot_id) VALUES (?, ?)", (user_id, BOT_ID))
+                await db.commit()
+                
+                if cursor.rowcount > 0:
+                    print(f"DEBUG: New subscription for bot {BOT_ID}, triggering sheet export")
+                    try:
+                        from google_sheets import sync_db_to_main_survey_sheet
+                        await sync_db_to_main_survey_sheet()
+                        print("DEBUG: Sheet export triggered successfully")
+                    except Exception as e:
+                        print(f"Error triggering sheet export: {e}")
+            except Exception as e:
+                print(f"Error saving subscription: {e}")
     
     # Если пользователя нет, пробуем синхронизировать с Google Sheets (возможно он пришел из другого бота)
     if not user_exists:
@@ -140,7 +157,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             await sync_with_google_sheets()
             
             # Проверяем снова
-            async with aiosqlite.connect("bot_database.db") as db:
+            async with aiosqlite.connect(DB_FILE) as db:
                 cursor = await db.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
                 user_exists = await cursor.fetchone()
                 print(f"DEBUG: user_exists query result after sync: {user_exists}")
@@ -328,8 +345,15 @@ async def main():
     # SYNC: Загружаем изменения из Google Sheets в БД
     print("[SYNC] Загрузка изменений из Google Sheets...")
     try:
-        #await sync_requests_from_sheets_to_db()
-        print(f"[OK] Загружено изменений для заявок")
+        # ЗАГРУЗКА ДАННЫХ ПЕРЕД ВЫГРУЗКОЙ - ВАЖНО ДЛЯ СОХРАННОСТИ ДАННЫХ
+        from automarket_sheets import sync_products_from_sheet, sync_services_from_sheet
+        print("[SYNC] 📥 Импорт данных из Google Sheets в базу...")
+        await sync_products_from_sheet()
+        await sync_services_from_sheet()
+        
+        # await sync_requests_from_sheets_to_db()
+        # print(f"[OK] Загружено изменений для заявок")
+        
         changes = await sync_with_google_sheets()
         if changes:
             print(f"[OK] Загружено изменений для {len(changes)} пользователей")
@@ -353,7 +377,7 @@ async def main():
     print("[EXPORT] Выгрузка данных из базы в Google Sheets...")
     
     # Проверяем данные в базе
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT COUNT(*) FROM auto_products")
         products_count = (await cursor.fetchone())[0]
         cursor = await db.execute("SELECT COUNT(*) FROM auto_services")
@@ -364,7 +388,7 @@ async def main():
     
     try:
         # Отключено: не перезаписываем изменения из Google Sheets
-        # await sync_db_to_main_survey_sheet()
+        await sync_db_to_main_survey_sheet()
         await export_all_automarket_data()
         await export_all_partner_data()
         print("[OK] Выгрузка завершена")
@@ -418,7 +442,7 @@ async def main():
 
 
 async def send_showcase(chat_id: int):
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT message_id FROM showcase_messages WHERE chat_id = ?", (chat_id,))
         rows = await cursor.fetchall()
         for row in rows:
@@ -448,7 +472,7 @@ async def send_showcase(chat_id: int):
         reply_markup=builder.as_markup()
     )
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("INSERT INTO showcase_messages VALUES (?, ?)", (message.message_id, chat_id))
         await db.commit()
 @dp.callback_query(lambda c: c.data == "disabled")
