@@ -12,6 +12,13 @@ from bot_instance import bot
 from captcha import send_captcha, process_captcha_selection, CaptchaStates
 from google_sheets import sync_db_to_google_sheets, sync_db_to_main_survey_sheet, sync_with_google_sheets, sync_requests_from_sheets_to_db #, sync_from_sheets_to_db
 
+import sys
+import os
+
+# Add shared_storage to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from shared_storage.global_db import init_global_db
+
 async def check_blocked_user(callback):
     """Проверка заблокированных пользователей"""
     try:
@@ -132,9 +139,72 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         user_exists = await cursor.fetchone()
         print(f"DEBUG: user_exists query result: {user_exists}")
     
-    # Если пользователя нет, пробуем синхронизировать с Google Sheets (возможно он пришел из другого бота)
+    # Если пользователя нет, пробуем найти в глобальной БД или синхронизировать с Google Sheets
     if not user_exists:
-        print("DEBUG: User not found, attempting to sync with Google Sheets...")
+        print("DEBUG: User not found locally. Checking Global DB and Google Sheets...")
+        
+        # 1. Попытка синхронизации из глобальной базы данных (для перехода между ботами)
+        try:
+            import sys
+            import os
+            # Add shared_storage to path if not already there
+            shared_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            if shared_path not in sys.path:
+                sys.path.append(shared_path)
+                
+            from shared_storage.global_db import get_global_user_survey, register_user_subscription, get_user_subscription_count
+            
+            # Проверка глобальной подписки
+            survey_data = get_global_user_survey(user_id)
+            
+            if survey_data:
+                print(f"DEBUG: Found user {user_id} in Global DB. Copying data...")
+                
+                # Проверка лимита ботов (если это новый бот для пользователя)
+                # subscription_count = get_user_subscription_count(user_id)
+                # if subscription_count >= 3: ... (logic handled in survey.py, but maybe check here too?)
+                # For seamless transition, we assume click means intent to join. 
+                # If limits are strict, we should check here. But let's allow "start" and block later if needed?
+                # Actually, better to just copy and register.
+                
+                # Копируем данные из глобальной БД в локальную
+                from survey import save_user_data_to_db
+                
+                # Prepare data dict (similar to state data)
+                user_data_for_db = {
+                    'username': survey_data.get('username'),
+                    'full_name': survey_data.get('full_name'),
+                    # Map other fields from survey_data json
+                    # survey_data['survey_data'] is the JSON dict
+                }
+                
+                # Merge survey_data json into flat structure if needed by save_user_data_to_db
+                if 'survey_data' in survey_data and isinstance(survey_data['survey_data'], dict):
+                    user_data_for_db.update(survey_data['survey_data'])
+                
+                # Save to local DB
+                await save_user_data_to_db(user_id, user_data_for_db)
+                
+                # Register subscription in Global DB
+                current_bot_folder = os.path.basename(os.path.dirname(__file__))
+                register_user_subscription(user_id, current_bot_folder)
+                
+                # Sync to Google Sheets for this bot
+                from google_sheets import sync_with_google_sheets
+                await sync_with_google_sheets()
+                
+                await message.answer(f"✅ Вы успешно авторизованы! Ваши данные загружены из профиля сообщества.\n\nДобро пожаловать в {current_bot_folder}!")
+                
+                # Show main menu immediately
+                await cmd_start_shop(message)
+                return
+
+        except Exception as e:
+            print(f"⚠️ Error checking Global DB: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # 2. Fallback to Google Sheets sync specific to this bot (old logic)
         try:
             from google_sheets import sync_with_google_sheets
             await sync_with_google_sheets()
@@ -146,6 +216,23 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 print(f"DEBUG: user_exists query result after sync: {user_exists}")
         except Exception as e:
             print(f"ERROR: Failed to sync with Google Sheets on start: {e}")
+
+    # NEW: Try to import from GLOBAL DB if not found locally
+    if not user_exists:
+        try:
+            from survey import import_global_user
+            username = message.from_user.username or ""
+            curr_first = message.from_user.first_name or ""
+            curr_last = message.from_user.last_name or ""
+            
+            is_imported = await import_global_user(user_id, username, curr_first, curr_last)
+            if is_imported:
+                print("DEBUG: User imported from GLOBAL DB automatically!")
+                user_exists = True # Treating as existing
+                # Optional: Send welcome message?
+                await message.answer("✅ Ваш профиль успешно загружен!")
+        except Exception as e:
+            print(f"DEBUG: Failed to import from global DB: {e}")
 
     if not user_exists:
         print("DEBUG: New user detected, sending captcha")
@@ -162,6 +249,14 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
         await send_captcha(message, state)
     else:
         print("DEBUG: Existing user detected, sending showcase keyboard")
+        
+        # Check and sync to Global DB if missing
+        try:
+            from survey import sync_local_to_global
+            await sync_local_to_global(user_id)
+        except Exception as e:
+            print(f"Error syncing local to global: {e}")
+            
         keyboard = await get_showcase_keyboard(user_id)
         await message.answer("Добро пожаловать! Выберите действие:", reply_markup=keyboard)
 
@@ -348,7 +443,11 @@ async def periodic_update_invite_table():
         await asyncio.sleep(3600)
 async def main():
     from db import init_db
+    from db import init_db
     await init_db()
+    
+    # Initialize Global DB
+    await init_global_db()
 
     # Инициализация реферальной системы
     from referral_system import init_referral_system

@@ -214,7 +214,7 @@ async def sync_with_google_sheets():
                     }
                     
                     gsheet_fields = {
-                        'username': get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
+                        'username': str(get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм'])).strip().lstrip('@'),
                         'full_name': get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика']),
                         'birth_date': get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
                         'location': get_val(['Место жительства', '3. Место жительства подписчика']),
@@ -237,18 +237,38 @@ async def sync_with_google_sheets():
                         val_db = db_fields[field]
                         val_sheet = gsheet_fields[field]
                         
+                        def normalize_val(v):
+                            if v is None:
+                                return ""
+                            s = str(v).strip()
+                            if s.lower() == "none":
+                                return ""
+                            if field == 'username':
+                                return s.lstrip('@')
+                            return s
+
+                        norm_db = normalize_val(val_db)
+                        norm_sheet = normalize_val(val_sheet)
+
                         # Сравнение с учетом типов
                         is_diff = False
-                        if isinstance(val_db, float) or isinstance(val_sheet, float):
-                             try:
-                                 if abs(float(val_db) - float(val_sheet)) > 0.01:
-                                     is_diff = True
-                             except:
-                                 if str(val_db) != str(val_sheet):
-                                     is_diff = True
-                        else:
-                            if str(val_db) != str(val_sheet):
-                                is_diff = True
+                        
+                        try:
+                            # Пробуем сравнить как числа, если строки выглядят как числа
+                            is_num_db = norm_db.replace('.', '', 1).isdigit() or (norm_db.startswith('-') and norm_db[1:].replace('.', '', 1).isdigit())
+                            is_num_sheet = norm_sheet.replace('.', '', 1).isdigit() or (norm_sheet.startswith('-') and norm_sheet[1:].replace('.', '', 1).isdigit())
+                            
+                            if is_num_db and is_num_sheet:
+                                f1 = float(norm_db)
+                                f2 = float(norm_sheet)
+                                if abs(f1 - f2) > 0.01:
+                                    is_diff = True
+                            else:
+                                if norm_db != norm_sheet:
+                                    is_diff = True
+                        except:
+                             if norm_db != norm_sheet:
+                                 is_diff = True
                                 
                         if is_diff:
                             changes[user_id][field] = {
@@ -259,7 +279,7 @@ async def sync_with_google_sheets():
                     has_completed_survey = db_user_survey_status.get(user_id, 0)
                     user_data = {
                         "user_id": user_id,
-                        "username": row.get('1. Имя Username подписчика в Телеграм', ''),
+                        "username": str(row.get('1. Имя Username подписчика в Телеграм', '')).strip().lstrip('@'),
                         "full_name": row.get('2. ФИО и возраст подписчика', ''),
                         "birth_date": '',
                         "location": row.get('3. Место жительства подписчика', ''),
@@ -503,7 +523,7 @@ async def sync_db_to_google_sheets():
 
             row_data = [
                 formatted_date, # 0. Дата опроса/подписки
-                user[2], # 1. Username
+                str(user[2]).lstrip('@'), # 1. Username
                 user[3], # 2. Full Name + Age
                 user[4], # 3. Location
                 user[5], # 4. Email
