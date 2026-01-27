@@ -11,7 +11,9 @@ from utils import check_blocked_user
 from captcha import send_captcha, CaptchaStates, process_captcha_selection
 from aiogram.fsm.context import FSMContext
 from cart import cart_order_start
-from google_sheets import sync_from_sheets_to_db
+from google_sheets import sync_from_sheets_to_db, sync_with_google_sheets
+from bot_instance import bot
+from notifications import send_user_notification
 
 SHOWCASE_TEXT = "ДОБРО ПОЖАЛОВАТЬ В ЧАТ-БОТ СООБЩЕСТВА!"
 
@@ -329,11 +331,25 @@ async def personal_account(callback: CallbackQuery):
         return
 
     user_id = callback.from_user.id
+    
     # Проверяем, прошел ли пользователь опрос (на случай прямого вызова или обхода)
     if not await check_survey_completed(user_id):
         await callback.answer("Для доступа к личному кабинету необходимо пройти опрос.", show_alert=True)
         return
+
     is_admin = user_id == ADMIN_ID
+
+    # Синхронизируем и проверяем изменения для уведомления
+    try:
+        await callback.answer("🔄 Синхронизация...", show_alert=False)
+        changes = await sync_with_google_sheets()
+        if changes and user_id in changes:
+             try:
+                 await send_user_notification(bot, user_id, changes[user_id])
+             except Exception as notify_error:
+                 print(f"Ошибка отправки уведомления из личного кабинета: {notify_error}")
+    except Exception as e:
+        print(f"Ошибка синхронизации в личном кабинете: {e}")
 
     builder = InlineKeyboardBuilder()
 
@@ -386,6 +402,13 @@ async def my_profile(callback: CallbackQuery):
         return
 
     user_id = callback.from_user.id
+
+    # Синхронизируем данные с Google Sheets перед отображением
+    try:
+        await callback.answer("🔄 Синхронизация...", show_alert=False)
+        await sync_from_sheets_to_db()
+    except Exception as e:
+        print(f"Ошибка синхронизации профиля: {e}")
 
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute(
