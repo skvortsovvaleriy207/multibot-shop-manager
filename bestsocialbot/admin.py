@@ -1003,9 +1003,12 @@ async def update_invite_table_with_channel_subs():
     if "Дата подписки в ТГ канал / результат" in headers:
         sub_col_idx = headers.index("Дата подписки в ТГ канал / результат")
     else:
-        # Попробуем найти столбец с похожим названием
+        # Попробуем найти столбец с похожим названием или fallback
         for idx, h in enumerate(headers):
-            if "подписк" in h and "канал" in h:
+            h_lower = h.lower()
+            if ("подписк" in h_lower and "канал" in h_lower) or \
+               "дд/мм/гг подписки" in h_lower or \
+               "0. дата опроса/подписки" in h_lower:
                 sub_col_idx = idx
                 break
         else:
@@ -1040,17 +1043,27 @@ async def update_invite_table_with_bot_joins(user_id):
     headers = all_rows[0]
     # Поиск индекса user_id
     user_id_idx = None
+    possible_id_cols = [
+        "user id", "telegram id", "id", 
+        "19. id подписчика в магазине", "id при парсинге",
+        "телеграм id", "id в магазине"
+    ]
+    
     for idx, h in enumerate(headers):
-        if h.strip().lower() in ["user id", "telegram id", "id"]:
+        if h.strip().lower() in possible_id_cols:
             user_id_idx = idx
             break
+            
     if user_id_idx is None:
         # Если не найдено — логируем и выходим
-        print("[ERROR] Не найден столбец User ID/Telegram ID/ID в Google Sheet!")
+        print(f"[ERROR] Не найден столбец User ID/Telegram ID/ID в Google Sheet! Заголовки: {headers}")
         return
     sub_col_idx = None
     for idx, h in enumerate(headers):
-        if "подписк" in h.lower() and "канал" in h.lower():
+        h_lower = h.lower()
+        if ("подписк" in h_lower and "канал" in h_lower) or \
+           "дд/мм/гг подписки" in h_lower or \
+           "0. дата опроса/подписки" in h_lower:
             sub_col_idx = idx
             break
     if sub_col_idx is None:

@@ -5,6 +5,7 @@ import aiosqlite
 from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
+from db import DB_FILE
 
 # Статусы заказов
 ORDER_STATUSES = {
@@ -27,7 +28,7 @@ async def my_orders(callback: CallbackQuery):
     
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Получаем заказы (товары)
         cursor = await db.execute("""
             SELECT o.id, o.order_type, o.item_id, o.status, o.order_date,
@@ -142,7 +143,7 @@ async def order_details(callback: CallbackQuery):
     order_id = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT o.id, o.user_id, o.order_type, o.item_id, o.seller_id, o.status, o.order_date, o.notes,
                    CASE 
@@ -217,7 +218,7 @@ async def request_details(callback: CallbackQuery):
         request_id = int(callback.data.split("_")[2])
         user_id = callback.from_user.id
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT id, title, price, status, created_at, additional_info
                 FROM order_requests
@@ -268,7 +269,7 @@ async def seller_orders(callback: CallbackQuery):
     
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT o.id, o.order_type, o.item_id, o.status, o.order_date,
                    CASE 
@@ -335,7 +336,7 @@ async def seller_order_details(callback: CallbackQuery):
     order_id = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT o.*, 
                    CASE 
@@ -418,7 +419,7 @@ async def cancel_order(callback: CallbackQuery):
         return
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT user_id, status FROM orders WHERE id = ?", (order_id,))
         order = await cursor.fetchone()
         
@@ -447,7 +448,7 @@ async def change_order_status(callback: CallbackQuery):
     new_status = parts[2]
     user_id = callback.from_user.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Проверяем, что это заказ продавца
         cursor = await db.execute("SELECT seller_id FROM orders WHERE id = ?", (order_id,))
         order = await cursor.fetchone()
@@ -476,7 +477,7 @@ async def contact_user(callback: CallbackQuery):
     
     contact_user_id = int(callback.data.split("_")[1])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT username, phone FROM users WHERE user_id = ?", (contact_user_id,))
         user = await cursor.fetchone()
     

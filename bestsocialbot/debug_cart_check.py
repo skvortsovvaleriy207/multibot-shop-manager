@@ -1,8 +1,9 @@
 import sqlite3
+from db import DB_FILE
 
 def check_cart():
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
         print("--- Cart Contents ---")

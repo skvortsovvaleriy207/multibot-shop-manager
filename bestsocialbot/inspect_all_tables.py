@@ -1,8 +1,9 @@
 
 import aiosqlite
 import asyncio
+from db import DB_FILE
 
-DB_FILE = "bot_database.db"
+DB_FILE = DB_FILE
 
 async def inspect():
     async with aiosqlite.connect(DB_FILE) as db:

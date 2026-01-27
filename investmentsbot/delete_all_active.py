@@ -1,9 +1,10 @@
 import sqlite3
+from db import DB_FILE
 
 USER_ID = 7254584539
 
 def delete_all_active():
-    db_path = "bot_database.db"
+    db_path = DB_FILE
     try:
         with sqlite3.connect(db_path) as db:
             cursor = db.cursor()

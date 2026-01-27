@@ -4,6 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dispatcher import dp
 from utils import check_blocked_user
 import aiosqlite
+from db import DB_FILE
 
 # Информация об оплате
 @dp.callback_query(F.data == "payment")
@@ -76,7 +77,7 @@ async def inbox(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, sender_id, subject, message_text, sent_at, is_read
             FROM messages 
@@ -121,7 +122,7 @@ async def outbox(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     import aiosqlite
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT id, recipient_id, subject, message_text, sent_at
             FROM messages 

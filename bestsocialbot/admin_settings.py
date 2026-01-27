@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 import aiosqlite
 from dispatcher import dp
 from config import ADMIN_ID
+from db import DB_FILE
 
 class AdminSettingsStates(StatesGroup):
     ENTER_SUPPORT_ID = State()
@@ -13,7 +14,7 @@ class AdminSettingsStates(StatesGroup):
 # Функция для получения ID админа для поддержки
 async def get_support_admin_id() -> int:
     """Получить ID админа для получения сообщений от подписчиков"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("SELECT value FROM settings WHERE key = 'support_admin_id'")
         result = await cursor.fetchone()
         if result:
@@ -23,7 +24,7 @@ async def get_support_admin_id() -> int:
 # Функция для установки ID админа для поддержки
 async def set_support_admin_id(admin_id: int):
     """Установить ID админа для получения сообщений от подписчиков"""
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         await db.execute("""
             INSERT OR REPLACE INTO settings (key, value) 
             VALUES ('support_admin_id', ?)

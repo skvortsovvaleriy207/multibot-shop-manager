@@ -1,21 +1,30 @@
-import asyncio
-import aiosqlite
+import sqlite3
+import os
 
-async def run():
-    async with aiosqlite.connect('bot_database.db') as db:
-        c1 = await db.execute('SELECT COUNT(*) FROM auto_products')
-        print('auto_products:', (await c1.fetchone())[0])
-        
-        c2 = await db.execute('SELECT COUNT(*) FROM auto_services')
-        print('auto_services:', (await c2.fetchone())[0])
-        
-        c3 = await db.execute("SELECT COUNT(*) FROM order_requests WHERE item_type='product'")
-        print('requests_product:', (await c3.fetchone())[0])
-        
-        c4 = await db.execute("SELECT COUNT(*) FROM order_requests WHERE item_type='service'")
-        print('requests_service:', (await c4.fetchone())[0])
-        
-        c5 = await db.execute("SELECT COUNT(*) FROM order_requests WHERE item_type='offer'")
-        print('requests_offer:', (await c5.fetchone())[0])
+DB_DIR = "/home/skvortsovvaleriy207/Proect/Python/multibot-shop-manager/investmentsbot"
+DB_FILE = os.path.join(DB_DIR, "bot_database.db")
 
-asyncio.run(run())
+try:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    
+    print(f"Checking database: {DB_FILE}")
+    
+    # Check users count
+    cursor.execute("SELECT COUNT(*) FROM users")
+    count = cursor.fetchone()[0]
+    print(f"Total users count: {count}")
+    
+    if count > 0:
+        cursor.execute("SELECT user_id, username, full_name, created_at FROM users LIMIT 5")
+        users = cursor.fetchall()
+        print("First 5 users:")
+        for u in users:
+            print(u)
+    else:
+        print("No users found.")
+        
+    conn.close()
+
+except Exception as e:
+    print(f"Error checking DB: {e}")

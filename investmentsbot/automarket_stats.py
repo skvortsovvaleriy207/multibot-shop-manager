@@ -5,6 +5,7 @@ import aiosqlite
 from dispatcher import dp
 from config import ADMIN_ID
 from utils import check_blocked_user
+from db import DB_FILE
 
 @dp.callback_query(F.data == "stats")
 async def automarket_stats(callback: CallbackQuery):
@@ -16,7 +17,7 @@ async def automarket_stats(callback: CallbackQuery):
         await callback.answer("Доступ запрещен.", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Статистика по товарам
         cursor = await db.execute("SELECT COUNT(*) FROM auto_products WHERE status = 'active'")
         active_products = (await cursor.fetchone())[0]

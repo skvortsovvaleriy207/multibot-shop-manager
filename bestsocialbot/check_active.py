@@ -1,10 +1,11 @@
 import sqlite3
 import sys
+from db import DB_FILE
 
 def check_active_processes(user_id):
     print(f"Checking for user {user_id}...")
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
         print("\n--- Order Requests (NOT approved/rejected) ---")

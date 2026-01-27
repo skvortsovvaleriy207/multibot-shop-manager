@@ -2,6 +2,7 @@ from aiogram import F, types, Router
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import aiosqlite
 from dispatcher import dp
+from db import DB_FILE
 
 
 router = Router()
@@ -33,7 +34,7 @@ async def user_view_section_posts(callback: types.CallbackQuery):
         sub_category = callback.data
         page = 1
         
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Count total posts
         cursor = await db.execute("SELECT COUNT(*) FROM shop_sections WHERE sub_category = ? AND is_active = 1", (sub_category,))
         total_count = (await cursor.fetchone())[0]

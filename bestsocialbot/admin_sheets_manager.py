@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 from config import CREDENTIALS_FILE
+from db import DB_FILE
 
 def get_google_sheets_client():
     return gspread.service_account(filename=CREDENTIALS_FILE)
@@ -24,7 +25,7 @@ async def sync_categories_from_sheet():
         sheet = gc.open_by_url(AUTO_CATEGORIES_SHEET_URL).sheet1
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 category_id = row.get('ID категории')
                 if not category_id:
@@ -61,7 +62,7 @@ async def sync_categories_to_sheet():
         
         headers = ["ID категории", "Название категории", "Описание", "Активна", "Дата создания"]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("SELECT id, name, description, is_active, created_at FROM auto_categories ORDER BY id")
             categories = await cursor.fetchall()
         
@@ -97,7 +98,7 @@ async def sync_user_bonuses_from_sheet():
         sheet = gc.open_by_url(USER_BONUSES_SHEET_URL).sheet1
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 user_id = row.get('Telegram ID')
                 if not user_id:
@@ -134,7 +135,7 @@ async def sync_user_bonuses_to_sheet():
         
         headers = ["Telegram ID", "Username", "ФИО", "ИТОГО бонусов", "ТЕКУЩИЙ БАЛАНС", "Последнее обновление"]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT u.user_id, u.username, u.full_name, 
                        COALESCE(ub.bonus_total, 0), COALESCE(ub.current_balance, 0), ub.last_updated
@@ -177,7 +178,7 @@ async def sync_reviews_from_sheet():
         sheet = gc.open_by_url(REVIEWS_SHEET_URL).sheet1
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 review_id = row.get('ID отзыва')
                 if not review_id:
@@ -215,7 +216,7 @@ async def sync_reviews_to_sheet():
         headers = ["ID отзыва", "Telegram ID", "Username", "Тип заказа", "ID товара/услуги", 
                   "Рейтинг", "Комментарий", "Одобрен", "Дата создания"]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT r.id, r.user_id, u.username, r.order_type, r.item_id,
                        r.rating, r.comment, r.is_approved, r.created_at

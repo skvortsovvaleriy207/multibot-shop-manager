@@ -1,8 +1,9 @@
 import aiosqlite
 import asyncio
+from db import DB_FILE
 
 async def inspect_db():
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         print("--- Product Purposes ---")
         async with db.execute("SELECT name FROM product_purposes") as cursor:
             rows = await cursor.fetchall()

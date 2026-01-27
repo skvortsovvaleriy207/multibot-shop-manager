@@ -8,7 +8,7 @@ import aiosqlite
 import asyncio
 from integration import *
 from datetime import datetime
-from db import check_channel_subscription
+from db import check_channel_subscription, DB_FILE
 from config import CHANNEL_ID, ADMIN_ID, CHANNEL_URL
 from dispatcher import dp
 from bot_instance import bot
@@ -103,7 +103,7 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
     #    await callback.answer()
     #    return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
         user = await cursor.fetchone()
 
@@ -326,7 +326,7 @@ async def process_q16(message: Message, state: FSMContext):
     except Exception:
         pass
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
         # Обновляем информацию о прохождении опроса
         await db.execute(
             """
@@ -398,8 +398,15 @@ async def process_q16(message: Message, state: FSMContext):
          try:
              from bot_instance import bot
              await bot.send_message(user_id, "✅ Ваш профиль успешно создан! Добро пожаловать.")
-         except:
+         except Exception:
              pass
+
+    # Force sync to Google Sheets
+    try:
+        from google_sheets import sync_db_to_main_survey_sheet
+        await sync_db_to_main_survey_sheet()
+    except Exception as e:
+        print(f"Error forcing sync in investmentsbot survey: {e}")
 
     from google_sheets import sync_db_to_google_sheets
     asyncio.create_task(sync_db_to_google_sheets())

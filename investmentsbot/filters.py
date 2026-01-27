@@ -2,6 +2,7 @@ import re
 from aiogram import types
 from aiogram.filters import BaseFilter
 import aiosqlite
+from db import DB_FILE
 
 BAD_WORDS = [
     'хуй', 'пизда', 'ебал', 'ебан', 'бля', 'блядь', 'сука', 'гондон', 'мудак',
@@ -80,7 +81,7 @@ class IsBlockedUser(BaseFilter):
         else:
             return False
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             return row and row[0] == 'О'

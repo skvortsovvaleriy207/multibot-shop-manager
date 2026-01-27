@@ -1,8 +1,9 @@
 
 import sqlite3
+from db import DB_FILE
 
 def inspect():
-    with sqlite3.connect("bot_database.db") as db:
+    with sqlite3.connect(DB_FILE) as db:
         print("--- ORDERS Table ---")
         cursor = db.execute("SELECT * FROM orders ORDER BY id DESC LIMIT 5")
         for row in cursor:

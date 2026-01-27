@@ -1,8 +1,9 @@
 
 import sqlite3
+from db import DB_FILE
 
 def check_schema():
-    conn = sqlite3.connect("bot_database.db")
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")

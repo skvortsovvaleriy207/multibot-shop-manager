@@ -70,6 +70,8 @@ class IsBadWord(BaseFilter):
         
         return False
 
+from db import connect_db
+
 class IsBlockedUser(BaseFilter):
     async def __call__(self, obj) -> bool:
         user_id = None
@@ -80,7 +82,7 @@ class IsBlockedUser(BaseFilter):
         else:
             return False
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with connect_db() as db:
             cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
             row = await cursor.fetchone()
             return row and row[0] == 'О'

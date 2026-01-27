@@ -1,9 +1,10 @@
 
 import sqlite3
+from db import DB_FILE
 
 def fix_cart_types():
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
         print("Checking for 'товар' entries in cart_order...")

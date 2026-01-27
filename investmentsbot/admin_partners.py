@@ -7,6 +7,7 @@ from datetime import datetime
 from dispatcher import dp
 from config import ADMIN_ID
 from partner_sheets import export_all_partner_data
+from db import DB_FILE
 
 
 class PartnerManagementStates(StatesGroup):
@@ -47,7 +48,7 @@ async def partners_passive_list(callback: types.CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT DISTINCT u.user_id, u.username, u.full_name, u.business, 
                    u.products_services, u.account_status
@@ -94,7 +95,7 @@ async def partners_list(callback: types.CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT DISTINCT u.user_id, u.username, u.full_name, u.business, 
                    u.products_services, u.account_status, COUNT(ap.id) as products_count
@@ -145,7 +146,7 @@ async def investors_list(callback: types.CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True)
         return
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT u.user_id, u.username, u.full_name, u.business, 
                    ub.bonus_total, ub.current_balance, u.account_status
@@ -187,7 +188,6 @@ async def investors_list(callback: types.CallbackQuery):
     builder.adjust(1)
     
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-
 
 
 

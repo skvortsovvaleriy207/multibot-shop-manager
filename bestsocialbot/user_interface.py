@@ -5,6 +5,7 @@ from dispatcher import dp
 import aiosqlite
 from referral_system import generate_referral_link, get_referral_stats
 from activity_system import save_user_activity_report, calculate_activity_score, ACTIVITY_TYPES
+from db import DB_FILE, SHARED_DB_FILE
 
 @dp.callback_query(F.data == "referral_program")
 async def referral_program(callback: CallbackQuery):
@@ -49,7 +50,7 @@ async def my_activity(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     # Получаем текущую активность
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
         cursor = await db.execute("""
             SELECT daily_activity_points, monthly_activity_points, current_activity
             FROM users WHERE user_id = ?

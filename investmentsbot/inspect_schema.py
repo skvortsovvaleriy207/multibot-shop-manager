@@ -1,8 +1,9 @@
 
 import sqlite3
+from db import DB_FILE
 
 def check_schema():
-    with sqlite3.connect("bot_database.db") as db:
+    with sqlite3.connect(DB_FILE) as db:
         print("--- product_purposes ---")
         cursor = db.execute("PRAGMA table_info(product_purposes)")
         for col in cursor:

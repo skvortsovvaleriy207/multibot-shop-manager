@@ -7,6 +7,7 @@ import aiosqlite
 from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
+from db import DB_FILE
 
 class ReviewStates(StatesGroup):
     RATING = State()
@@ -71,7 +72,7 @@ async def finish_review(message, state: FSMContext):
     data = await state.get_data()
     user_id = message.from_user.id if hasattr(message, 'from_user') else message.chat.id
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         # Проверяем, не оставлял ли пользователь уже отзыв
         cursor = await db.execute(
             "SELECT id FROM reviews WHERE item_type = ? AND item_id = ? AND user_id = ?",
@@ -126,7 +127,7 @@ async def view_reviews(callback: CallbackQuery):
     item_type = parts[2]
     item_id = int(parts[3])
     
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(DB_FILE) as db:
         cursor = await db.execute("""
             SELECT r.rating, r.review_text, r.created_at, u.username
             FROM reviews r

@@ -1,9 +1,10 @@
 
 import sqlite3
+from db import DB_FILE
 
 def debug_cart():
     try:
-        conn = sqlite3.connect("bot_database.db")
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         
         print("--- All rows in cart_order ---")

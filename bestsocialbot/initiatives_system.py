@@ -5,6 +5,7 @@ from config import CREDENTIALS_FILE, PLANS_REPORTS_SHEET_URL
 import asyncio
 import logging
 from bot_instance import bot
+from db import DB_FILE
 
 # Статусы предложений согласно ТЗ
 PROPOSAL_STATUSES = [
@@ -40,7 +41,7 @@ def is_valid_proposal(text: str) -> bool:
 async def export_initiatives_to_sheets():
     """Выгрузка инициатив в таблицу планов и отчетов"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT user_id, username, full_name, business_proposal, 
                        created_at, phone, email
@@ -87,7 +88,7 @@ async def export_initiatives_to_sheets():
 async def notify_initiators():
     """Уведомление инициаторов для уточнения деталей"""
     try:
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT user_id, username, full_name, business_proposal
                 FROM users 
@@ -154,7 +155,7 @@ async def sync_proposal_statuses():
         if status_col == -1 or user_id_col == -1:
             return False
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data[1:]:
                 if len(row) > max(status_col, user_id_col):
                     user_id = row[user_id_col]

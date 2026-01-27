@@ -2,21 +2,41 @@ import logging
 import aiosqlite
 from aiogram import Bot
 
+from db import connect_db, SHARED_DB_FILE
+
 async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
     """
     Отправляет уведомление пользователю о состоянии его профиля.
     changes: словарь изменений (не используется для формирования текста, но может быть полезен для логирования)
     """
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        # 1. Получаем данные пользователя
         cursor = await db.execute("""
             SELECT 
                 username, full_name, birth_date, location, email, phone, employment,
                 financial_problem, social_problem, ecological_problem, passive_subscriber,
-                active_partner, investor_trader, business_proposal, bonus_total, current_balance
+                active_partner, investor_trader, business_proposal
             FROM users 
             WHERE user_id = ?
         """, (user_id,))
-        user_data = await cursor.fetchone()
+        user_basic_data = await cursor.fetchone()
+        
+        # 2. Получаем ПОСЛЕДНЮЮ запись о бонусах
+        cursor = await db.execute("""
+            SELECT bonus_total, current_balance 
+            FROM user_bonuses 
+            WHERE user_id = ? 
+            ORDER BY updated_at DESC 
+            LIMIT 1
+        """, (user_id,))
+        bonus_data = await cursor.fetchone()
+
+        if user_basic_data:
+             # Merge tuples. bonus_data might be None if no bonuses yet.
+             bonus_values = bonus_data if bonus_data else (0.0, 0.0)
+             user_data = user_basic_data + bonus_values
+        else:
+             user_data = None
     
     if not user_data:
         logging.warning(f"Attempted to notify non-existent user {user_id}")
@@ -49,7 +69,7 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
     # 1. Сохраняем сообщение в БД (для внутреннего ящика)
     try:
         from datetime import datetime
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(SHARED_DB_FILE) as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                 VALUES (NULL, ?, ?, ?, ?, 0)

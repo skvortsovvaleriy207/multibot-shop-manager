@@ -104,7 +104,7 @@ async def survey_start(callback: CallbackQuery, state: FSMContext):
     #    await callback.answer()
     #    return
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
         cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
         user = await cursor.fetchone()
 
@@ -327,7 +327,7 @@ async def process_q16(message: Message, state: FSMContext):
     except Exception:
         pass
 
-    async with aiosqlite.connect("bot_database.db") as db:
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
         # Обновляем информацию о прохождении опроса
         await db.execute(
             """
@@ -388,6 +388,13 @@ async def process_q16(message: Message, state: FSMContext):
     try:
         # Отправляем уведомление о создании/обновлении профиля
         await send_user_notification(bot, user_id, {})
+
+        # Force sync to Google Sheets to ensure Sheet has latest data (preventing Import overwrite)
+        try:
+            from google_sheets import sync_db_to_main_survey_sheet
+            await sync_db_to_main_survey_sheet()
+        except Exception as e:
+            print(f"Error forcing sync in survey: {e}")
     except Exception as e:
         print(f"Ошибка отправки уведомления о профиле: {e}")
 
@@ -489,6 +496,7 @@ async def process_q16(message: Message, state: FSMContext):
 
 
 from dispatcher import dp
+from db import DB_FILE, SHARED_DB_FILE
 
 @dp.callback_query(F.data == "end_surrey")
 async def end_surrey(callback: CallbackQuery):
@@ -787,5 +795,4 @@ async def nature_links(callback: CallbackQuery):
                 "https://t.me/problems_in_nature_bot",
                 "https://t.me/+y7u2xXDQIUA3NGMy",
                 "https://t.me/+x_qEjMskwVoyOGRi")
-
 

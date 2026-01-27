@@ -1,8 +1,9 @@
 import sqlite3
 import os
 from datetime import datetime
+from db import DB_FILE
 
-DB_FILE = "bot_database.db"
+DB_FILE = DB_FILE
 
 def inspect_products():
     if not os.path.exists(DB_FILE):

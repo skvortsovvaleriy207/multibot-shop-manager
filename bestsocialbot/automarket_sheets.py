@@ -3,6 +3,7 @@ import aiosqlite
 from datetime import datetime
 from config import CREDENTIALS_FILE, AUTO_PRODUCTS_SHEET_URL, AUTO_SERVICES_SHEET_URL, AUTO_ORDERS_SHEET_URL
 import asyncio
+from db import DB_FILE
 
 def get_google_sheets_client():
     return gspread.service_account(filename=CREDENTIALS_FILE)
@@ -35,7 +36,7 @@ async def sync_products_to_sheet():
         ]
         
         # Получаем данные из БД
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT ap.id, ap.created_at, ap.user_id, u.username, c.name, 
                        ap.title, ap.description, ap.price, ap.specifications, 
@@ -117,7 +118,7 @@ async def sync_services_to_sheet():
             "Контактная информация", "Статус", "Количество фото"
         ]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT as_.id, as_.created_at, as_.user_id, u.username, c.name,
                        as_.title, as_.description, as_.price, as_.location,
@@ -192,7 +193,7 @@ async def sync_orders_to_sheet():
             "Username продавца", "Статус заказа", "Цена", "Примечания"
         ]
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute("""
                 SELECT o.id, o.order_date, o.order_type, o.item_id, 
                        CASE 
@@ -276,7 +277,7 @@ async def sync_products_from_sheet():
             return False
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 product_id = row.get('ID товара')
                 if not product_id:
@@ -315,7 +316,7 @@ async def sync_services_from_sheet():
             return False
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 service_id = row.get('ID услуги')
                 if not service_id:
@@ -354,7 +355,7 @@ async def sync_orders_from_sheet():
             return False
         data = sheet.get_all_records()
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             for row in data:
                 order_id = row.get('ID заказа')
                 new_status = row.get('Статус заказа')
@@ -484,7 +485,7 @@ async def export_request_to_sheet(request_id: int, item_type: str, catalog_id: i
         # Получаем данные заявки
         table_name = "service_orders" if item_type == "service" else "order_requests"
         
-        async with aiosqlite.connect("bot_database.db") as db:
+        async with aiosqlite.connect(DB_FILE) as db:
             cursor = await db.execute(f"SELECT * FROM {table_name} WHERE id = ?", (request_id,))
             row = await cursor.fetchone()
             columns = [description[0] for description in cursor.description]
