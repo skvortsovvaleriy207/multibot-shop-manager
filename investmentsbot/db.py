@@ -1,9 +1,24 @@
 import aiosqlite
 import os
 from datetime import datetime
+from contextlib import asynccontextmanager
 
 DB_FILE = "bot_database.db"
 SHARED_DB_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "shared_storage", "bot_database.db"))
+
+@asynccontextmanager
+async def connect_db():
+    async with aiosqlite.connect(DB_FILE) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA synchronous=NORMAL")
+        
+        # ATTACH SHARED DB
+        try:
+            await db.execute(f"ATTACH DATABASE '{SHARED_DB_FILE}' AS shared")
+        except Exception as e:
+            print(f"Error attaching shared DB in connect_db: {e}")
+            
+        yield db
 
 async def init_db():
 
@@ -97,7 +112,6 @@ async def init_db():
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
-            
             await shared_db.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,6 +123,21 @@ async def init_db():
                     is_read BOOLEAN DEFAULT FALSE,
                     FOREIGN KEY (sender_id) REFERENCES users (user_id),
                     FOREIGN KEY (recipient_id) REFERENCES users (user_id)
+                )
+            """)
+
+            # ISOLATED DATA TABLE
+            await shared_db.execute("""
+                CREATE TABLE IF NOT EXISTS bot_specific_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    bot_name TEXT,
+                    balance REAL DEFAULT 0,
+                    account_status TEXT, -- 'Работа' or 'Блокировка'
+                    user_status TEXT,    -- 'Партнер', 'Инвестор' etc.
+                    updated_at TEXT,
+                    UNIQUE(user_id, bot_name),
+                    FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
             """)
             
@@ -786,7 +815,51 @@ async def check_channel_subscription(bot, user_id: int, channel_id: int) -> bool
         return False
 
 async def check_account_status(user_id: int) -> bool:
-    async with aiosqlite.connect("bot_database.db") as db:
-        cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
-        status = await cursor.fetchone()
-        return status and status[0] == "Р" 
+    from config import BOT_NAME
+    status = await get_bot_status(user_id, BOT_NAME)
+    return status == "Работа"
+
+# --- BOT SPECIFIC LOGIC ---
+
+async def ensure_bot_data_exists(user_id, bot_name):
+    """Ensure a row exists for this user and bot"""
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        await db.execute("""
+            INSERT OR IGNORE INTO bot_specific_data (user_id, bot_name, balance, account_status, user_status, updated_at)
+            VALUES (?, ?, 0, 'Работа', 'Подписчик', ?)
+        """, (user_id, bot_name, updated_at))
+        await db.commit()
+
+async def update_bot_balance(user_id, amount, bot_name):
+    """Add amount to specific bot balance"""
+    await ensure_bot_data_exists(user_id, bot_name)
+    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        await db.execute("""
+            UPDATE bot_specific_data 
+            SET balance = balance + ?, updated_at = ?
+            WHERE user_id = ? AND bot_name = ?
+        """, (amount, updated_at, user_id, bot_name))
+        await db.commit()
+
+async def get_bot_balance(user_id, bot_name):
+    """Get balance for specific bot"""
+    await ensure_bot_data_exists(user_id, bot_name)
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        cursor = await db.execute("SELECT balance FROM bot_specific_data WHERE user_id = ? AND bot_name = ?", (user_id, bot_name))
+        row = await cursor.fetchone()
+        return row[0] if row else 0.0
+
+async def get_bot_status(user_id, bot_name):
+    """Get account_status for specific bot"""
+    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        # Check specific table first
+        cursor = await db.execute("SELECT account_status FROM bot_specific_data WHERE user_id = ? AND bot_name = ?", (user_id, bot_name))
+        row = await cursor.fetchone()
+        if row:
+            return row[0]
+        
+        # Fallback to creating default if not exists (but only if we need strict check)
+        # Here we just return 'Работа' as default for non-existent-yet users
+        return 'Работа' 

@@ -119,12 +119,16 @@ async def calculate_monthly_referral_bonuses():
                 bonus = active_count * REFERRAL_BONUS
                 
                 # Начисляем бонус
+                # LEGACY: Track total earnings only for stats
                 await db.execute("""
-                    UPDATE users SET 
-                        referral_earnings = referral_earnings + ?,
-                        current_balance = current_balance + ?
+                    UPDATE users SET referral_earnings = referral_earnings + ?
                     WHERE user_id = ?
-                """, (bonus, bonus, referrer_id))
+                """, (bonus, referrer_id))
+                
+                # ISOLATED BALANCE:
+                from config import BOT_NAME
+                from db import update_bot_balance
+                await update_bot_balance(referrer_id, bonus, BOT_NAME)
                 
                 # Отмечаем бонусы как выплаченные
                 await db.execute("""

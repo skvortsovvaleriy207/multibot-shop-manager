@@ -380,18 +380,22 @@ async def personal_account(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 2, 2, 1, 1)
 
-    if callback.message.caption is not None:
-        await callback.message.edit_caption(
-            caption="👤 **Личный кабинет**\n\n"
-                    "Выберите действие:",
-            reply_markup=builder.as_markup()
-        )
-    else:
-        await callback.message.edit_text(
-            text="👤 **Личный кабинет**\n\n"
-                 "Выберите действие:",
-            reply_markup=builder.as_markup()
-        )
+    try:
+        if callback.message.caption is not None:
+            await callback.message.edit_caption(
+                caption="👤 **Личный кабинет**\n\n"
+                        "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text="👤 **Личный кабинет**\n\n"
+                     "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
+    except Exception as e:
+        if "message is not modified" not in str(e):
+             logging.error(f"Error updating personal account message: {e}")
     try:
         await callback.answer()
     except Exception:
@@ -413,6 +417,9 @@ async def my_profile(callback: CallbackQuery):
     except Exception as e:
         print(f"Ошибка синхронизации профиля: {e}")
 
+    from db import get_bot_balance, get_bot_status
+    from config import BOT_NAME
+
     async with aiosqlite.connect(SHARED_DB_FILE) as db:
         cursor = await db.execute(
             "SELECT username, first_name, last_name, created_at, full_name, user_status FROM users WHERE user_id = ?",
@@ -432,12 +439,10 @@ async def my_profile(callback: CallbackQuery):
             (user_id,)
         )
         answers = await cursor.fetchall()
-
-        cursor = await db.execute(
-            "SELECT current_balance FROM user_bonuses WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
-            (user_id,)
-        )
-        balance = await cursor.fetchone()
+        
+        # Isolated Balance & Status
+        balance = await get_bot_balance(user_id, BOT_NAME)
+        # bot_account_status = await get_bot_status(user_id, BOT_NAME) # Unused in display below, but good to have
 
     if not user_data:
         await callback.answer("Профиль не найден. Пожалуйста, пройдите опрос.", show_alert=True)
@@ -451,7 +456,7 @@ async def my_profile(callback: CallbackQuery):
         f"👤 Никнейм: {user_data[0] or 'Не указано'}\n"
         f"📝 ФИО: {full_name_answer or 'Не указано'}\n"
         f"📅 Дата регистрации: {(datetime.fromisoformat(user_data[3]).strftime('%d.%m.%Y %H:%M') if isinstance(user_data[3], str) else 'Не указано')}\n"
-        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n"
+        f"💰 Текущий баланс бонусов: {balance} монет\n"
         f"🔰 Статус: {user_data[5] or 'Не указан'}\n\n"
         f"📊 **Ваши ответы на опрос:**\n"
     )

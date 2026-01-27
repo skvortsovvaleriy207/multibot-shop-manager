@@ -8,7 +8,7 @@ from datetime import datetime
 from dispatcher import dp
 from utils import check_blocked_user
 from config import ADMIN_ID
-from db import DB_FILE, SHARED_DB_FILE
+from db import DB_FILE, SHARED_DB_FILE, connect_db
 
 
 class MessageStates(StatesGroup):
@@ -26,7 +26,7 @@ async def messages_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     # Получаем количество непрочитанных сообщений
-    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+    async with connect_db() as db:
         cursor = await db.execute(
             "SELECT COUNT(*) FROM messages WHERE recipient_id = ? AND is_read = 0",
             (user_id,)
@@ -136,7 +136,7 @@ async def compose_text(message: Message, state: FSMContext):
     sender_id = message.from_user.id
 
     # Сохраняем сообщение в БД
-    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+    async with connect_db() as db:
         await db.execute("""
             INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
             VALUES (?, ?, ?, ?, ?, 0)
@@ -173,7 +173,7 @@ async def compose_text(message: Message, state: FSMContext):
 async def send_system_message(recipient_id: int, subject: str, message_text: str):
     """Отправить системное сообщение пользователю"""
     try:
-        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        async with connect_db() as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                 VALUES (NULL, ?, ?, ?, ?, 0)
@@ -199,7 +199,7 @@ async def notify_admin_new_order_request(user_id: int, request_id: int, request_
         user_info = f"@{user_id}"
 
         # Получаем информацию о пользователе из БД
-        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        async with connect_db() as db:
             cursor = await db.execute(
                 "SELECT username, full_name FROM users WHERE user_id = ?",
                 (user_id,)
@@ -259,7 +259,7 @@ async def notify_admin_new_order_request(user_id: int, request_id: int, request_
 
         # Используем уже существующий функционал отправки сообщений
         # Сохраняем сообщение в БД
-        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        async with connect_db() as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                 VALUES (?, ?, ?, ?, ?, 0)
@@ -349,7 +349,7 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
 
         # Сохраняем уведомление в БД для админа
         try:
-            async with aiosqlite.connect(SHARED_DB_FILE) as db:
+            async with connect_db() as db:
                 await db.execute("""
                     INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                     VALUES (?, ?, ?, ?, ?, 0)
@@ -406,7 +406,7 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
     """Отправить полную заявку админу для одобрения"""
     try:
         # Получаем информацию о пользователе
-        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        async with connect_db() as db:
             cursor = await db.execute(
                 "SELECT username, full_name FROM users WHERE user_id = ?",
                 (user_id,)
@@ -521,7 +521,7 @@ async def send_order_request_to_admin(user_id: int, request_id: int, state_data:
         message_text += "**💬 Для связи:** Отправьте сообщение пользователю"
 
         # Сохраняем полную заявку как сообщение админу
-        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+        async with connect_db() as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
                 VALUES (?, ?, ?, ?, ?, 0)
@@ -577,12 +577,17 @@ async def notify_new_order(seller_id: int, order_id: int, item_title: str, buyer
 @dp.callback_query(F.data == "messages_inbox")
 async def messages_inbox(callback: CallbackQuery):
     """Входящие сообщения"""
+    try:
+        await callback.answer()
+    except:
+        pass
+
     if await check_blocked_user(callback):
         return
 
     user_id = callback.from_user.id
 
-    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+    async with connect_db() as db:
         cursor = await db.execute("""
             SELECT m.id, m.sender_id, m.subject, m.message_text, m.sent_at, m.is_read, u.username
             FROM messages m
@@ -594,6 +599,7 @@ async def messages_inbox(callback: CallbackQuery):
 
         messages = await cursor.fetchall()
 
+    await callback.answer()
     if not messages:
         builder = InlineKeyboardBuilder()
         builder.add(types.InlineKeyboardButton(text="◀️ К сообщениям", callback_data="messages"))
@@ -602,7 +608,6 @@ async def messages_inbox(callback: CallbackQuery):
             "📥 **Входящие сообщения**\n\n❌ У вас нет сообщений",
             reply_markup=builder.as_markup()
         )
-        await callback.answer()
         return
 
     text = "📥 **Входящие сообщения**\n\n"
@@ -623,18 +628,22 @@ async def messages_inbox(callback: CallbackQuery):
     builder.adjust(1)
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
 
 
 @dp.callback_query(F.data == "messages_sent")
 async def messages_sent(callback: CallbackQuery):
     """Отправленные сообщения"""
+    try:
+        await callback.answer()
+    except:
+        pass
+
     if await check_blocked_user(callback):
         return
 
     user_id = callback.from_user.id
 
-    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+    async with connect_db() as db:
         cursor = await db.execute("""
             SELECT m.id, m.recipient_id, m.subject, m.message_text, m.sent_at, u.username
             FROM messages m
@@ -654,7 +663,6 @@ async def messages_sent(callback: CallbackQuery):
             "📤 **Отправленные сообщения**\n\n❌ Вы не отправляли сообщений",
             reply_markup=builder.as_markup()
         )
-        await callback.answer()
         return
 
     text = "📤 **Отправленные сообщения**\n\n"
@@ -674,7 +682,7 @@ async def messages_sent(callback: CallbackQuery):
     builder.adjust(1)
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
-    await callback.answer()
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
 
 
 @dp.callback_query(F.data.startswith("read_message_"))
@@ -686,7 +694,7 @@ async def read_message(callback: CallbackQuery):
     message_id = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
 
-    async with aiosqlite.connect(SHARED_DB_FILE) as db:
+    async with connect_db() as db:
         cursor = await db.execute("""
             SELECT m.sender_id, m.subject, m.message_text, m.sent_at, u.username
             FROM messages m

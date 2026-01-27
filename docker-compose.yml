@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  bestsocialbot:
+    build: ./bestsocialbot
+    container_name: bestsocialbot
+    restart: unless-stopped
+    env_file:
+      - ./bestsocialbot/.env
+    volumes:
+      # Mount the local config/code for hot-reloading (optional, remove if production build differs)
+      - ./bestsocialbot:/app
+      # MOUNT SHARED STORAGE
+      # The bots expect DB at ../shared_storage/bot_database.db relative to /app/db.py
+      # So in container: /shared_storage
+      - ./shared_storage:/shared_storage
+
+  investmentsbot:
+    build: ./investmentsbot
+    container_name: investmentsbot
+    restart: unless-stopped
+    env_file:
+      - ./investmentsbot/.env
+    volumes:
+      - ./investmentsbot:/app
+      # MOUNT SHARED STORAGE
+      - ./shared_storage:/shared_storage

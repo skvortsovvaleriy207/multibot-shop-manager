@@ -2,7 +2,7 @@ import gspread
 from datetime import datetime
 import logging
 import aiosqlite
-from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
+from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, KNOWN_BOT_SHEETS, SHEET_ORDERS
 import asyncio
 from collections import defaultdict
 from db import connect_db, DB_FILE, SHARED_DB_FILE
@@ -115,7 +115,25 @@ async def sync_with_google_sheets():
         client = get_google_sheets_client()
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
         sheet = spreadsheet.worksheet(SHEET_MAIN)
-        gsheet_data = sheet.get_all_records()
+        # gsheet_data = sheet.get_all_records()
+        # ERROR FIX: Handle duplicate headers by manually constructing list of dicts
+        all_values = sheet.get_all_values()
+        gsheet_data = []
+        if all_values:
+            headers = all_values[0]
+            # Normalize headers to ensure no empty keys break logic ? No, keep raw.
+            # Identify duplicates?
+            
+            for row in all_values[1:]:
+                record = {}
+                for i, val in enumerate(row):
+                    if i < len(headers):
+                        key = headers[i]
+                        # If key is empty string, skip? Or keep?
+                        # If duplicate key, keep FIRST one (record.setdefault implies first wins? No, if key in record, skip)
+                        if key not in record:
+                           record[key] = val
+                gsheet_data.append(record)
         print(f"DEBUG: Fetched {len(gsheet_data)} rows from Google Sheets")
         if len(gsheet_data) > 0:
             print(f"DEBUG: First row keys: {list(gsheet_data[0].keys())}")
@@ -233,43 +251,58 @@ async def sync_with_google_sheets():
                 """, (user_id,))
                 db_user = await cursor.fetchone()
                 
+                def normalize_key(s):
+                    return "".join(c.lower() for c in str(s) if c.isalnum())
+
+                def get_val(keys):
+                    # 1. Exact match
+                    for k in keys:
+                        if k in row:
+                            return str(row[k]).strip()
+                    
+                    # 2. Stripped match
+                    for k in keys:
+                        for row_k in row:
+                            if str(row_k).strip() == k:
+                                return str(row[row_k]).strip()
+
+                    # 3. Super-fuzzy match (normalize both side)
+                    row_keys_norm = {normalize_key(rk): rk for rk in row.keys()}
+                    for k in keys:
+                        k_norm = normalize_key(k)
+                        if k_norm in row_keys_norm:
+                            real_key = row_keys_norm[k_norm]
+                            return str(row[real_key]).strip()
+                    return ''
+
+                def get_float_val(keys):
+                    for k in keys:
+                        if k in row:
+                            return _safe_float(row[k])
+                    return 0.0
+                
+                gsheet_fields = {
+                    'username': get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
+                    'full_name': get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика', 'ФИО и возраст подписчика']),
+                    'birth_date': get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
+                    'location': get_val(['Место жительства', '3. Место жительства подписчика']),
+                    'email': get_val(['Email', '4. Эл. почта подписчика']),
+                    'phone': get_val(['Телефон', 'Мобильный телефон']),
+                    'employment': get_val(['Занятость', '5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', 'Текущая занятость']),
+                    'financial_problem': get_val(['Финансовая проблема', '6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)']),
+                    'social_problem': get_val(['Социальная проблема', '7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)']),
+                    'ecological_problem': get_val(['Экологическая проблема', '8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)']),
+                    'passive_subscriber': get_val(['Пассивный подписчик', '9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', 'Пассивный подписчик (1.0)']),
+                    'active_partner': get_val(['Активный партнер', '10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', 'Активный партнер (2.0)']),
+                    'investor_trader': get_val(['Инвестор/трейдер', '11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', 'Инвестор/трейдер (3.0)']),
+                    'business_proposal': get_val(['Бизнес-предложение', '12. Свое предложение от подписчика']),
+                    'bonus_total': get_float_val(['Сумма бонусов', 'ИТОГО бонусов', '13. ИТОГО: сумма бонусов монет по графам 9+10+11+12']),
+                    'current_balance': get_float_val(['Текущий баланс', 'ТЕКУЩИЙ БАЛАНС', '15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14']),
+                    'user_status': get_val(['Статус подписчика', '26. Статус подписчика', '26. Статус']),
+                    'bot_subscriptions': get_val(['Подписки', '28. Подписки'])
+                }
+
                 if db_user:
-                    def normalize_key(s):
-                        return "".join(c.lower() for c in str(s) if c.isalnum())
-
-                    def get_val(keys):
-                        # 1. Exact match
-                        for k in keys:
-                            if k in row:
-                                return str(row[k]).strip()
-                        
-                        # 2. Stripped match
-                        for k in keys:
-                            for row_k in row:
-                                if str(row_k).strip() == k:
-                                    return str(row[row_k]).strip()
-
-                        # 3. Super-fuzzy match (normalize both side)
-                        row_keys_norm = {normalize_key(rk): rk for rk in row.keys()}
-                        for k in keys:
-                            k_norm = normalize_key(k)
-                            if k_norm in row_keys_norm:
-                                real_key = row_keys_norm[k_norm]
-                                return str(row[real_key]).strip()
-                        
-                        # Debug if not found for target user
-                        # if str(user_id) == '7254584539':
-                        #      # Print repr to see invisible chars
-                        #      print(f"DEBUG: MISSING VALUE for keys {keys}. Keys repr: {[repr(k) for k in keys]}")
-                             # print(f"DEBUG: Row keys repr: {[repr(k) for k in row.keys()]}")
-                        return ''
-
-                    def get_float_val(keys):
-                        for k in keys:
-                            if k in row:
-                                return _safe_float(row[k])
-                        return 0.0
-
                     db_fields = {
                         'username': str(db_user[0] or '').strip(),
                         'full_name': str(db_user[1] or '').strip(),
@@ -291,27 +324,6 @@ async def sync_with_google_sheets():
                         'bot_subscriptions': str(db_user[17] or '').strip()
                     }
                     
-                    gsheet_fields = {
-                        'username': get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
-                        'full_name': get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика', 'ФИО и возраст подписчика']),
-                        'birth_date': get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
-                        'location': get_val(['Место жительства', '3. Место жительства подписчика']),
-                        'email': get_val(['Email', '4. Эл. почта подписчика']),
-                        'phone': get_val(['Телефон', 'Мобильный телефон']),
-                        'employment': get_val(['Занятость', '5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', 'Текущая занятость']),
-                        'financial_problem': get_val(['Финансовая проблема', '6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)']),
-                        'social_problem': get_val(['Социальная проблема', '7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)']),
-                        'ecological_problem': get_val(['Экологическая проблема', '8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)']),
-                        'passive_subscriber': get_val(['Пассивный подписчик', '9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', 'Пассивный подписчик (1.0)']),
-                        'active_partner': get_val(['Активный партнер', '10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', 'Активный партнер (2.0)']),
-                        'investor_trader': get_val(['Инвестор/трейдер', '11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', 'Инвестор/трейдер (3.0)']),
-                        'business_proposal': get_val(['Бизнес-предложение', '12. Свое предложение от подписчика']),
-                        'bonus_total': get_float_val(['Сумма бонусов', 'ИТОГО бонусов', '13. ИТОГО: сумма бонусов монет по графам 9+10+11+12']),
-                        'current_balance': get_float_val(['Текущий баланс', 'ТЕКУЩИЙ БАЛАНС', '15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14']),
-                        'user_status': get_val(['Статус подписчика', '26. Статус подписчика', '26. Статус']),
-                        'bot_subscriptions': get_val(['Подписки', '28. Подписки'])
-                    }
-
                     for field in gsheet_fields:
                         val_db = db_fields[field]
                         val_sheet = gsheet_fields[field]
@@ -319,12 +331,12 @@ async def sync_with_google_sheets():
                         # Сравнение с учетом типов
                         is_diff = False
                         if isinstance(val_db, float) or isinstance(val_sheet, float):
-                             try:
-                                 if abs(float(val_db) - float(val_sheet)) > 0.01:
-                                     is_diff = True
-                             except:
-                                 if str(val_db) != str(val_sheet):
-                                     is_diff = True
+                                try:
+                                    if abs(float(val_db) - float(val_sheet)) > 0.01:
+                                        is_diff = True
+                                except:
+                                    if str(val_db) != str(val_sheet):
+                                        is_diff = True
                         else:
                             if str(val_db) != str(val_sheet):
                                 is_diff = True
@@ -427,14 +439,36 @@ async def sync_with_google_sheets():
                             """,
                             (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
                     print(f"[SYNC] Добавлен/обновлён user_id: {user_id}, username: {user_data.get('username', '')}")
+                    try:
+                        # Capture isolated fields
+                        iso_balance = gsheet_fields['current_balance']
+                        iso_account_status = row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р")
+                        iso_user_status = gsheet_fields['user_status']
+
+                        # --- ISOLATED DATA UPDATE ---
+                        from config import BOT_NAME
+                        updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        await db.execute("""
+                            INSERT OR IGNORE INTO bot_specific_data (user_id, bot_name, balance, account_status, user_status, updated_at)
+                            VALUES (?, ?, 0, 'Работа', 'Подписчик', ?)
+                        """, (user_id, BOT_NAME, updated_at))
+                    
+                        await db.execute("""
+                            UPDATE bot_specific_data
+                            SET balance = ?, account_status = ?, user_status = ?, updated_at = ?
+                            WHERE user_id = ? AND bot_name = ?
+                        """, (iso_balance, iso_account_status, iso_user_status, updated_at, user_id, BOT_NAME))
+
+                        print(f"[SYNC] Updated {BOT_NAME} data for user {user_id}: Bal={iso_balance}, Stat={iso_account_status}")
+
+                    except Exception as e:
+                        logging.error(f"Error updating isolated data for user {user_id}: {e}")
+
                 except Exception as e:
                     logging.error(f"Error processing row {row}: {e}")
                     continue
             await db.commit()
-            await db.commit()
-            # Фильтруем изменения, исключая служебного пользователя с ID=0
-            filtered_changes = {uid: chg for uid, chg in changes.items() if uid != 0}
-            return filtered_changes
+            return changes
     except Exception as e:
         logging.error(f"Error syncing with Google Sheets: {e}")
         return None
@@ -464,11 +498,11 @@ async def sync_db_to_google_sheets():
         sheet = spreadsheet.worksheet(SHEET_MAIN)
 
         # Получаем данные из базы данных
+        from config import BOT_NAME
         async with aiosqlite.connect(SHARED_DB_FILE) as db:
-            cursor = await db.execute("""
+            cursor = await db.execute(f"""
                 SELECT DISTINCT
-                    u.survey_date,
-                    u.created_at,
+                    COALESCE(u.survey_date, u.created_at),
                     u.username,
                     u.full_name,
                     u.location,
@@ -483,7 +517,7 @@ async def sync_db_to_google_sheets():
                     u.business_proposal,
                     ub.bonus_total,
                     ub.bonus_adjustment,
-                    ub.current_balance,
+                    COALESCE(bsd.balance, 0), -- Isolated Balance
                     u.notes,
                     u.referral_count,
                     u.referral_payment,
@@ -493,11 +527,12 @@ async def sync_db_to_google_sheets():
                     u.sales,
                     u.requisites,
                     u.business,
-                    u.user_status,
-                    u.account_status,
+                    COALESCE(bsd.user_status, u.user_status, 'Подписчик'), -- Isolated User Status
+                    COALESCE(bsd.account_status, u.account_status, 'Работа'), -- Isolated Account Status
                     u.bot_subscriptions
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
+                LEFT JOIN bot_specific_data bsd ON u.user_id = bsd.user_id AND bsd.bot_name = '{BOT_NAME}'
                 WHERE u.user_id != 0
                 GROUP BY u.user_id
                 ORDER BY MAX(ub.updated_at) DESC
@@ -537,69 +572,79 @@ async def sync_db_to_google_sheets():
             "28. Подписки"
         ]
 
+
         data = [headers]
         for user in users:
-            # Parse purchases and sales strings "Count (на Sum)"
-            p_text = user[22] or ""
-            p_count = "0"
-            p_sum = "0"
-            if " (на " in p_text:
-                parts = p_text.split(" (на ")
-                p_count = parts[0]
-                p_sum = parts[1].replace(")", "")
-            
-            s_text = user[23] or ""
-            s_sum = "0"
-            if " (на " in s_text:
-                parts = s_text.split(" (на ")
-                s_sum = parts[1].replace(")", "")
 
             # Determine Survey/Subscription Date
-            survey_date = user[0] if user[0] else (user[1] if user[1] else "")
+            survey_date = user[0] if user[0] else ""
             
             formatted_date = survey_date
             try:
                 if survey_date:
-                    # Handle both full datetime and just date strings
                     if "T" in survey_date:
                         dt = datetime.fromisoformat(survey_date)
                     else:
-                         dt = datetime.strptime(survey_date, "%Y-%m-%d")
+                        try:
+                            dt = datetime.strptime(survey_date, "%Y-%m-%d")
+                        except ValueError:
+                            dt = datetime.strptime(survey_date, "%d.%m.%Y")
                     formatted_date = dt.strftime("%d.%m.%Y")
             except (ValueError, TypeError) as e:
-                 print(f"Date parsing error: {e}")
-                 pass
+                 # Boolean logic: if all parsers failed, it's garbage. Clear it.
+                 # Previously we kept it if it had digits, but 'darya88' has digits.
+                 print(f"Date parsing error for '{survey_date}': {e}. Clearing invalid date.")
+                 formatted_date = ""
+
+            try:
+                # Parse purchases (Index 21) and sales (Index 22)
+                p_text = user[21] or ""
+                p_count = "0"
+                p_sum = "0"
+                if " (на " in p_text:
+                    parts = p_text.split(" (на ")
+                    p_count = parts[0]
+                    p_sum = parts[1].replace(")", "")
+                
+                s_text = user[22] or ""
+                s_sum = "0"
+                if " (на " in s_text:
+                    parts = s_text.split(" (на ")
+                    s_sum = parts[1].replace(")", "")
+            except Exception as e:
+                print(f"ERROR: Failed to parse purchases/sales for user {user[1]}: {e}")
+                continue
 
             row_data = [
                 formatted_date, # 0. Дата опроса/подписки
-                user[2], # 1. Username
-                user[3], # 2. Full Name
-                user[4], # 3. Location
-                user[5], # 4. Email
-                user[6], # 5. Employment
-                user[7], # 6. Financial Problem
-                user[8], # 7. Social Problem
-                user[9], # 8. Ecological Problem
-                user[10], # 9. Passive
-                user[11], # 10. Active
-                user[12], # 11. Investor
-                user[13], # 12. Proposal
-                user[14], # 13. Bonus Total
-                user[15], # 14. Bonus Adjustment
-                user[16], # 15. Current Balance
-                user[17], # 16. Notes
-                user[18], # 17. Referral Count
-                user[19], # 18. Referral Payment
-                user[20], # 19. ID
-                user[21], # 20. Requests
+                user[1], # 1. Username
+                user[2], # 2. Full Name
+                user[3], # 3. Location
+                user[4], # 4. Email
+                user[5], # 5. Employment
+                user[6], # 6. Financial Problem
+                user[7], # 7. Social Problem
+                user[8], # 8. Ecological Problem
+                user[9], # 9. Passive
+                user[10], # 10. Active
+                user[11], # 11. Investor
+                user[12], # 12. Proposal
+                user[13], # 13. Bonus Total
+                user[14], # 14. Bonus Adjustment
+                user[15], # 15. Current Balance
+                user[16], # 16. Notes
+                user[17], # 17. Referral Count
+                user[18], # 18. Referral Payment
+                user[19], # 19. ID
+                user[20], # 20. Requests
                 p_count,  # 21. Purchase Count
                 p_sum,    # 22. Purchase Sum
                 s_sum,    # 23. Sales Sum
-                user[24], # 24. Requisites
-                user[25], # 25. Business
-                user[26], # 26. User Status
-                user[27], # 27. Account Status
-                user[28]  # 28. Subscriptions
+                user[23], # 24. Requisites
+                user[24], # 25. Business
+                user[25], # 26. User Status
+                user[26], # 27. Account Status
+                user[27]  # 28. Subscriptions
             ]
             data.append(row_data)
 
@@ -992,7 +1037,7 @@ async def sync_db_to_main_survey_sheet():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
-                    CAST(u.user_id AS TEXT), # Moved user_id here
+                    CAST(u.user_id AS TEXT), -- Moved user_id here
                     u.referral_count,
                     u.referral_payment,
                     u.subscription_date,
@@ -1045,6 +1090,9 @@ async def sync_db_to_main_survey_sheet():
 
         sheet.clear()
         sheet.update('A1', data)
+
+        # Trigger Cross-Sync to Connected Bots
+        await process_cross_sync()
 
         return True
     except Exception as e:

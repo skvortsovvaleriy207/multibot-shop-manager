@@ -167,6 +167,13 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                     await db.commit()
                     print(f"DEBUG: Added {this_bot_name} to subscriptions for user {user_id}")
                     
+                    # Notify user about linking if they came from another bot
+                    if current_subs:
+                        try:
+                            await message.answer("🔄 Обнаружен ваш профиль из другого бота! Аккаунты успешно объединены, данные синхронизированы.")
+                        except Exception:
+                            pass
+                    
                     # Trigger push to Google Sheets to save the new subscription
                     from google_sheets import sync_db_to_google_sheets
                     await sync_db_to_google_sheets()

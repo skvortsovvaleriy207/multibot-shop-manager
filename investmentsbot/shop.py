@@ -324,11 +324,28 @@ async def exit_shop_menu_handler(callback: CallbackQuery):
 async def soon(callback: CallbackQuery):
     await callback.answer("будет скоро", show_alert=False)
 
+import logging
+
 @dp.callback_query(F.data == "personal_account")
 async def personal_account(callback: CallbackQuery):
     """Личный кабинет - доступен из главной страницы магазина"""
     if await check_blocked_user(callback):
         return
+
+    # Trigger Sync and Notify if changes found
+    try:
+        from google_sheets import sync_with_google_sheets
+        from notifications import send_user_notification
+        from bot_instance import bot
+
+        changes = await sync_with_google_sheets()
+        if changes and callback.from_user.id in changes:
+            try:
+                await send_user_notification(bot, callback.from_user.id, changes[callback.from_user.id])
+            except Exception as e:
+                logging.error(f"Error sending notification: {e}")
+    except Exception as sync_e:
+        logging.error(f"Error in background sync: {sync_e}")
 
     user_id = callback.from_user.id
     # Проверяем, прошел ли пользователь опрос (на случай прямого вызова или обхода)
@@ -387,7 +404,19 @@ async def my_profile(callback: CallbackQuery):
     if await check_blocked_user(callback):
         return
 
+    # Sync with Google Sheets before showing profile
+    try:
+        from google_sheets import sync_with_google_sheets
+        print(f"DEBUG: Triggering sync from my_profile for user {callback.from_user.id}")
+        await callback.answer("🔄 Синхронизация...", show_alert=False)
+        await sync_with_google_sheets()
+    except Exception as e:
+        print(f"ERROR: Sync failed in my_profile: {e}")
+
     user_id = callback.from_user.id
+
+    from db import get_bot_balance, get_bot_status
+    from config import BOT_NAME
 
     async with aiosqlite.connect(SHARED_DB_FILE) as db:
         cursor = await db.execute(
@@ -409,11 +438,20 @@ async def my_profile(callback: CallbackQuery):
         )
         answers = await cursor.fetchall()
 
-        cursor = await db.execute(
-            "SELECT current_balance FROM user_bonuses WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1",
-            (user_id,)
-        )
-        balance = await cursor.fetchone()
+        # Isolated Balance & Status
+        balance = await get_bot_balance(user_id, BOT_NAME)
+        bot_account_status = await get_bot_status(user_id, BOT_NAME)
+        # Fallback to shared status if isolated is missing/default? get_bot_status handles it?
+        # get_bot_status returns account_status. 
+        # But we also have "User Status" (Partner/Investor).
+        # We need to decide if we show Shared User Status or Isolated?
+        # User said "Account Status (Block/Work)". That's handled by get_bot_status.
+        # "Status" in profile text (line 433) refers to user_data[5] (user_status).
+        # We can keep user_status SHARED for now unless requested otherwise, OR fetch from bot_specific_data if we want full isolation.
+        # I'll keep user_status shared but update BALANCE and ACCOUNT STATUS (if displayed).
+        
+        # Profile text (line 433) displays "Статус: ...". This is usually "Партнер", "Инвестор".
+        # I will keep user_status shared but ensure BALANCE is isolated.
 
 
 
@@ -429,7 +467,7 @@ async def my_profile(callback: CallbackQuery):
         f"👤 Никнейм: {user_data[0] or 'Не указано'}\n"
         f"📝 ФИО: {full_name_answer or 'Не указано'}\n"
         f"📅 Дата регистрации: {(datetime.fromisoformat(user_data[3]).strftime('%d.%m.%Y %H:%M') if isinstance(user_data[3], str) else 'Не указано')}\n"
-        f"💰 Текущий баланс бонусов: {balance[0] if balance else 0} монет\n"
+        f"💰 Текущий баланс бонусов: {balance} монет\n"
         f"🔰 Статус: {user_data[5] or 'Не указан'}\n\n"
         f"📊 **Ваши ответы на опрос:**\n"
     )

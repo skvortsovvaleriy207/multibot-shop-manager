@@ -2,10 +2,155 @@ import gspread
 from datetime import datetime
 import logging
 import aiosqlite
-from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
+from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, KNOWN_BOT_SHEETS
 import asyncio
 from db import DB_FILE, SHARED_DB_FILE
 from collections import defaultdict
+
+async def sync_to_external_sheet(sheet_url, target_bot_name):
+    """Generic function to sync relevant users to an external bot's sheet"""
+    try:
+        if not sheet_url or "docs.google.com" not in sheet_url:
+             logging.warning(f"Skipping sync to {target_bot_name}: Invalid URL")
+             return
+
+        client = get_google_sheets_client()
+        spreadsheet = client.open_by_url(sheet_url)
+        sheet = spreadsheet.worksheet(SHEET_MAIN)
+
+        async with aiosqlite.connect(SHARED_DB_FILE) as db:
+            # Query users subscribed to the target bot
+            cursor = await db.execute('''
+                SELECT DISTINCT
+                    COALESCE(u.survey_date, u.created_at, ''),
+                    u.username,
+                    u.full_name,
+                    u.location,
+                    u.email,
+                    u.employment,
+                    u.financial_problem,
+                    u.social_problem,
+                    u.ecological_problem,
+                    u.passive_subscriber,
+                    u.active_partner,
+                    u.investor_trader,
+                    u.business_proposal,
+                    ub.bonus_total,
+                    ub.bonus_adjustment,
+                    ub.current_balance,
+                    u.problem_cost,
+                    u.notes,
+                    u.partnership_date,
+                    CAST(u.user_id AS TEXT), 
+                    u.referral_count,
+                    u.referral_payment,
+                    u.subscription_date,
+                    u.subscription_payment_date,
+                    u.purchases,
+                    u.sales,
+                    u.requisites,
+                    u.shop_id,
+                    u.business,
+                    u.products_services,
+                    u.account_status,
+                    u.user_status,
+                    u.bot_subscriptions
+                FROM users u
+                LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
+                WHERE u.user_id != 0
+                  AND (u.bot_subscriptions LIKE ? OR u.bot_subscriptions IS NULL OR u.bot_subscriptions = '')
+                GROUP BY u.user_id
+                ORDER BY MAX(ub.updated_at) DESC
+            ''', (f'%{target_bot_name}%',))
+            users = await cursor.fetchall()
+        
+        if not users:
+            return
+
+        # Header Structure (Standardized for Cross-Sync)
+        headers = [
+            "0. Дата опроса/подписки", "1. Имя Username подписчика в Телеграм", "2. ФИО и возраст подписчика",
+            "Место жительства", "Email", "Текущая занятость",
+            "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
+            "Пассивный подписчик (1.0)", "Активный партнер (2.0)", "Инвестор/трейдер (3.0)",
+            "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
+            "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация",
+            "ДД/ММ/ГГ партнерства", "Телеграм ID", "Количество рефералов",
+            "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Дата оплаты подписки", "Заказы-Покупки", "Заказы-Продажи",
+            "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
+        ]
+
+        data = [headers]
+        for user in users:
+            # Date Parsing Logic
+            survey_date = user[0] if user[0] else (user[1] if user[1] else "")
+            formatted_date = survey_date
+            try:
+                if survey_date:
+                    if "T" in survey_date:
+                        dt = datetime.fromisoformat(survey_date)
+                    else:
+                        try:
+                            dt = datetime.strptime(survey_date, "%Y-%m-%d")
+                        except ValueError:
+                            dt = datetime.strptime(survey_date, "%d.%m.%Y")
+                    formatted_date = dt.strftime("%d.%m.%Y")
+            except (ValueError, TypeError):
+                 pass
+
+            # Map DB columns to Sheet columns
+            row_data = [
+                formatted_date,     # 0
+                user[1],            # 1 Username
+                user[2],            # 2 Full Name
+                user[3],            # Location
+                user[4],            # Email
+                user[5],            # Employment
+                user[6],            # Fin Problem
+                user[7],            # Soc Problem
+                user[8],            # Eco Problem
+                user[9],            # Passive
+                user[10],           # Active
+                user[11],           # Investor
+                user[12],           # Proposal
+                user[13],           # Bonus Total
+                user[14],           # Adjustment
+                user[15],           # Balance
+                user[16],           # Problem Cost
+                user[17],           # Notes
+                user[18],           # Partnership Date
+                user[19],           # User ID
+                user[20],           # Ref Count
+                user[21],           # Ref Payment
+                user[22],           # Sub Date
+                user[23],           # Sub Pay Date
+                user[24],           # Purchases
+                user[25],           # Sales
+                user[26],           # Requisites
+                user[27],           # Shop ID
+                user[28],           # Business
+                user[29],           # Products/Services
+                user[30]            # Account Status
+            ]
+            data.append(row_data)
+
+        sheet.clear()
+        sheet.update('A1', data)
+        logging.info(f"Successfully cross-synced to {target_bot_name} Sheet")
+    except Exception as e:
+        logging.error(f"Error in cross-sync to {target_bot_name} Sheet: {e}")
+
+async def process_cross_sync():
+    """Iterate through known bots and trigger sync if URL is available"""
+    try:
+        if not KNOWN_BOT_SHEETS:
+             return
+        for bot_name, sheet_url in KNOWN_BOT_SHEETS.items():
+            if sheet_url:
+                await sync_to_external_sheet(sheet_url, bot_name)
+    except Exception as e:
+        logging.error(f"Error in process_cross_sync: {e}")
+
 
 UNIFIED_SHEET_URL = MAIN_SURVEY_SHEET_URL
 SHEET_MAIN = "Основная таблица"
@@ -118,7 +263,21 @@ def _fetch_sheet_data_sync_generic(sheet_url, worksheet_name):
         client = gspread.service_account(filename=CREDENTIALS_FILE)
         spreadsheet = client.open_by_url(sheet_url)
         worksheet = spreadsheet.worksheet(worksheet_name)
-        return worksheet.get_all_records()
+        # return worksheet.get_all_records()
+        # ERROR FIX: Handle duplicate headers by manually constructing list of dicts
+        all_values = worksheet.get_all_values()
+        gsheet_data = []
+        if all_values:
+            headers = all_values[0]
+            for row in all_values[1:]:
+                record = {}
+                for i, val in enumerate(row):
+                    if i < len(headers):
+                        key = headers[i]
+                        if key not in record:
+                           record[key] = val
+                gsheet_data.append(record)
+        return gsheet_data
     except Exception as e:
         logging.error(f"Error in _fetch_sheet_data_sync_generic: {e}")
         raise e
@@ -179,13 +338,48 @@ async def sync_with_google_sheets():
             for row in gsheet_data:
                 user_id = None
                 
-                # 1. Пробуем найти по явному ID
-                user_id_raw = row.get('19. ID подписчика в магазине') or row.get('Телеграм ID') or row.get('Telegram ID') or row.get('User ID')
+                # Helper function for robust ID parsing
+                def parse_id_robust(val):
+                    if not val:
+                        return None
+                    s = str(val).strip()
+                    if s.endswith('.0'):
+                        s = s[:-2]
+                    if s.isdigit():
+                        return int(s)
+                    try:
+                        f = float(s)
+                        if f.is_integer():
+                            return int(f)
+                    except ValueError:
+                        pass
+                    return None
+
+                # Search keys with variations
+                id_keys = [
+                    '19. ID подписчика в магазине', 'Telegram ID', 'User ID', 'ID', 'user_id',
+                    'Телеграм ID', 'ID в магазине', 'ID подписчика'
+                ]
                 
-                if user_id_raw and str(user_id_raw).strip().isdigit():
-                     user_id = int(str(user_id_raw).strip())
-                
-                # 2. Если ID нет, пробуем найти по Username
+                for k in id_keys:
+                    # Check exact match first
+                    val = row.get(k)
+                    if val:
+                        user_id = parse_id_robust(val)
+                        if user_id: 
+                            break
+                            
+                    # Check stripped keys if keys in row might have spaces
+                    if not user_id:
+                        for row_k, row_v in row.items():
+                            if str(row_k).strip() == k:
+                                user_id = parse_id_robust(row_v)
+                                if user_id:
+                                    break
+                    if user_id:
+                        break
+
+                # 2. Если ID нет, пробуем найти по Username (Fallback)
                 if not user_id:
                     username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
                     if username_raw:
@@ -194,6 +388,10 @@ async def sync_with_google_sheets():
                             user_id = username_map[clean_uname]
 
                 if not user_id:
+                    # Optional debug for target
+                    # username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
+                    # if username_raw and "darya" in str(username_raw).lower():
+                    #     print(f"DEBUG: Failed to resolve user_id for {username_raw}")
                     continue
                 
                 try:
@@ -202,6 +400,8 @@ async def sync_with_google_sheets():
                     continue
             
             for user_id, row in unique_rows.items():
+                if user_id == 7254584539:
+                     print(f"DEBUG: Processing logic for {user_id}...")
                 # Explicitly select needed columns to avoid index confusion
                 cursor = await db.execute("""
                     SELECT username, full_name, birth_date, location, email, phone, 
@@ -290,9 +490,14 @@ async def sync_with_google_sheets():
                                 'new': val_sheet
                             }
                 try:
-                    has_completed_survey = db_user_survey_status.get(user_id, 0)
+                    # Capture isolated fields
+                    iso_balance = gsheet_fields['current_balance']
+                    iso_account_status = row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р")
+                    iso_user_status = gsheet_fields['user_status']
+
+                    # Prepare user_data for Shared 'users' table update
+                    # EXCLUDING account_status/user_status to prevent overwriting other bots' data
                     user_data = {
-                        "user_id": user_id,
                         "username": gsheet_fields['username'],
                         "full_name": gsheet_fields['full_name'],
                         "birth_date": gsheet_fields['birth_date'],
@@ -307,88 +512,72 @@ async def sync_with_google_sheets():
                         "active_partner": gsheet_fields['active_partner'],
                         "investor_trader": gsheet_fields['investor_trader'],
                         "business_proposal": gsheet_fields['business_proposal'],
-                        "bonus_total": gsheet_fields['bonus_total'],
-                        "current_balance": gsheet_fields['current_balance'],
-                        "updated_at": datetime.now().isoformat(),
-                        "has_completed_survey": 1, # Если пользователь есть в таблице, значит он прошел опрос
-                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
-
+                        # "bonus_total": gsheet_fields['bonus_total'], # Keeping bonus_total in shared for now? Or isolated? Context suggests Balance is key.
+                        # Let's keep bonus_total in shared table if it's aggregate, OR if logic changes later. 
+                        # But wait, user emphasized ISOLATION.
+                        # However, current_balance is the spendable one.
+                        
                         "notes": row.get("16. Иная информация для админа", ""),
-                        "user_status": gsheet_fields['user_status'],
                         "bot_subscriptions": gsheet_fields['bot_subscriptions']
+                        # "account_status": ... EXCLUDED
+                        # "user_status": ... EXCLUDED
                     }
-                    full_name = user_data.get("full_name", "").split()
-                    if len(full_name) > 0:
-                        user_data["first_name"] = full_name[0]
-                    if len(full_name) > 1:
-                        user_data["last_name"] = " ".join(full_name[1:])
 
-                    # Проверяем существование пользователя
-                    cursor = await db.execute(
-                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
-                        (user_id,)
-                    )
+                    # Handle User Existence in Shared DB
+                    cursor = await db.execute("SELECT user_id, has_completed_survey FROM users WHERE user_id = ?", (user_id,))
                     existing_user = await cursor.fetchone()
 
                     if existing_user:
-                        # Сохраняем статус опроса если он уже был пройден
                         if existing_user[1] == 1:
                             user_data["has_completed_survey"] = 1
                         
-                        # Обновляем существующего пользователя
                         update_fields = []
                         update_values = []
-
                         for key, value in user_data.items():
-                            if key != "user_id":
-                                update_fields.append(f"{key} = ?")
-                                update_values.append(value)
-                        
+                            update_fields.append(f"{key} = ?")
+                            update_values.append(value)
                         update_values.append(user_id)
                         
-                        update_query = f"""
-                            UPDATE users 
-                            SET {', '.join(update_fields)}
-                            WHERE user_id = ?
-                        """
-                        
-                        await db.execute(update_query, update_values)
-                        
+                        await db.execute(f"UPDATE users SET {', '.join(update_fields)} WHERE user_id = ?", update_values)
                     else:
-                         columns = ", ".join(user_data.keys())
-                         placeholders = ", ".join([f":{key}" for key in user_data.keys()])
-                         await db.execute(f"INSERT INTO users ({columns}) VALUES ({placeholders})", user_data)
-                    cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
-                    bonus_record = await cursor.fetchone()
-                    if bonus_record:
-                        await db.execute(
-                            """
-                            UPDATE user_bonuses 
-                            SET bonus_total = ?, current_balance = ?, updated_at = ?
-                            WHERE user_id = ?
-                            """,
-                            (user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"], user_id))
-                    else:
-                        await db.execute(
-                            """
-                            INSERT INTO user_bonuses 
-                            (user_id, bonus_total, current_balance, updated_at)
-                            VALUES (?, ?, ?, ?)
-                            """,
-                            (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
-                    print(f"[SYNC] Добавлен/обновлён user_id: {user_id}, username: {user_data.get('username', '')}")
+                        # For new user, we might need default status in shared table?
+                        # Or just insert what we have.
+                        user_data["user_id"] = user_id
+                        # We might need to set created_at here if missing
+                        user_data["created_at"] = datetime.now().isoformat()
+                        
+                        columns = ", ".join(user_data.keys())
+                        placeholders = ", ".join([f":{key}" for key in user_data.keys()])
+                        await db.execute(f"INSERT INTO users ({columns}) VALUES ({placeholders})", user_data)
+
+                    # --- ISOLATED DATA UPDATE ---
+                    from config import BOT_NAME
+                    # Ensure record exists
+                    updated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    await db.execute("""
+                        INSERT OR IGNORE INTO bot_specific_data (user_id, bot_name, balance, account_status, user_status, updated_at)
+                        VALUES (?, ?, 0, 'Работа', 'Подписчик', ?)
+                    """, (user_id, BOT_NAME, updated_at))
+                    
+                    # Update Isolated Fields
+                    await db.execute("""
+                        UPDATE bot_specific_data
+                        SET balance = ?, account_status = ?, user_status = ?, updated_at = ?
+                        WHERE user_id = ? AND bot_name = ?
+                    """, (iso_balance, iso_account_status, iso_user_status, updated_at, user_id, BOT_NAME))
+
+                    print(f"[SYNC] Updated {BOT_NAME} data for user {user_id}: Bal={iso_balance}, Stat={iso_account_status}")
+
                 except Exception as e:
                     logging.error(f"Error processing row {row}: {e}")
                     continue
             await db.commit()
+            # Skip changes calculation for now
             await db.commit()
-            # Фильтруем изменения, исключая служебного пользователя с ID=0
-            filtered_changes = {uid: chg for uid, chg in changes.items() if uid != 0}
-            return filtered_changes
+            return changes
     except Exception as e:
         logging.error(f"Error syncing with Google Sheets: {e}")
         return None
-
 
 async def sync_db_to_google_sheets():
     try:
@@ -412,11 +601,11 @@ async def sync_db_to_google_sheets():
         sheet = spreadsheet.worksheet(SHEET_MAIN)
 
         # Получаем данные из базы данных
+        from config import BOT_NAME
         async with aiosqlite.connect(SHARED_DB_FILE) as db:
-            cursor = await db.execute("""
+            cursor = await db.execute(f"""
                 SELECT DISTINCT
-                    u.survey_date,
-                    u.created_at,
+                    COALESCE(u.survey_date, u.created_at),
                     u.username,
                     u.full_name,
                     u.location,
@@ -431,7 +620,7 @@ async def sync_db_to_google_sheets():
                     u.business_proposal,
                     ub.bonus_total,
                     ub.bonus_adjustment,
-                    ub.current_balance,
+                    COALESCE(bsd.balance, 0), -- Isolated Balance
                     u.notes,
                     u.referral_count,
                     u.referral_payment,
@@ -441,11 +630,12 @@ async def sync_db_to_google_sheets():
                     u.sales,
                     u.requisites,
                     u.business,
-                    u.user_status,
-                    u.account_status,
+                    COALESCE(bsd.user_status, u.user_status, 'Подписчик'), -- Isolated User Status
+                    COALESCE(bsd.account_status, u.account_status, 'Работа'), -- Isolated Account Status
                     u.bot_subscriptions
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
+                LEFT JOIN bot_specific_data bsd ON u.user_id = bsd.user_id AND bsd.bot_name = '{BOT_NAME}'
                 WHERE u.user_id != 0
                 GROUP BY u.user_id
                 ORDER BY MAX(ub.updated_at) DESC
@@ -503,8 +693,8 @@ async def sync_db_to_google_sheets():
 
             # Determine Survey/Subscription Date
             # Use survey_date or fallback to created_at
-            # user[0] is survey_date, user[1] is created_at
-            survey_date = user[0] if user[0] else (user[1] if user[1] else "")
+            # user[0] is survey_date (due to COALESCE), user[1] is username
+            survey_date = user[0] if user[0] else ""
             
             # Format date if possible to ensure readability
             formatted_date = survey_date
@@ -513,8 +703,9 @@ async def sync_db_to_google_sheets():
                 dt = datetime.fromisoformat(survey_date)
                 formatted_date = dt.strftime("%d.%m.%Y")
             except (ValueError, TypeError):
-                # If parsing fails or already in desired format, keep as is
-                 pass
+                # If parsing fails, clear it. 
+                # Strict check to handle 'darya88' cases
+                formatted_date = ""
 
             row_data = [
                 formatted_date, # 0. Дата опроса/подписки
@@ -541,11 +732,11 @@ async def sync_db_to_google_sheets():
                 p_count,  # 21. Purchase Count (21)
                 p_sum,    # 22. Purchase Sum (22)
                 s_sum,    # 23. Sales Sum (23)
-                user[24], # 24. Requisites -> Other info (24)
-                user[25], # 25. Business (25)
-                user[27], # 26. User Status (26)
+                user[23], # 24. Requisites -> Other info (24)
+                user[24], # 25. Business (25)
+                user[25], # 26. User Status (26)
                 user[26], # 27. Account Status (27)
-                user[28]  # 28. Subscriptions
+                user[27]  # 28. Subscriptions
             ]
             data.append(row_data)
 
@@ -907,7 +1098,7 @@ async def sync_db_to_main_survey_sheet():
         data = [headers]
         for user in users:
             # Parse purchases and sales strings "Count (на Sum)"
-            p_text = user[22] or ""
+            p_text = user[21] or ""
             p_count = "0"
             p_sum = "0"
             if " (на " in p_text:
@@ -915,12 +1106,12 @@ async def sync_db_to_main_survey_sheet():
                 p_count = parts[0]
                 p_sum = parts[1].replace(")", "")
             
-            s_text = user[23] or ""
+            s_text = user[22] or ""
             s_sum = "0"
             if " (на " in s_text:
                 parts = s_text.split(" (на ")
                 s_sum = parts[1].replace(")", "")
-
+            
             # Determine Survey/Subscription Date
             survey_date = user[0] if user[0] else (user[1] if user[1] else "")
             
@@ -931,48 +1122,55 @@ async def sync_db_to_main_survey_sheet():
                     if "T" in survey_date:
                         dt = datetime.fromisoformat(survey_date)
                     else:
-                         dt = datetime.strptime(survey_date, "%Y-%m-%d")
+                        try:
+                            dt = datetime.strptime(survey_date, "%Y-%m-%d")
+                        except ValueError:
+                            # Try fallback format DD.MM.YYYY
+                            dt = datetime.strptime(survey_date, "%d.%m.%Y")
                     formatted_date = dt.strftime("%d.%m.%Y")
             except (ValueError, TypeError) as e:
-                 print(f"Date parsing error for {user[2]}: {e}")
+                 print(f"Date parsing error for '{survey_date}': {e}")
                  pass
 
             row_data = [
                 formatted_date, # 0. Дата опроса/подписки
-                user[2], # 1. Username
-                user[3], # 2. Full Name
-                user[4], # 3. Location
-                user[5], # 4. Email
-                user[6], # 5. Employment
-                user[7], # 6. Financial Problem
-                user[8], # 7. Social Problem
-                user[9], # 8. Ecological Problem
-                user[10], # 9. Passive
-                user[11], # 10. Active
-                user[12], # 11. Investor
-                user[13], # 12. Proposal
-                user[14], # 13. Bonus Total
-                user[15], # 14. Bonus Adjustment
-                user[16], # 15. Current Balance
-                user[17], # 16. Notes
-                user[18], # 17. Referral Count
-                user[19], # 18. Referral Payment
-                user[20], # 19. ID
-                user[21], # 20. Requests
+                user[1], # 1. Username
+                user[2], # 2. Full Name
+                user[3], # 3. Location
+                user[4], # 4. Email
+                user[5], # 5. Employment
+                user[6], # 6. Financial Problem
+                user[7], # 7. Social Problem
+                user[8], # 8. Ecological Problem
+                user[9], # 9. Passive
+                user[10], # 10. Active
+                user[11], # 11. Investor
+                user[12], # 12. Proposal
+                user[13], # 13. Bonus Total
+                user[14], # 14. Bonus Adjustment
+                user[15], # 15. Current Balance
+                user[16], # 16. Notes
+                user[17], # 17. Referral Count
+                user[18], # 18. Referral Payment
+                user[19], # 19. ID
+                user[20], # 20. Requests
                 p_count,  # 21. Purchase Count
                 p_sum,    # 22. Purchase Sum
                 s_sum,    # 23. Sales Sum
-                user[24], # 24. Requisites
-                user[25], # 25. Business
-                user[26], # 26. User Status
-                user[27], # 27. Account Status
-                user[28]  # 28. Subscriptions
+                user[23], # 24. Requisites / Other Info
+                user[24], # 25. Business
+                user[25], # 26. User Status
+                user[26], # 27. Account Status
+                user[27]  # 28. Subscriptions
             ]
             data.append(row_data)
 
         sheet.clear()
         sheet.update('A1', data)
         print(f"[EXPORT] Successfully wrote {len(data)} rows to Google Sheets.")
+        
+        # Trigger Cross-Sync to Connected Bots
+        await process_cross_sync()
 
         return True
     except Exception as e:
