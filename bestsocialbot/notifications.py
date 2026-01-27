@@ -37,7 +37,7 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
         'active_partner': 'Статус активного партнера',
         'investor_trader': 'Статус инвестора/трейдера',
         'business_proposal': 'Бизнес-предложение',
-        'bonus_total': 'Общая сумма бонусов',
+        'business_proposal': 'Бизнес-предложение',
         'current_balance': 'Текущий баланс'
     }
 
