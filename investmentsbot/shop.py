@@ -378,18 +378,24 @@ async def personal_account(callback: CallbackQuery):
     else:
         builder.adjust(1, 1, 2, 2, 1, 1)
 
-    if callback.message.caption is not None:
-        await callback.message.edit_caption(
-            caption="👤 **Личный кабинет**\n\n"
-                    "Выберите действие:",
-            reply_markup=builder.as_markup()
-        )
-    else:
-        await callback.message.edit_text(
-            text="👤 **Личный кабинет**\n\n"
-                 "Выберите действие:",
-            reply_markup=builder.as_markup()
-        )
+    try:
+        if callback.message.caption is not None:
+            await callback.message.edit_caption(
+                caption="👤 **Личный кабинет**\n\n"
+                        "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
+        else:
+            await callback.message.edit_text(
+                text="👤 **Личный кабинет**\n\n"
+                     "Выберите действие:",
+                reply_markup=builder.as_markup()
+            )
+    except Exception as e:
+        if "message is not modified" in str(e):
+             pass
+        else:
+             print(f"Error in personal_account: {e}")
     try:
         await callback.answer()
     except Exception:

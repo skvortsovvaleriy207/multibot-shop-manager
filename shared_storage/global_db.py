@@ -38,6 +38,14 @@ async def init_global_db():
                     FOREIGN KEY (user_id) REFERENCES global_users(user_id)
                 )
             """)
+            # Legal documents table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS legal_documents (
+                    key TEXT PRIMARY KEY,
+                    content TEXT,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
             await db.commit()
     except Exception as e:
         logging.error(f"Error initializing global DB: {e}")
@@ -103,3 +111,19 @@ async def save_global_user(user_id: int, username: str, full_name: str, survey_d
             (user_id, survey_json, datetime.now().isoformat())
         )
         await db.commit()
+
+async def save_legal_document(key: str, content: str):
+    """Saves a legal document to the global database."""
+    async with aiosqlite.connect(GLOBAL_DB_PATH) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO legal_documents (key, content, updated_at) VALUES (?, ?, ?)",
+            (key, content, datetime.now().isoformat())
+        )
+        await db.commit()
+
+async def get_legal_document(key: str) -> str:
+    """Retrieves a legal document content from the global database."""
+    async with aiosqlite.connect(GLOBAL_DB_PATH) as db:
+        cursor = await db.execute("SELECT content FROM legal_documents WHERE key = ?", (key,))
+        row = await cursor.fetchone()
+        return row[0] if row else None

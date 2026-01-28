@@ -99,9 +99,17 @@ async def admin_2fa_check(message: types.Message, state: FSMContext):
     else:
         await message.answer("❌ Неверный код. Попробуйте ещё раз.")
 
+@dp.callback_query(F.data == "admin_panel_menu")
+async def show_admin_panel_handler(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("🔒 Доступ запрещен", show_alert=True)
+        return
+    await show_admin_panel(callback)
+    await callback.answer()
+
 async def show_admin_panel(message_or_callback):
     builder = InlineKeyboardBuilder()
-    # builder.add(types.InlineKeyboardButton(text="📢 Управление контентом", callback_data="admin_content")) # New button (Hidden)
+    builder.add(types.InlineKeyboardButton(text="📢 Управление контентом", callback_data="manage_content"))
     builder.add(types.InlineKeyboardButton(text="📚 Управление каталогом", callback_data="admin_catalog_manager"))
     builder.add(types.InlineKeyboardButton(text="📋 Основная таблица", callback_data="data_table"))
     builder.add(types.InlineKeyboardButton(text="🏪 Магазин", callback_data="main_shop_page"))

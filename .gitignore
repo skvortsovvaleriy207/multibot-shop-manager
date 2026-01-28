@@ -15,3 +15,5 @@ bestsocialbot_1/credentials.json_old
 **/*credentials.json_old
 credentials.json_old
 *.zip
+/temp
+

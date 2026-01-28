@@ -357,7 +357,7 @@ async def sync_orders_from_sheet():
         async with aiosqlite.connect("bot_database.db") as db:
             for row in data:
                 order_id = row.get('ID заказа')
-                new_status = row.get('Статус заказа')
+                new_status = str(row.get('Статус заказа', '')).strip()
                 if not order_id or not new_status:
                     continue
                     
@@ -365,7 +365,9 @@ async def sync_orders_from_sheet():
                 cursor = await db.execute("SELECT status FROM orders WHERE id = ?", (order_id,))
                 current = await cursor.fetchone()
                 
-                if current and current[0] != new_status:
+                current_status = str(current[0]).strip() if current and current[0] else ""
+                
+                if current and current_status != new_status:
                     await db.execute("UPDATE orders SET status = ? WHERE id = ?", (new_status, order_id))
                     
                     # Уведомляем пользователей об изменении

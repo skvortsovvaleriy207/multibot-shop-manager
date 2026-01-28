@@ -26,8 +26,10 @@ from shared_storage.global_db import (
     is_user_subscribed, 
     register_user_subscription, 
     get_global_user_survey, 
-    save_global_user
+    save_global_user,
+    get_legal_document
 )
+from aiogram.types import BufferedInputFile
 
 BOT_FOLDER_NAME = os.path.basename(os.path.dirname(__file__))
 
@@ -473,6 +475,40 @@ async def process_q16(message: Message, state: FSMContext):
 В опросе вы заявили свою самую важную проблему - она может быть не только личной, но и общей также и для других подписчиков, партнеров и инвесторов. С целью взаимодействия с ними вы можете выбрать здесь в меню ТОЛЬКО ОДНУ КНОПКУ Телеграм сообщества, которое наиболее соответствует вашей проблеме, и перейти в его чат-бот, где будет создан ваш личный профиль с учётом ваших данных, активности и баланса бонусов. 
 ЖЕЛАЕМ ВАМ УСПЕШНОГО РЕШЕНИЯ ВАШИХ ПРОБЛЕМ В КЛУБЕ ПО ОБЩИМ ИНТЕРЕСАМ!"""
     )
+    # Send Confirmation Message with Legal Docs buttons
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="📜 Политика конфиденциальности", callback_data="get_legal_privacy"))
+    builder.add(types.InlineKeyboardButton(text="📜 Пользовательское соглашение", callback_data="get_legal_terms"))
+    builder.add(types.InlineKeyboardButton(text="✅ Подтверждаю", callback_data="confirm_legal"))
+    builder.adjust(1)
+    
+    await message.answer(
+        "✅ Подтверждаю, что мне больше 18 лет, я ознакомился и обязуюсь выполнять как подписчик Пользовательское соглашение и Политику конфиденциальности в Сообществе.",
+        reply_markup=builder.as_markup()
+    )
+    await state.clear() # Clear state after survey is done
+@dp.callback_query(F.data == "get_legal_privacy")
+async def get_legal_privacy(callback: CallbackQuery):
+    content = await get_legal_document("privacy_policy")
+    if content:
+        file = BufferedInputFile(content.encode('utf-8'), filename="privacy_policy.txt")
+        await callback.message.answer_document(file, caption="📜 Политика конфиденциальности")
+    else:
+        await callback.answer("Документ не найден", show_alert=True)
+    await callback.answer()
+
+@dp.callback_query(F.data == "get_legal_terms")
+async def get_legal_terms(callback: CallbackQuery):
+    content = await get_legal_document("user_agreement")
+    if content:
+        file = BufferedInputFile(content.encode('utf-8'), filename="user_agreement.txt")
+        await callback.message.answer_document(file, caption="📜 Пользовательское соглашение")
+    else:
+        await callback.answer("Документ не найден", show_alert=True)
+    await callback.answer()
+
+@dp.callback_query(F.data == "confirm_legal")
+async def confirm_legal(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
         text="Дом/Жилье",
@@ -547,18 +583,6 @@ async def process_q16(message: Message, state: FSMContext):
         url="https://t.me/+Za9_9dD6hOEwZWQy"
     ))
 
-
-    builder.adjust(1, 1, 1)
-
-
-
-    await message.answer(
-        text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
-        reply_markup=builder.as_markup()
-    )
-
-
-    await state.clear()
 
 
 

@@ -169,9 +169,13 @@ async def compose_text(message: Message, state: FSMContext):
     await state.clear()
 
 
-async def send_system_message(recipient_id: int, subject: str, message_text: str):
+async def send_system_message(recipient_id: int, subject: str, message_text: str) -> bool:
     """Отправить системное сообщение пользователю"""
     try:
+        if not recipient_id or recipient_id == 0:
+            print(f"❌ Ошибка: Неверный recipient_id={recipient_id}")
+            return False
+
         async with aiosqlite.connect("bot_database.db") as db:
             await db.execute("""
                 INSERT INTO messages (sender_id, recipient_id, subject, message_text, sent_at, is_read)
@@ -188,8 +192,10 @@ async def send_system_message(recipient_id: int, subject: str, message_text: str
             f"{message_text}\n\n"
             f"💬 Проверьте раздел 'Сообщения' в личном кабинете"
         )
+        return True
     except Exception as e:
-        print(f"Ошибка отправки системного сообщения: {e}")
+        print(f"Ошибка отправки системного сообщения пользователю {recipient_id}: {e}")
+        return False
 
 
 async def notify_admin_new_order_request(user_id: int, request_id: int, request_data: dict):
@@ -365,24 +371,16 @@ async def notify_admin_new_category(category_type: str, value: str, user_id: int
             # Продолжаем отправку даже если ошибка БД
 
         # Отправляем уведомление через существующий функционал
-        try:
-
-            await send_system_message(
-                ADMIN_ID,
-                f"Запрос на добавление {category_type_name}",
-                message_text
-            )
-        except Exception as send_error:
-            print(f"❌ Ошибка отправки сообщения: {send_error}")
-            # Отправляем напрямую
-            try:
-                from bot_instance import bot
-                await bot.send_message(ADMIN_ID, message_text)
-            except Exception as bot_error:
-                print(f"❌ Ошибка прямой отправки: {bot_error}")
-
-        print(f"✅ Отправлено уведомление админу о новой {category_type_name}: {value}")
-        return True
+        if await send_system_message(
+            ADMIN_ID,
+            f"Запрос на добавление {category_type_name}",
+            message_text
+        ):
+            print(f"✅ Отправлено уведомление админу о новой {category_type_name}: {value}")
+            return True
+        else:
+             print(f"⚠️ Не удалось отправить уведомление админу (ID={ADMIN_ID}). Возможно, бот не запущен у админа.")
+             return False
 
     except Exception as e:
         print(f"❌ Ошибка отправки уведомления админу о новой категории: {e}")

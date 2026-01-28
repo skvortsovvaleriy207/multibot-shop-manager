@@ -33,15 +33,35 @@ def init_unified_sheet():
         spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
 
         sheets_config = [
-            (SHEET_MAIN, 33,
-             ["ДД/ММ/ГГ проведения опроса", "Телеграм ID", "Телеграм @username", "ФИО подписчика", "ДД/ММ/ГГ рождения",
-              "Место жительства", "Email", "Мобильный телефон", "Текущая занятость", "Финансовая проблема",
-              "Социальная проблема", "Экологическая проблема", "Пассивный подписчик (1.0)", "Активный партнер (2.0)",
-              "Инвестор/трейдер (3.0)", "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
-              "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация", "ДД/ММ/ГГ партнерства", "Количество рефералов",
-              "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
-              "Иная информация магазин", "Статус в магазине", "Бизнес подписчика", "Заказы/Товары/Услуги",
-              "Статус аккаунта (Р/Б)"]),
+            (SHEET_MAIN, 28,
+             ["0. Дата опроса/подписки",
+              "1. Имя Username подписчика в Телеграм",
+              "2. ФИО и возраст подписчика",
+              "3. Место жительства подписчика",
+              "4. Эл. почта подписчика",
+              "5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
+              "6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
+              "7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
+              "8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
+              "9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц",
+              "10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц",
+              "11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц",
+              "12. Свое предложение от подписчика",
+              "13. ИТОГО: сумма бонусов монет по графам 9+10+11+12",
+              "14. Добавление (+) / уменьшение (-) бонусов-монет админом, причина изменения",
+              "15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14",
+              "16. Иная информация для админа",
+              "17. Текущее количество рефералов у партнера",
+              "18. Бонусы партнеру за рефералов",
+              "19. ID подписчика в магазине",
+              "20. Количество заявок в магазине",
+              "21. Количество заказов товаров (Т), услуг (У), предложений (П)",
+              "22. Общая стоимость всех покупок в магазине",
+              "23. Общая стоимость всех продаж в магазине",
+              "24. Иная информация о подписчике в магазине",
+              "25. Свой бизнес (ООО, ИП, С/з, АО, НКО) у подписчика магазина",
+              "26. Статус подписчика",
+              "27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика"]),
             (SHEET_PARTNERS, 6,
              ["Тематика партнерства", "Команда партнера", "Активность партнера", "Каналы/чаты подписки",
               "Статус партнера", "Примечание"]),
@@ -114,33 +134,42 @@ async def sync_with_google_sheets():
             changes = defaultdict(dict)
             # Дедупликация данных из Google Sheets
             unique_rows = {}
+            username_map = {} # Для поиска по username если ID нет
+            
+            # Сначала собираем мапу username -> user_id из БД для lookup
+            cursor = await db.execute("SELECT username, user_id FROM users WHERE user_id != 0 AND username IS NOT NULL AND username != ''")
+            db_username_rows = await cursor.fetchall()
+            for uname, uid in db_username_rows:
+                clean_uname = str(uname).strip().lower().replace('@', '')
+                if clean_uname:
+                    username_map[clean_uname] = uid
+
             for row in gsheet_data:
-                user_id_raw = row.get('Telegram ID') or row.get('User ID')
-                if not user_id_raw or str(user_id_raw).strip() == '':
+                user_id = None
+                
+                # 1. Пробуем найти по явному ID
+                user_id_raw = row.get('19. ID подписчика в магазине') or row.get('Telegram ID') or row.get('User ID')
+                if user_id_raw and str(user_id_raw).strip().isdigit():
+                     user_id = int(str(user_id_raw).strip())
+                
+                # 2. Если ID нет, пробуем найти по Username
+                if not user_id:
+                    username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
+                    if username_raw:
+                        clean_uname = str(username_raw).strip().lower().replace('@', '')
+                        if clean_uname in username_map:
+                            user_id = username_map[clean_uname]
+                            # logging.info(f"Resolved user_id {user_id} by username {username_raw}")
+
+                if not user_id:
                     continue
+                
                 try:
-                    user_id = int(str(user_id_raw).strip())
                     unique_rows[user_id] = row
                 except ValueError:
                     continue
             
             for user_id, row in unique_rows.items():
-                # Check for recent local update to prevent overwrite
-                # If local data was updated less than 10 minutes ago, skip this sync cycle
-                try:
-                    cursor = await db.execute("SELECT updated_at FROM users WHERE user_id = ?", (user_id,))
-                    time_row = await cursor.fetchone()
-                    if time_row and time_row[0]:
-                        try:
-                            last_update = datetime.fromisoformat(time_row[0])
-                            if (datetime.now() - last_update).total_seconds() < 600: # 10 minutes
-                                logging.info(f"Skipping sync for user {user_id} due to recent local update ({time_row[0]})")
-                                continue
-                        except ValueError:
-                            pass # Invalid date format, proceed with sync
-                except Exception as e:
-                    logging.error(f"Error checking updated_at for user {user_id}: {e}")
-
                 # Explicitly select needed columns to avoid index confusion
                 cursor = await db.execute("""
                     SELECT username, full_name, birth_date, location, email, phone, 
@@ -185,7 +214,7 @@ async def sync_with_google_sheets():
                     }
                     
                     gsheet_fields = {
-                        'username': get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
+                        'username': str(get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм'])).strip().lstrip('@'),
                         'full_name': get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика']),
                         'birth_date': get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
                         'location': get_val(['Место жительства', '3. Место жительства подписчика']),
@@ -208,18 +237,38 @@ async def sync_with_google_sheets():
                         val_db = db_fields[field]
                         val_sheet = gsheet_fields[field]
                         
+                        def normalize_val(v):
+                            if v is None:
+                                return ""
+                            s = str(v).strip()
+                            if s.lower() == "none":
+                                return ""
+                            if field == 'username':
+                                return s.lstrip('@')
+                            return s
+
+                        norm_db = normalize_val(val_db)
+                        norm_sheet = normalize_val(val_sheet)
+
                         # Сравнение с учетом типов
                         is_diff = False
-                        if isinstance(val_db, float) or isinstance(val_sheet, float):
-                             try:
-                                 if abs(float(val_db) - float(val_sheet)) > 0.01:
-                                     is_diff = True
-                             except:
-                                 if str(val_db) != str(val_sheet):
-                                     is_diff = True
-                        else:
-                            if str(val_db) != str(val_sheet):
-                                is_diff = True
+                        
+                        try:
+                            # Пробуем сравнить как числа, если строки выглядят как числа
+                            is_num_db = norm_db.replace('.', '', 1).isdigit() or (norm_db.startswith('-') and norm_db[1:].replace('.', '', 1).isdigit())
+                            is_num_sheet = norm_sheet.replace('.', '', 1).isdigit() or (norm_sheet.startswith('-') and norm_sheet[1:].replace('.', '', 1).isdigit())
+                            
+                            if is_num_db and is_num_sheet:
+                                f1 = float(norm_db)
+                                f2 = float(norm_sheet)
+                                if abs(f1 - f2) > 0.01:
+                                    is_diff = True
+                            else:
+                                if norm_db != norm_sheet:
+                                    is_diff = True
+                        except:
+                             if norm_db != norm_sheet:
+                                 is_diff = True
                                 
                         if is_diff:
                             changes[user_id][field] = {
@@ -228,46 +277,78 @@ async def sync_with_google_sheets():
                             }
                 try:
                     has_completed_survey = db_user_survey_status.get(user_id, 0)
-                    
-                    # Если статус 0 (новый или не прошел), проверяем наличие данных опроса в таблице
-                    if has_completed_survey == 0:
-                        has_survey_data = any([
-                            row.get('Финансовая проблема'),
-                            row.get('Социальная проблема'),
-                            row.get('Экологическая проблема')
-                        ])
-                        if has_survey_data:
-                            has_completed_survey = 1
                     user_data = {
                         "user_id": user_id,
-                        "username": row.get('Username', ''),
-                        "full_name": row.get('ФИО', ''),
-                        "birth_date": row.get('Дата рождения', ''),
-                        "location": row.get('Место жительства', ''),
-                        "email": row.get('Email', ''),
-                        "phone": row.get('Телефон', ''),
-                        "employment": row.get('Занятость', ''),
-                        "financial_problem": row.get('Финансовая проблема', ''),
-                        "social_problem": row.get('Социальная проблема', ''),
-                        "ecological_problem": row.get('Экологическая проблема', ''),
-                        "passive_subscriber": row.get('Пассивный подписчик', ''),
-                        "active_partner": row.get('Активный партнер', ''),
-                        "investor_trader": row.get('Инвестор/трейдер', ''),
-                        "business_proposal": row.get('Бизнес-предложение', ''),
-                        "bonus_total": float(row.get('Сумма бонусов') or 0),
-                        "current_balance": float(row.get('Текущий баланс') or 0),
+                        "username": str(row.get('1. Имя Username подписчика в Телеграм', '')).strip().lstrip('@'),
+                        "full_name": row.get('2. ФИО и возраст подписчика', ''),
+                        "birth_date": '',
+                        "location": row.get('3. Место жительства подписчика', ''),
+                        "email": row.get('4. Эл. почта подписчика', ''),
+                        "phone": '',
+                        "employment": row.get('5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', ''),
+                        "financial_problem": row.get('6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', ''),
+                        "social_problem": row.get('7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', ''),
+                        "ecological_problem": row.get('8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', ''),
+                        "passive_subscriber": row.get('9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', ''),
+                        "active_partner": row.get('10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', ''),
+                        "investor_trader": row.get('11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', ''),
+                        "business_proposal": row.get('12. Свое предложение от подписчика', ''),
+                        "bonus_total": float(row.get('13. ИТОГО: сумма бонусов монет по графам 9+10+11+12') or 0),
+                        "current_balance": float(row.get('15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14') or 0),
                         "updated_at": datetime.now().isoformat(),
                         "has_completed_survey": has_completed_survey,
-                        "account_status": row.get("Статус аккаунта", "Р")
+                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
+                        "has_completed_survey": has_completed_survey,
+                        "account_status": row.get("27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика", "Р"),
+                        "notes": row.get("16. Иная информация для админа", ""),
+                        "user_status": row.get("26. Статус подписчика", "")
                     }
                     full_name = user_data.get("full_name", "").split()
                     if len(full_name) > 0:
                         user_data["first_name"] = full_name[0]
                     if len(full_name) > 1:
                         user_data["last_name"] = " ".join(full_name[1:])
-                    columns = ", ".join(user_data.keys())
-                    placeholders = ", ".join([f":{key}" for key in user_data.keys()])
-                    await db.execute(f"INSERT OR REPLACE INTO users ({columns}) VALUES ({placeholders})", user_data)
+                    
+                    # Проверяем существование пользователя
+                    cursor = await db.execute(
+                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    existing_user = await cursor.fetchone()
+
+                    if existing_user:
+                        # Сохраняем статус опроса если он уже был пройден
+                        if existing_user[1] == 1:
+                            user_data["has_completed_survey"] = 1
+                        
+                        # Сохраняем дату регистрации и другие важные поля, которых нет в таблице
+                        # Это предотвращает их затирание
+                        
+                        # Обновляем существующего пользователя
+                        update_fields = []
+                        update_values = []
+
+                        for key, value in user_data.items():
+                            if key != "user_id":  # user_id не обновляем
+                                update_fields.append(f"{key} = ?")
+                                update_values.append(value)
+                        
+                        # Добавляем user_id для WHERE
+                        update_values.append(user_id)
+                        
+                        update_query = f"""
+                            UPDATE users 
+                            SET {', '.join(update_fields)}
+                            WHERE user_id = ?
+                        """
+                        
+                        await db.execute(update_query, update_values)
+                        
+                    else:
+                        # Вставляем нового пользователя
+                        columns = ", ".join(user_data.keys())
+                        placeholders = ", ".join([f":{key}" for key in user_data.keys()])
+                        await db.execute(f"INSERT INTO users ({columns}) VALUES ({placeholders})", user_data)
                     cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
                     bonus_record = await cursor.fetchone()
                     if bonus_record:
@@ -302,6 +383,17 @@ async def sync_with_google_sheets():
 
 async def sync_db_to_google_sheets():
     try:
+        # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
+        # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
+        try:
+             sync_result = await sync_from_sheets_to_db()
+             if sync_result and not sync_result.get("success", False):
+                 logging.error(f"Pre-sync failed: {sync_result.get('message')}. Aborting export to prevent data loss.")
+                 return False
+        except Exception as sync_err:
+             logging.error(f"Pre-sync failed with exception in sync_db_to_google_sheets: {sync_err}")
+             return False
+
         # Сначала агрегируем статистику
         from data_aggregator import aggregate_user_statistics
         await aggregate_user_statistics()
@@ -314,14 +406,12 @@ async def sync_db_to_google_sheets():
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
-                    sa1.answer_text as survey_date,
-                    u.user_id,
+                    u.survey_date,
+                    u.created_at,
                     sa3.answer_text as username,
                     sa4.answer_text as full_name,
-                    sa5.answer_text as birth_date,
                     sa6.answer_text as location,
                     sa7.answer_text as email,
-                    sa8.answer_text as phone,
                     sa9.answer_text as employment,
                     sa10.answer_text as financial_problem,
                     sa11.answer_text as social_problem,
@@ -333,21 +423,18 @@ async def sync_db_to_google_sheets():
                     ub.bonus_total,
                     ub.bonus_adjustment,
                     ub.current_balance,
-                    u.problem_cost,
                     u.notes,
-                    u.partnership_date,
-                    COALESCE(u.total_referrals, u.referral_count, 0) as referral_count,
-                    COALESCE(u.referral_earnings, u.referral_payment, 0) as referral_payment,
-                    u.subscription_date,
-                    u.subscription_date,
+                    u.referral_count,
+                    u.referral_payment,
+                    CAST(u.user_id AS TEXT),
                     u.requests_text,
                     u.purchases,
                     u.sales,
                     u.requisites,
-                    u.shop_id,
                     u.business,
-                    u.products_services,
-                    u.account_status
+                    u.account_status,
+                    u.account_status, -- Duplicate for 27th column if needed or just status
+                    u.user_status
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
                 LEFT JOIN survey_answers sa1 ON u.user_id = sa1.user_id AND sa1.question_id = 1
@@ -372,20 +459,99 @@ async def sync_db_to_google_sheets():
             users = await cursor.fetchall()
 
         headers = [
-            "Дата опроса", "Telegram ID", "Username", "ФИО", "Дата рождения",
-            "Место жительства", "Email", "Телефон", "Занятость",
-            "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
-            "Пассивный подписчик", "Активный партнер", "Инвестор/трейдер",
-            "Бизнес-предложение", "Сумма бонусов", "Корректировка бонусов",
-            "Текущий баланс", "Стоимость проблем", "Примечания",
-            "Дата партнерства", "Количество рефералов", "Оплата за рефералов",
-            "Дата подписки", "Заявки всего/в работе", "Заказы-Покупки", "Заказы-Продажи",
-            "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
+            "0. Дата опроса/подписки",
+            "1. Имя Username подписчика в Телеграм",
+            "2. ФИО и возраст подписчика",
+            "3. Место жительства подписчика",
+            "4. Эл. почта подписчика",
+            "5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)",
+            "6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)",
+            "7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)",
+            "8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)",
+            "9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц",
+            "10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц",
+            "11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц",
+            "12. Свое предложение от подписчика",
+            "13. ИТОГО: сумма бонусов монет по графам 9+10+11+12",
+            "14. Добавление (+) / уменьшение (-) бонусов-монет админом, причина изменения",
+            "15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14",
+            "16. Иная информация для админа",
+            "17. Текущее количество рефералов у партнера",
+            "18. Бонусы партнеру за рефералов",
+            "19. ID подписчика в магазине", # Telegram ID
+            "20. Количество заявок в магазине", # requests_text
+            "21. Количество заказов товаров (Т), услуг (У), предложений (П)", # purchases count + sales count? Or just purchase count? Let's use purchases split.
+            "22. Общая стоимость всех покупок в магазине", # purchases sum
+            "23. Общая стоимость всех продаж в магазине", # sales sum
+            "24. Иная информация о подписчике в магазине", # requisites
+            "25. Свой бизнес (ООО, ИП, С/з, АО, НКО) у подписчика магазина", # business
+            "26. Статус подписчика", # shop stuff?? Using account_status or shop_id? Let's use 'Статус аккаунта' if undefined.
+            "27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика" # account_status
         ]
 
         data = [headers]
         for user in users:
-            data.append(list(user))
+            # Parse purchases and sales strings "Count (на Sum)"
+            p_text = user[22] or ""
+            p_count = "0"
+            p_sum = "0"
+            if " (на " in p_text:
+                parts = p_text.split(" (на ")
+                p_count = parts[0]
+                p_sum = parts[1].replace(")", "")
+            
+            s_text = user[23] or ""
+            s_sum = "0"
+            if " (на " in s_text:
+                parts = s_text.split(" (на ")
+                s_sum = parts[1].replace(")", "")
+            
+            # Determine Survey/Subscription Date
+            # Use survey_date or fallback to created_at
+            # user[0] is survey_date, user[1] is created_at
+            survey_date = user[0] if user[0] else (user[1] if user[1] else "")
+            
+            # Format date if possible to ensure readability
+            formatted_date = survey_date
+            try:
+                # Try parsing standard ISO format if applicable
+                dt = datetime.fromisoformat(survey_date)
+                formatted_date = dt.strftime("%d.%m.%Y")
+            except (ValueError, TypeError):
+                # If parsing fails or already in desired format, keep as is
+                 pass
+
+            row_data = [
+                formatted_date, # 0. Дата опроса/подписки
+                str(user[2]).lstrip('@'), # 1. Username
+                user[3], # 2. Full Name + Age
+                user[4], # 3. Location
+                user[5], # 4. Email
+                user[6], # 5. Employment
+                user[7], # 6. Financial Problem
+                user[8], # 7. Social Problem
+                user[9], # 8. Ecological Problem
+                user[10], # 9. Passive
+                user[11], # 10. Active
+                user[12], # 11. Investor
+                user[13], # 12. Proposal
+                user[14], # 13. Bonus Total
+                user[15], # 14. Bonus Adjustment
+                user[16], # 15. Current Balance
+                user[17], # 16. Notes (16)
+                user[18], # 17. Referral Count (17)
+                user[19], # 18. Referral Payment (18)
+                user[20], # 19. ID (19)
+                user[21], # 20. Requests (20)
+                p_count,  # 21. Purchase Count (21)
+                p_sum,    # 22. Purchase Sum (22)
+                s_sum,    # 23. Sales Sum (23)
+                user[24], # 24. Requisites -> Other info (24)
+                user[25], # 25. Business (25)
+                user[27], # 26. User Status (26)
+                user[26]  # 27. Account Status (27)
+            ]
+            data.append(row_data)
 
         sheet.clear()
         sheet.update('A1', data)
@@ -402,31 +568,62 @@ from datetime import datetime
 import logging
 from typing import Dict, Any, Optional
 import aiosqlite
-from config import BESTHOME_SURVEY_SHEET_URL, CREDENTIALS_FILE
+from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, BESTHOME_SURVEY_SHEET_URL
 
 
-async def sync_from_sheets_to_db() -> Dict[str, Any]:
-    """
-    Загружает данные из Google Sheets в базу данных текущего бота
-    Только для Основной таблицы
-
-    Returns:
-        dict: Результат синхронизации
-    """
+def _fetch_sheet_data_sync():
+    """Синхронная функция для получения данных из Google Sheets (запускается в отдельном потоке)"""
     try:
         # Авторизация в Google Sheets
         client = gspread.service_account(filename=CREDENTIALS_FILE)
 
         # Открываем таблицу besthome
-        spreadsheet = client.open_by_url(BESTHOME_SURVEY_SHEET_URL)
+        # Открываем таблицу besthome (или MAIN_SURVEY_SHEET_URL если используем унификацию)
+        # UNIFIED_SHEET_URL определен выше как MAIN_SURVEY_SHEET_URL
+        # Чтобы исправить расхождение данных, используем MAIN_SURVEY_SHEET_URL
+        from config import MAIN_SURVEY_SHEET_URL
+        spreadsheet = client.open_by_url(MAIN_SURVEY_SHEET_URL)
         worksheet = spreadsheet.worksheet("Основная таблица")
 
         # Получаем все данные из таблицы
-        all_data = worksheet.get_all_records()
+        return worksheet.get_all_records()
+    except Exception as e:
+        logging.error(f"Error checking implementation details in _fetch_sheet_data_sync: {e}")
+        raise e
+
+
+async def sync_from_sheets_to_db() -> Dict[str, Any]:
+    """
+    Загружает данные из Google Sheets в базу данных текущего бота
+    Только для Основной таблицы.
+    Использует отдельный поток для сетевых запросов чтобы не блокировать event loop.
+    """
+    try:
+        # Запускаем блокирующую функцию получения данных в отдельном потоке с таймаутом
+        try:
+            all_data = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_sheet_data_sync),
+                timeout=20.0  # Таймаут 20 секунд
+            )
+        except asyncio.TimeoutError:
+            logging.error("Timeout checking implementation details for google sheets sync")
+            return {
+                "success": False,
+                "message": "Превышено время ожидания синхронизации (таймаут)",
+                "synced_count": 0
+            }
+        except Exception as e:
+            logging.error(f"Error in background thread for sync: {e}")
+            return {
+                "success": False,
+                "message": f"Ошибка соединения с таблицей: {str(e)}",
+                "synced_count": 0
+            }
 
         if not all_data:
             return {
-                "success": False,
+                # Empty sheet is not a failure, just nothing to sync.
+                "success": True,
                 "message": "В таблице нет данных",
                 "synced_count": 0
             }
@@ -439,62 +636,91 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                 try:
                     # Получаем ID пользователя (пробуем разные названия столбцов)
                     telegram_id = None
+                    
+                    # Порядок проверки ключей важен
+                    keys_to_check = [
+                        '19. ID подписчика в магазине',
+                        'Telegram ID',
+                        'User ID',
+                        'ID'
+                    ]
+                    
+                    for key in keys_to_check:
+                         if key in row and str(row[key]).strip():
+                             telegram_id = row[key]
+                             break
 
-                    if 'Telegram ID' in row:
-                        telegram_id = row['Telegram ID']
-                    elif 'User ID' in row:
-                        telegram_id = row['User ID']
-                    elif 'ID' in row:
-                        telegram_id = row['ID']
+                    # LOGGING FOR DEBUGGING
+                    if synced_count == 0:
+                        logging.info(f"DEBUG: First row keys from Sheet: {list(row.keys())}")
+                    
+                    # Логика определения ID
+                    user_id = None
+                    if telegram_id and str(telegram_id).strip().isdigit():
+                        user_id = int(str(telegram_id).strip())
+                    
+                    # Fallback: поиск по Username (если ID нет)
+                    if not user_id:
+                        username_raw = row.get('1. Имя Username подписчика в Телеграм') or row.get('Username')
+                        if username_raw:
+                             # Пробуем найти в БД по username
+                             clean_uname_sheet = str(username_raw).strip().lower().replace('@', '')
+                             cursor_u = await db.execute("SELECT user_id FROM users WHERE username IS NOT NULL AND lower(replace(username, '@', '')) = ?", (clean_uname_sheet,))
+                             res_u = await cursor_u.fetchone()
+                             if res_u:
+                                 user_id = res_u[0]
+                                 # logging.info(f"Resolved user_id {user_id} in manual sync by username {username_raw}")
 
-                    # Пропускаем строки без ID
-                    if not telegram_id or str(telegram_id).strip() == '':
+                    if not user_id:
                         continue
-
-                    user_id = int(str(telegram_id).strip())
+                        
+                    # Пропускаем строки без ID (если и fallback не сработал)
+                    # if not telegram_id or str(telegram_id).strip() == '':
+                    #    continue
+                    
+                    # user_id = int(str(telegram_id).strip()) # Already handled above
 
                     # Пропускаем нулевой ID (служебная запись)
                     if user_id == 0:
                         continue
 
-                    # Helper functions for robust key access
+                    # Формируем данные пользователя для вставки/обновления
+                    # Используем нумерованные заголовки как в sync_with_google_sheets
                     def get_val(keys):
                         for k in keys:
                             if k in row:
-                                return str(row[k]).strip()
+                                return row[k]
                         return ''
-                    
-                    def get_float_val(keys):
-                        for k in keys:
-                            if k in row:
-                                return _safe_float(row[k])
-                        return 0.0
 
-                    # Формируем данные пользователя для вставки/обновления
+                    def get_float_val(keys):
+                        val = get_val(keys)
+                        return _safe_float(val)
+
                     user_data = {
                         "user_id": user_id,
-                        "username": get_val(['Username', 'Телеграм @username', '1. Имя Username подписчика в Телеграм']),
-                        "full_name": get_val(['ФИО', 'ФИО подписчика', '2. ФИО и возраст подписчика']),
-                        "birth_date": get_val(['Дата рождения', 'ДД/ММ/ГГ рождения']),
-                        "location": get_val(['Место жительства', '3. Место жительства подписчика']),
-                        "email": get_val(['Email', '4. Эл. почта подписчика']),
-                        "phone": get_val(['Телефон', 'Мобильный телефон']),
-                        "employment": get_val(['Занятость', '5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)']),
-                        "financial_problem": get_val(['Финансовая проблема', '6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)']),
-                        "social_problem": get_val(['Социальная проблема', '7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)']),
-                        "ecological_problem": get_val(['Экологическая проблема', '8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)']),
-                        "passive_subscriber": get_val(['Пассивный подписчик', '9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц']),
-                        "active_partner": get_val(['Активный партнер', '10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц']),
-                        "investor_trader": get_val(['Инвестор/трейдер', '11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц']),
-                        "business_proposal": get_val(['Бизнес-предложение', '12. Свое предложение от подписчика']),
-                        "bonus_total": get_float_val(['Сумма бонусов', 'ИТОГО бонусов', '13. ИТОГО: сумма бонусов монет по графам 9+10+11+12']),
-                        "current_balance": get_float_val(['Текущий баланс', 'ТЕКУЩИЙ БАЛАНС', '15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14']),
-                        "problem_cost": get_val(['Стоимость проблем', 'Стоимость проблем']),
-                        "notes": get_val(['Примечания', 'Иная информация для админа', '16. Иная информация для админа']),
-                        "account_status": get_val(['Статус аккаунта', '27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика', 'Статус аккаунта (Р/Б)']) or 'Р',
-                        "user_status": get_val(['Статус подписчика', '26. Статус подписчика', '26. Статус']),
-                        "updated_at": datetime.now().isoformat()
+                        "username": get_val(['1. Имя Username подписчика в Телеграм', 'Username', 'Телеграм @username']),
+                        "full_name": get_val(['2. ФИО и возраст подписчика', 'ФИО', 'ФИО и возраст подписчика']),
+                        "birth_date": get_val(['Дата рождения']),
+                        "location": get_val(['3. Место жительства подписчика', 'Место жительства']),
+                        "email": get_val(['4. Эл. почта подписчика', 'Email']),
+                        "phone": get_val(['Телефон']),
+                        "employment": get_val(['5. Текущая занятость подписчика (учеба, свой бизнес, работа по найму, ИП, ООО, самозанятый, пенсионер, иное - пояснить)', 'Занятость', 'Текущая занятость']),
+                        "financial_problem": get_val(['6. Самая важная финансовая проблема (долги, текущие расходы, убытки бизнеса, нужны инвесторы или долевые партнеры, иное - пояснить)', 'Финансовая проблема']),
+                        "social_problem": get_val(['7. Самая важная социальная проблема (улучшение семьи, здоровья, жилья, образования, иное - пояснить)', 'Социальная проблема']),
+                        "ecological_problem": get_val(['8. Самая важная экологическая проблема в вашем регионе (загрязнения, пожары, наводнения, качество воды, загазованность, иное - пояснить)', 'Экологическая проблема']),
+                        "passive_subscriber": get_val(['9. Вы будете пассивным подписчиком в нашем сообществе? - Получаете по 1,0 бонусу-монете в месяц', 'Пассивный подписчик', 'Пассивный подписчик (1.0)']),
+                        "active_partner": get_val(['10. Вы будете активным партнером - предпринимателем в сообществе? - Получаете по 2,0 бонуса-монеты в месяц', 'Активный партнер', 'Активный партнер (2.0)']),
+                        "investor_trader": get_val(['11. Вы будете инвестором или биржевым трейдером в сообществе? - Получаете по 3,0 бонуса-монеты в месяц', 'Инвестор/трейдер', 'Инвестор/трейдер (3.0)']),
+                        "business_proposal": get_val(['12. Свое предложение от подписчика', 'Бизнес-предложение']),
+                        "bonus_total": get_float_val(['13. ИТОГО: сумма бонусов монет по графам 9+10+11+12', 'Сумма бонусов', 'ИТОГО бонусов']),
+                        "current_balance": get_float_val(['15. ВСЕГО ТЕКУЩИЙ БАЛАНС бонусов-монет: сумма/вычитание по графам 13 и 14', 'Текущий баланс', 'ТЕКУЩИЙ БАЛАНС']),
+                        "problem_cost": get_val(['Стоимость проблем']),
+                        "notes": get_val(['16. Иная информация для админа', 'Примечания', 'Иная информация']),
+                        "account_status": get_val(['27. Текущее состояние: Работа (Р) / Блокировка (Б) аккаунта подписчика', 'Статус аккаунта', 'Account Status']) or 'Р',
+                        "updated_at": datetime.now().isoformat(),
+                        "user_status": get_val(['26. Статус подписчика', 'User Status'])
                     }
+
 
                     # Извлекаем имя и фамилию из полного имени
                     full_name = user_data.get("full_name", "").split()
@@ -502,24 +728,28 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         user_data["first_name"] = full_name[0]
                     if len(full_name) > 1:
                         user_data["last_name"] = " ".join(full_name[1:])
-
-                    # Определяем, заполнил ли пользователь опрос
-                    # Если есть какие-то данные в анкете, считаем опрос заполненным
-                    has_survey_data = any([
-                        user_data["financial_problem"],
-                        user_data["social_problem"],
-                        user_data["ecological_problem"]
-                    ])
-                    user_data["has_completed_survey"] = 1 if has_survey_data else 0
-
+                    
                     # Проверяем существование пользователя
                     cursor = await db.execute(
-                        "SELECT user_id FROM users WHERE user_id = ?",
+                        "SELECT user_id, has_completed_survey FROM users WHERE user_id = ?",
                         (user_id,)
                     )
-                    user_exists = await cursor.fetchone() is not None
-
-                    if user_exists:
+                    existing_user = await cursor.fetchone()
+                    
+                    if existing_user:
+                        # Сохраняем статус опроса если он уже был пройден
+                        if existing_user[1] == 1:
+                            user_data["has_completed_survey"] = 1
+                        else:
+                            # Или определяем по наличию данных (как fallback)
+                            has_survey_data = any([
+                                user_data.get("financial_problem"),
+                                user_data.get("social_problem"),
+                                user_data.get("ecological_problem")
+                            ])
+                            if has_survey_data:
+                                user_data["has_completed_survey"] = 1
+                        
                         # Обновляем существующего пользователя
                         update_fields = []
                         update_values = []
@@ -538,10 +768,18 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
                         """
 
                         await db.execute(update_query, update_values)
-                        logging.info(f"Обновлён пользователь {user_id}")
-
+                        # logging.info(f"Обновлён пользователь {user_id}")
                     else:
                         # Вставляем нового пользователя
+                        # Определяем статус опроса для нового пользователя
+                        has_survey_data = any([
+                                user_data.get("financial_problem"),
+                                user_data.get("social_problem"),
+                                user_data.get("ecological_problem")
+                            ])
+                        if has_survey_data:
+                            user_data["has_completed_survey"] = 1
+
                         columns = list(user_data.keys())
                         placeholders = ", ".join(["?" for _ in columns])
                         column_names = ", ".join(columns)
@@ -553,7 +791,28 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
 
                         await db.execute(insert_query, list(user_data.values()))
                         logging.info(f"Добавлен пользователь {user_id}")
-
+                    
+                    # Обновляем таблицу бонусов
+                    cursor = await db.execute("SELECT id FROM user_bonuses WHERE user_id = ?", (user_id,))
+                    bonus_record = await cursor.fetchone()
+                    
+                    if bonus_record:
+                        await db.execute(
+                            """
+                            UPDATE user_bonuses 
+                            SET bonus_total = ?, current_balance = ?, updated_at = ?
+                            WHERE user_id = ?
+                            """,
+                            (user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"], user_id))
+                    else:
+                        await db.execute(
+                            """
+                            INSERT INTO user_bonuses 
+                            (user_id, bonus_total, current_balance, updated_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (user_id, user_data["bonus_total"], user_data["current_balance"], user_data["updated_at"]))
+                            
                     synced_count += 1
 
                 except Exception as e:
@@ -583,6 +842,8 @@ def _safe_float(value) -> float:
     if value is None:
         return 0.0
     try:
+        if isinstance(value, str):
+            value = value.replace(',', '.')
         return float(value)
     except (ValueError, TypeError):
         return 0.0
@@ -596,14 +857,10 @@ async def sync_db_to_main_survey_sheet():
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
                 SELECT DISTINCT
-                    sa1.answer_text,
-                    CAST(u.user_id AS TEXT),
                     sa3.answer_text,
                     sa4.answer_text,
-                    sa5.answer_text,
                     sa6.answer_text,
                     sa7.answer_text,
-                    sa8.answer_text,
                     sa9.answer_text,
                     sa10.answer_text,
                     sa11.answer_text,
@@ -618,6 +875,7 @@ async def sync_db_to_main_survey_sheet():
                     u.problem_cost,
                     u.notes,
                     u.partnership_date,
+                    CAST(u.user_id AS TEXT), # Moved user_id here
                     u.referral_count,
                     u.referral_payment,
                     u.subscription_date,
@@ -653,14 +911,14 @@ async def sync_db_to_main_survey_sheet():
             users = await cursor.fetchall()
 
         headers = [
-            "Дата опроса", "Telegram ID", "Username", "ФИО", "Дата рождения",
-            "Место жительства", "Email", "Телефон", "Занятость",
+            "Телеграм @username", "ФИО и возраст подписчика",
+            "Место жительства", "Email", "Текущая занятость",
             "Финансовая проблема", "Социальная проблема", "Экологическая проблема",
-            "Пассивный подписчик", "Активный партнер", "Инвестор/трейдер",
-            "Бизнес-предложение", "Сумма бонусов", "Корректировка бонусов",
-            "Текущий баланс", "Стоимость проблем", "Примечания",
-            "Дата партнерства", "Количество рефералов", "Оплата за рефералов",
-            "Дата подписки", "Дата оплаты подписки", "Покупки", "Продажи",
+            "Пассивный подписчик (1.0)", "Активный партнер (2.0)", "Инвестор/трейдер (3.0)",
+            "Бизнес-предложение", "ИТОГО бонусов", "Корректировка бонусов",
+            "ТЕКУЩИЙ БАЛАНС", "Стоимость проблем", "Иная информация",
+            "ДД/ММ/ГГ партнерства", "Телеграм ID", "Количество рефералов",
+            "Оплата за рефералов", "ДД/ММ/ГГ подписки", "Дата оплаты подписки", "Заказы-Покупки", "Заказы-Продажи",
             "Реквизиты", "ID в магазине", "Бизнес", "Товары/услуги", "Статус аккаунта"
         ]
 

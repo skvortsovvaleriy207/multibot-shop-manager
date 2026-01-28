@@ -456,7 +456,10 @@ async def process_supplier_id(message: Message, state: FSMContext):
 async def approve_and_add_to_catalog(request_id, item_type, supplier_id):
     try:
         source_table = "order_requests"
-        target_table = "auto_services" if item_type == "service" else "auto_products"
+        if item_type == "offer":
+             target_table = None
+        else:
+             target_table = "auto_services" if item_type == "service" else "auto_products"
         
         async with aiosqlite.connect("bot_database.db") as db:
             # 1. Получаем данные заявки
@@ -471,71 +474,66 @@ async def approve_and_add_to_catalog(request_id, item_type, supplier_id):
             columns = [description[0] for description in cursor.description]
             request_data = dict(zip(columns, row))
             
-            # 2. Определяем category_id
-            category_name = request_data.get('category')
-            category_id = 999 # Fallback
-            
-            if category_name:
-                # Ищем в auto_categories (для каталога магазина)
-                # Если не найдено, возможно придется создать или использовать default
-                # В текущей реализации auto_categories имеет type 'tech' или 'service'
-                cat_type = 'service' if item_type == 'service' else 'tech'
+            # 2. Определяем category_id и добавляем в каталог только если не offer
+            catalog_id = 0
+            if target_table:
+                category_name = request_data.get('category')
+                category_id = 999 # Fallback
                 
-                cursor = await db.execute("SELECT id FROM auto_categories WHERE name = ? AND type = ?", (category_name, cat_type))
-                cat_row = await cursor.fetchone()
-                
-                if cat_row:
-                    category_id = cat_row[0]
-                else:
-                    # Если категории нет, создаем новую? Или используем "Общая"?
-                    # Создадим новую для простоты
-                    await db.execute("INSERT INTO auto_categories (name, type) VALUES (?, ?)", (category_name, cat_type))
-                    cursor = await db.execute("SELECT last_insert_rowid()")
-                    category_id = (await cursor.fetchone())[0]
+                if category_name:
+                    # Ищем в auto_categories (для каталога магазина)
+                    cat_type = 'service' if item_type == 'service' else 'tech'
+                    
+                    cursor = await db.execute("SELECT id FROM auto_categories WHERE name = ? AND type = ?", (category_name, cat_type))
+                    cat_row = await cursor.fetchone()
+                    
+                    if cat_row:
+                        category_id = cat_row[0]
+                    else:
+                        # Если категории нет, создаем новую для простоты
+                        await db.execute("INSERT INTO auto_categories (name, type) VALUES (?, ?)", (category_name, cat_type))
+                        cursor = await db.execute("SELECT last_insert_rowid()")
+                        category_id = (await cursor.fetchone())[0]
 
-            # 3. Добавляем в каталог (auto_products / auto_services)
-            # Маппинг полей
-            # auto_products: user_id, category_id, title, description, price, images, specifications, status, created_at
-            # + rating columns...
-            
-            # Form description from request data fields
-            description_parts = []
-            if request_data.get('additional_info'): description_parts.append(request_data['additional_info'])
-            if request_data.get('purpose'): description_parts.append(f"Назначение: {request_data['purpose']}")
-            if request_data.get('condition'): description_parts.append(f"Состояние: {request_data['condition']}")
-            if request_data.get('item_class'): description_parts.append(f"Класс: {request_data['item_class']}")
-            if request_data.get('detailed_specs'): description_parts.append(f"Детали: {request_data['detailed_specs']}")
-            
-            description = "\n".join(description_parts)
-            
-            # Handle images (already JSON in request?)
-            images = request_data.get('images', '[]')
-            
-            # Handle specifications
-            specs = request_data.get('specifications', '')
-            
-            # Insert
-            # Insert
-            cursor = await db.execute(f"""
-                INSERT INTO {target_table} 
-                (user_id, category_id, title, description, price, images, specifications, status, created_at, contact_info)
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
-            """, (
-                supplier_id, 
-                category_id, 
-                request_data.get('title'),
-                description,
-                _parse_price(request_data.get('price')),
-                images,
-                specs,
-                datetime.now().isoformat(),
-                request_data.get('contact')
-            ))
-            
-            # Получаем ID новой карточки в каталоге
-            catalog_id = cursor.lastrowid
-            
-            await db.commit()
+                # 3. Добавляем в каталог (auto_products / auto_services)
+                
+                # Form description from request data fields
+                description_parts = []
+                if request_data.get('additional_info'): description_parts.append(request_data['additional_info'])
+                if request_data.get('purpose'): description_parts.append(f"Назначение: {request_data['purpose']}")
+                if request_data.get('condition'): description_parts.append(f"Состояние: {request_data['condition']}")
+                if request_data.get('item_class'): description_parts.append(f"Класс: {request_data['item_class']}")
+                if request_data.get('detailed_specs'): description_parts.append(f"Детали: {request_data['detailed_specs']}")
+                
+                description = "\n".join(description_parts)
+                
+                # Handle images
+                images = request_data.get('images', '[]')
+                
+                # Handle specifications
+                specs = request_data.get('specifications', '')
+                
+                # Insert
+                cursor = await db.execute(f"""
+                    INSERT INTO {target_table} 
+                    (user_id, category_id, title, description, price, images, specifications, status, created_at, contact_info)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                """, (
+                    supplier_id, 
+                    category_id, 
+                    request_data.get('title'),
+                    description,
+                    _parse_price(request_data.get('price')),
+                    images,
+                    specs,
+                    datetime.now().isoformat(),
+                    request_data.get('contact')
+                ))
+                
+                # Получаем ID новой карточки в каталоге
+                catalog_id = cursor.lastrowid
+                
+                await db.commit()
             
             # Export to Google Sheet (Заявки)
             try:

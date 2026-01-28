@@ -136,6 +136,7 @@ async def create_order_start(callback: CallbackQuery, state: FSMContext):
 
     if callback.message.content_type == types.ContentType.TEXT:
         await callback.message.edit_text(
+            "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
             "📋 **Создание заявки**\n\n"
             "Выберите тип карточки:",
             reply_markup=builder.as_markup()
@@ -143,6 +144,7 @@ async def create_order_start(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.delete()
         await callback.message.answer(
+            "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
             "📋 **Создание заявки**\n\n"
             "Выберите тип карточки:",
             reply_markup=builder.as_markup()
@@ -215,6 +217,7 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
     builder.adjust(1)
 
     await callback.message.edit_text(
+        "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
         "📋 **Карточка товара**\n\n"
         "Выберите цель:",
         reply_markup=builder.as_markup()
@@ -1690,7 +1693,7 @@ async def product_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(
@@ -1759,6 +1762,7 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
 
     if callback.message.content_type == types.ContentType.TEXT:
         await callback.message.edit_text(
+            "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
             "📋 **Карточка услуги**\n\n"
             "Выберите цель:",
             reply_markup=builder.as_markup()
@@ -1766,6 +1770,7 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.delete()
         await callback.message.answer(
+            "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
             "📋 **Карточка услуги**\n\n"
             "Выберите цель:",
             reply_markup=builder.as_markup()
@@ -3158,7 +3163,7 @@ async def service_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(
@@ -3220,6 +3225,7 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
     builder.adjust(1)
 
     await callback.message.edit_text(
+        "Одновременно магазин рассматривает от одного подписчика только одну Заявку на покупку/продажу товара/услуги/предложения\n\n"
         "📋 **Карточка предложения (Property)**\n\n"
         "Выберите цель:",
         reply_markup=builder.as_markup()
@@ -4149,7 +4155,7 @@ async def offer_process_contact(message: Message, state: FSMContext):
 
             builder = InlineKeyboardBuilder()
             builder.add(types.InlineKeyboardButton(text="🏠 В личный кабинет", callback_data="personal_account"))
-            builder.add(types.InlineKeyboardButton(text="🛒 К корзине", callback_data="cart_order"))
+            builder.add(types.InlineKeyboardButton(text="🛒 К заявкам", callback_data="cart_order"))
             builder.adjust(1)
 
             await message.answer(
