@@ -661,7 +661,7 @@ async def end_surrey(callback: CallbackQuery):
     ))
     builder.add(types.InlineKeyboardButton(
         text="выход из чат-бота",
-        url="https://t.me/+vz7-Ko4rDy03Yjhi"
+        url="https://t.me/+Za9_9dD6hOEwZWQy "
     ))
 
     builder.adjust(1, 1, 1)
