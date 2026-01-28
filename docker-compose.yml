@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  bestsocialbot:
+    build: .
+    command: python bestsocialbot/main.py
+    restart: always
+    volumes:
+      - ./bestsocialbot/bot_database.db:/app/bestsocialbot/bot_database.db
+      - ./bestsocialbot/.env:/app/bestsocialbot/.env
+      - ./shared_storage:/app/shared_storage
+      - ./credentials.json:/app/credentials.json
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  investmentsbot:
+    build: .
+    command: python investmentsbot/main.py
+    restart: always
+    volumes:
+      - ./investmentsbot/bot_database.db:/app/investmentsbot/bot_database.db
+      - ./investmentsbot/.env:/app/investmentsbot/.env
+      - ./shared_storage:/app/shared_storage
+      - ./credentials.json:/app/credentials.json
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  gifthealthbot:
+    build: .
+    command: python gifthealthbot/main.py
+    restart: always
+    volumes:
+      - ./gifthealthbot/bot_database.db:/app/gifthealthbot/bot_database.db
+      - ./gifthealthbot/.env:/app/gifthealthbot/.env
+      - ./shared_storage:/app/shared_storage
+      - ./credentials.json:/app/credentials.json
+    environment:
+      - PYTHONUNBUFFERED=1
+
+# Note: No redis service included as no usage was found in codebase.
+# If needed, add:
+#   redis:
+#     image: redis:alpine
