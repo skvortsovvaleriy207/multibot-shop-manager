@@ -160,6 +160,16 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             if survey_data:
                 print(f"DEBUG: Found user {user_id} in Global DB. Copying data...")
                 
+                # Проверка лимита подписок (Critical Fix)
+                current_bot_folder = os.path.basename(os.path.dirname(__file__))
+                sub_count = await get_user_subscription_count(user_id)
+                is_subbed = await is_user_subscribed(user_id, current_bot_folder)
+
+                if sub_count >= 3 and not is_subbed:
+                    print(f"DEBUG: Subscription limit reached for user {user_id} (Count: {sub_count})")
+                    await message.answer("❌ Вы не можете подписаться на этого бота, так как достигли лимита подписок (максимум 3 бота).")
+                    return
+
                 # Копируем данные из глобальной БД в локальную
                 from survey import save_user_data_to_db
                 

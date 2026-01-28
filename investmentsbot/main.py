@@ -155,18 +155,21 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             from shared_storage.global_db import get_global_user_survey, register_user_subscription, get_user_subscription_count
             
             # Проверка глобальной подписки
-            survey_data = get_global_user_survey(user_id)
+            survey_data = await get_global_user_survey(user_id)
             
             if survey_data:
                 print(f"DEBUG: Found user {user_id} in Global DB. Copying data...")
                 
-                # Проверка лимита ботов (если это новый бот для пользователя)
-                # subscription_count = get_user_subscription_count(user_id)
-                # if subscription_count >= 3: ... (logic handled in survey.py, but maybe check here too?)
-                # For seamless transition, we assume click means intent to join. 
-                # If limits are strict, we should check here. But let's allow "start" and block later if needed?
-                # Actually, better to just copy and register.
-                
+                # Проверка лимита подписок (Critical Fix)
+                current_bot_folder = os.path.basename(os.path.dirname(__file__))
+                sub_count = await get_user_subscription_count(user_id)
+                is_subbed = await is_user_subscribed(user_id, current_bot_folder)
+
+                if sub_count >= 3 and not is_subbed:
+                    print(f"DEBUG: Subscription limit reached for user {user_id} (Count: {sub_count})")
+                    await message.answer("❌ Вы не можете подписаться на этого бота, так как достигли лимита подписок (максимум 3 бота).")
+                    return
+
                 # Копируем данные из глобальной БД в локальную
                 from survey import save_user_data_to_db
                 
@@ -232,6 +235,10 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 # Optional: Send welcome message?
                 await message.answer("✅ Ваш профиль успешно загружен!")
         except Exception as e:
+            if "limit" in str(e).lower():
+                print(f"DEBUG: Subscription limit reached for user {user_id}")
+                await message.answer("❌ Вы не можете подписаться на этого бота, так как достигли лимита подписок (максимум 3 бота).")
+                return
             print(f"DEBUG: Failed to import from global DB: {e}")
 
     if not user_exists:

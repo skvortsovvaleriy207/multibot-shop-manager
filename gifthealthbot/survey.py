@@ -100,7 +100,76 @@ from datetime import datetime
 
 from db import check_account_status
 
+async def save_user_data_to_db(user_id: int, data: dict):
+    """
+    Saves user data to the local bot database.
+    Used by main.py when importing from Global DB.
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        # 1. Update/Insert into users table
+        # We need to map the flat data dictionary to table columns
+        # Default values for missing fields
+        
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO users (
+                user_id, username, first_name, last_name, has_completed_survey, created_at,
+                survey_date, full_name, birth_date, location, email, phone, employment,
+                financial_problem, social_problem, ecological_problem, passive_subscriber,
+                active_partner, investor_trader, business_proposal
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                data.get("username", ""),
+                data.get("first_name", ""),
+                data.get("last_name", ""),
+                1, # has_completed_survey
+                datetime.now().isoformat(),
+                datetime.now().strftime("%Y-%m-%d"),
+                data.get("full_name", data.get("q4", "")), # Fallback to q4 if full_name not explicit
+                data.get("birth_date", ""),
+                data.get("location", data.get("q6", "")),
+                data.get("email", data.get("q7", "")),
+                data.get("phone", ""),
+                data.get("employment", data.get("q9", "")),
+                data.get("financial_problem", data.get("q10", "")),
+                data.get("social_problem", data.get("q11", "")),
+                data.get("ecological_problem", data.get("q12", "")),
+                data.get("passive_subscriber", data.get("q13", "")),
+                data.get("active_partner", data.get("q14", "")),
+                data.get("investor_trader", data.get("q15", "")),
+                data.get("business_proposal", data.get("q16", ""))
+            )
+        )
+        
+        # 2. Save Survey Answers (Optional, but good for consistency)
+        # We assume data keys might be like "q3", "q4" etc if coming from survey state
+        # Or keys like "financial_problem" if coming from structured dict.
+        # For now, let's just save valid q-keys if present.
+        for q_num in [3, 4, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]:
+            key = f"q{q_num}"
+            if key in data:
+                 await db.execute(
+                    "INSERT INTO survey_answers (user_id, question_id, answer_text, answered_at) VALUES (?, ?, ?, ?)",
+                    (user_id, q_num, data[key], datetime.now().isoformat())
+                )
 
+        # 3. Save Bonuses
+        # Calculate bonus if valid
+        bonus_total = 0
+        try:
+            if "да" in str(data.get("passive_subscriber", "")).lower() or "да" in str(data.get("q13", "")).lower(): bonus_total += 1
+            if "да" in str(data.get("active_partner", "")).lower() or "да" in str(data.get("q14", "")).lower(): bonus_total += 2
+            if "да" in str(data.get("investor_trader", "")).lower() or "да" in str(data.get("q15", "")).lower(): bonus_total += 3
+        except:
+            pass
+            
+        await db.execute(
+            "INSERT INTO user_bonuses (user_id, bonus_total, current_balance, updated_at) VALUES (?, ?, ?, ?)",
+            (user_id, bonus_total, bonus_total, datetime.now().isoformat())
+        )
+        await db.commit()
 
 
 @dp.callback_query(F.data == "survey")

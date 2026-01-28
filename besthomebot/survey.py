@@ -572,8 +572,8 @@ async def get_legal_terms(callback: CallbackQuery):
 async def confirm_legal(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="Дом/Жилье",
-        url="https://t.me/Better_House_Bot"
+        text="Бизнес/Партнерство",
+        url="https://t.me/bestsocialbot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника",
@@ -641,7 +641,7 @@ async def confirm_legal(callback: CallbackQuery):
     ))
     builder.add(types.InlineKeyboardButton(
         text="выход из чат-бота",
-        url="https://t.me/+b6yAidzNRd8yMTgy"
+        url="https://t.me/+vz7-Ko4rDy03Yjhi"
     ))
 
     builder.adjust(1)
@@ -660,8 +660,8 @@ from dispatcher import dp
 async def end_surrey(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(
-        text="Дом/Жилье",
-        url="https://t.me/Better_House_Bot"
+         text="Бизнес/Партнерство",
+        url="https://t.me/bestsocialbot"
     ))
     builder.add(types.InlineKeyboardButton(
         text="Автотехника ",
