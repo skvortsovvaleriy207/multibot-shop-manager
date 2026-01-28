@@ -37,6 +37,18 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
 
+  besthomebot:
+    build: .
+    command: python besthomebot/main.py
+    restart: always
+    volumes:
+      - ./besthomebot/bot_database.db:/app/besthomebot/bot_database.db
+      - ./besthomebot/.env:/app/besthomebot/.env
+      - ./shared_storage:/app/shared_storage
+      - ./credentials.json:/app/credentials.json
+    environment:
+      - PYTHONUNBUFFERED=1
+
 # Note: No redis service included as no usage was found in codebase.
 # If needed, add:
 #   redis:
