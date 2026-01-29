@@ -562,6 +562,64 @@ async def approve_and_add_to_catalog(request_id, item_type, supplier_id):
         print(f"Ошибка в approve_and_add_to_catalog: {e}")
         return False
 
+
+@dp.callback_query(F.data == "admin_new_requests")
+async def admin_new_requests_handler(callback: CallbackQuery, state: FSMContext):
+    """Список новых заявок для обработки администратором"""
+    if callback.from_user.id != ADMIN_ID:
+        await callback.answer("❌ Доступ запрещен", show_alert=True)
+        return
+
+    await state.clear()
+    
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Получаем все заявки в статусе active/new/pending
+        cursor = await db.execute("""
+            SELECT id, title, item_type, operation, created_at, user_id
+            FROM order_requests 
+            WHERE status IN ('active', 'new', 'pending')
+            ORDER BY created_at DESC
+            LIMIT 20
+        """)
+        requests = await cursor.fetchall()
+        
+    if not requests:
+        await callback.answer("Новых заявок нет", show_alert=True)
+        # Если это было редактирование сообщения
+        try:
+             builder = InlineKeyboardBuilder()
+             builder.add(types.InlineKeyboardButton(text="◀️ В админ-панель", callback_data="admin_panel_menu"))
+             await callback.message.edit_text("📭 **Новых заявок нет**\n\nВсе заявки обработаны.", reply_markup=builder.as_markup())
+        except:
+             pass
+        return
+
+    builder = InlineKeyboardBuilder()
+    
+    for req_id, title, item_type, operation, created_at, user_id in requests:
+        # Формируем текст кнопки
+        req_type_icon = "📦" if item_type == "product" else "🛠" if item_type == "service" else "📋"
+        op_icon = "🛒" if operation == "buy" else "💰" if operation == "sell" else "🤝"
+        
+        btn_text = f"{req_type_icon} {op_icon} #{req_id} {title[:15]}..."
+        
+        # Callback для просмотра заявки
+        builder.add(types.InlineKeyboardButton(
+            text=btn_text, 
+            callback_data=f"view_item_{item_type}_{req_id}"
+        ))
+
+    builder.add(types.InlineKeyboardButton(text="🔄 Обновить", callback_data="admin_new_requests"))
+    builder.add(types.InlineKeyboardButton(text="◀️ В админ-панель", callback_data="admin_panel_menu"))
+    builder.adjust(1)
+    
+    await callback.message.edit_text(
+        f"📋 **Список новых заявок ({len(requests)})**\n\n"
+        "Выберите заявку для просмотра и обработки:",
+        reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
 def _parse_price(price_str):
     if not price_str: return 0
     try:

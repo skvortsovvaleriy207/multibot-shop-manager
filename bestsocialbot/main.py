@@ -284,6 +284,7 @@ try:
 except ImportError as e:
     logging.error(f"Error importing table_links: {e}")
 from order_request_system import *
+from cart import *
 import admin_catalog_manager
 import admin_posts  # New module for admin content management
 import user_posts   # New module for user content viewing
