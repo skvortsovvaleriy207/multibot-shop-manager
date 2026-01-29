@@ -112,7 +112,7 @@ def init_unified_sheet():
 async def sync_with_google_sheets():
     try:
         # Use safe fetch with retries
-        gsheet_data = await asyncio.to_thread(_fetch_sheet_data_sync)
+        gsheet_data = await _fetch_sheet_data_sync()
         if not gsheet_data:
             logging.warning("Received empty data from Google Sheets")
             return None
@@ -623,7 +623,7 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
         try:
             all_data = await asyncio.wait_for(
                 _fetch_sheet_data_sync(),
-                timeout=60.0  # Increased timeout for retries
+                timeout=600.0  # Increased timeout for retries
             )
         except asyncio.TimeoutError:
             logging.error("Timeout checking implementation details for google sheets sync")

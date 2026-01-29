@@ -155,7 +155,7 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
             from shared_storage.global_db import get_global_user_survey, register_user_subscription, get_user_subscription_count
             
             # Проверка глобальной подписки
-            survey_data = get_global_user_survey(user_id)
+            survey_data = await get_global_user_survey(user_id)
             
             if survey_data:
                 print(f"DEBUG: Found user {user_id} in Global DB. Copying data...")

@@ -4,6 +4,26 @@ import random
 import gspread
 from functools import wraps
 
+from aiogram.types import Message, CallbackQuery
+from db import check_account_status
+
+async def check_blocked_user(event):
+    """
+    Checks if the user is blocked. 
+    Returns True if blocked (and sends message), False otherwise.
+    """
+    user_id = event.from_user.id
+    # check_account_status returns True if allowed ("Р"), False otherwise
+    is_allowed = await check_account_status(user_id)
+    
+    if not is_allowed:
+        if isinstance(event, CallbackQuery):
+            await event.answer("Ваш аккаунт заблокирован или не найден.", show_alert=True)
+        else:
+            await event.answer("Ваш аккаунт заблокирован или не найден.")
+        return True 
+    return False
+
 def retry_google_api(retries: int = 5, delay: float = 5.0, backoff: float = 2.0):
     """
     Decorator to retry function calls upon gspread.exceptions.APIError.

@@ -131,7 +131,7 @@ async def sync_with_google_sheets():
         try:
             gsheet_data = await asyncio.wait_for(
                 _fetch_sheet_data_sync_generic(UNIFIED_SHEET_URL, SHEET_MAIN),
-                timeout=60.0
+                timeout=600.0
             )
         except asyncio.TimeoutError:
             logging.error("Timeout syncing with Google Sheets")
