@@ -28,7 +28,7 @@ def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
 
-@retry_google_api(retries=3, delay=5)
+@retry_google_api(retries=5, delay=5)
 def init_unified_sheet():
     try:
         client = get_google_sheets_client()
@@ -111,7 +111,7 @@ def init_unified_sheet():
 
 
 
-@retry_google_api(retries=3, delay=5)
+@retry_google_api(retries=5, delay=5)
 def _fetch_sheet_data_sync_generic(sheet_url, worksheet_name):
     """Синхронная функция для получения данных из Google Sheets (для запуска в thread)"""
     try:

@@ -28,7 +28,7 @@ def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
 
-@retry_google_api(retries=3, delay=5)
+@retry_google_api(retries=5, delay=5)
 def init_unified_sheet():
     try:
         client = get_google_sheets_client()
@@ -111,10 +111,11 @@ def init_unified_sheet():
 
 async def sync_with_google_sheets():
     try:
-        client = get_google_sheets_client()
-        spreadsheet = client.open_by_url(UNIFIED_SHEET_URL)
-        sheet = spreadsheet.worksheet(SHEET_MAIN)
-        gsheet_data = sheet.get_all_records()
+        # Use safe fetch with retries
+        gsheet_data = await asyncio.to_thread(_fetch_sheet_data_sync)
+        if not gsheet_data:
+            logging.warning("Received empty data from Google Sheets")
+            return None
         logging.info(f"Fetched {len(gsheet_data)} rows from Google Sheets")
 
         # Повторные попытки при блокировке БД
@@ -589,7 +590,7 @@ import aiosqlite
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, BESTHOME_SURVEY_SHEET_URL
 
 
-@retry_google_api(retries=3, delay=5)
+@retry_google_api(retries=5, delay=5)
 def _fetch_sheet_data_sync():
     """Синхронная функция для получения данных из Google Sheets (запускается в отдельном потоке)"""
     try:
