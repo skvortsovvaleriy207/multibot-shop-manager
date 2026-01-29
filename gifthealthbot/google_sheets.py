@@ -555,13 +555,29 @@ async def sync_db_to_google_sheets():
             ]
             data.append(row_data)
 
-        sheet.clear()
-        sheet.update('A1', data)
+        
+        # Use the helper function to update the sheet safely
+        await _update_sheet_data_sync(UNIFIED_SHEET_URL, SHEET_MAIN, data)
 
         return True
     except Exception as e:
         logging.error(f"Error syncing DB to Google Sheets: {e}")
         return False
+
+
+@retry_google_api(retries=5, delay=5)
+def _update_sheet_data_sync(sheet_url, worksheet_name, data):
+    """Синхронная функция для обновления данных в Google Sheets (для запуска в thread)"""
+    try:
+        client = gspread.service_account(filename=CREDENTIALS_FILE)
+        spreadsheet = client.open_by_url(sheet_url)
+        sheet = spreadsheet.worksheet(worksheet_name)
+        sheet.clear()
+        sheet.update('A1', data)
+        return True
+    except Exception as e:
+        logging.error(f"Error in _update_sheet_data_sync: {e}")
+        raise e
 
 
 # google_sheets_sync.py

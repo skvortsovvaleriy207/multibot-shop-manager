@@ -9,18 +9,33 @@ from utils import retry_google_api
 def get_google_sheets_client():
     return gspread.service_account(filename=CREDENTIALS_FILE)
 
-@retry_google_api(retries=3, delay=5)
+@retry_google_api(retries=5, delay=5)
+def _update_partner_sheet_sync(sheet_name, data, create_cols=34):
+    """Синхронная функция для обновления листа партнеров с повторными попытками"""
+    if not MAIN_SURVEY_SHEET_URL:
+        logging.error("MAIN_SURVEY_SHEET_URL не указан")
+        return False
+        
+    try:
+        client = get_google_sheets_client()
+        spreadsheet = client.open_by_url(MAIN_SURVEY_SHEET_URL)
+        try:
+            sheet = spreadsheet.worksheet(sheet_name)
+        except gspread.WorksheetNotFound:
+            logging.info(f"Лист '{sheet_name}' не найден, создаем новый")
+            sheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=create_cols)
+        
+        sheet.clear()
+        if data:
+            sheet.update('A1', data)
+        return True
+    except Exception as e:
+        logging.error(f"Ошибка в _update_partner_sheet_sync для {sheet_name}: {e}")
+        raise e
+
 async def sync_partners_tech_to_sheet():
     """Синхронизация партнеров по автотехнике с Google Sheets"""
     try:
-        gc = get_google_sheets_client()
-        
-        if not MAIN_SURVEY_SHEET_URL:
-            print("Ошибка: MAIN_SURVEY_SHEET_URL не указан в config.py")
-            return False
-            
-        sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры")
-        
         headers = [
             "Дата опроса", "Telegram ID", "Username партнера", "Компания-партнер",
             "Год основания", "Местонахождение", "Email партнера", "Телефон партнера",
@@ -90,9 +105,7 @@ async def sync_partners_tech_to_sheet():
             ]
             data.append(row)
         
-        sheet.clear()
-        if data:
-            sheet.update('A1', data)
+        await _update_partner_sheet_sync("Партнеры", data)
         
         print(f"Синхронизировано {len(partners)} партнеров по автотехнике")
         return True
@@ -101,22 +114,9 @@ async def sync_partners_tech_to_sheet():
         print(f"Ошибка синхронизации партнеров по автотехнике: {e}")
         return False
 
-@retry_google_api(retries=3, delay=5)
 async def sync_partners_services_to_sheet():
     """Синхронизация партнеров по автоуслугам с Google Sheets"""
     try:
-        gc = get_google_sheets_client()
-        
-        if not MAIN_SURVEY_SHEET_URL:
-            print("Ошибка: MAIN_SURVEY_SHEET_URL не указан в config.py")
-            return False
-            
-        try:
-            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Партнеры (Услуги)")
-        except gspread.WorksheetNotFound:
-            print("Лист 'Партнеры (Услуги)' не найден, создаем новый")
-            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).add_worksheet(title="Партнеры (Услуги)", rows=1000, cols=34)
-        
         headers = [
             "Дата опроса", "Telegram ID", "Username партнера", "Компания-партнер",
             "Год основания", "Местонахождение", "Email партнера", "Телефон партнера",
@@ -158,9 +158,7 @@ async def sync_partners_services_to_sheet():
             ]
             data.append(row)
         
-        sheet.clear()
-        if data:
-            sheet.update('A1', data)
+        await _update_partner_sheet_sync("Партнеры (Услуги)", data)
         
         print(f"Синхронизировано {len(partners)} партнеров по автоуслугам")
         return True
@@ -169,22 +167,9 @@ async def sync_partners_services_to_sheet():
         print(f"Ошибка синхронизации партнеров по автоуслугам: {e}")
         return False
 
-@retry_google_api(retries=3, delay=5)
 async def sync_investors_to_sheet():
     """Синхронизация инвесторов с Google Sheets"""
     try:
-        gc = get_google_sheets_client()
-        
-        if not MAIN_SURVEY_SHEET_URL:
-            print("Ошибка: MAIN_SURVEY_SHEET_URL не указан в config.py")
-            return False
-            
-        try:
-            sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).worksheet("Инвесторы")
-        except gspread.WorksheetNotFound:
-             print("Лист 'Инвесторы' не найден, создаем новый")
-             sheet = gc.open_by_url(MAIN_SURVEY_SHEET_URL).add_worksheet(title="Инвесторы", rows=1000, cols=34)
-        
         headers = [
             "Дата опроса", "Telegram ID инвестора", "Username инвестора",
             "Компания-инвестор", "Год основания", "Местонахождение",
@@ -226,9 +211,7 @@ async def sync_investors_to_sheet():
             ]
             data.append(row)
         
-        sheet.clear()
-        if data:
-            sheet.update('A1', data)
+        await _update_partner_sheet_sync("Инвесторы", data)
         
         print(f"Синхронизировано {len(investors)} инвесторов")
         return True
