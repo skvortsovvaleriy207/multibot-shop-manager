@@ -380,6 +380,7 @@ from google_sheets import sync_with_google_sheets, sync_requests_from_sheets_to_
 import asyncio
 from aiogram import Bot
 from datetime import datetime
+import random
 async def send_user_notification(bot: Bot, user_id: int, changes: dict):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
@@ -392,6 +393,9 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict):
         """, (user_id,))
         user_data = await cursor.fetchone()
     if not user_data:
+        return
+    
+    if user_id == 0:
         return
     field_names = {
         'username': 'Никнейм',
@@ -429,8 +433,11 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict):
     except Exception as e:
         logging.error(f"Failed to send notification to user {user_id}: {e}")
 async def periodic_sync():
+    # Random initial delay to prevent thundering herd issues when multiple bots restart
+    await asyncio.sleep(random.uniform(10, 60))
     while True:
         try:
+             # Regular interval sync
             await asyncio.sleep(5)  # Задержка перед синхронизацией
             changes = await sync_with_google_sheets()
             if changes:

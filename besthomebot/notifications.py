@@ -18,6 +18,10 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict = None):
         """, (user_id,))
         user_data = await cursor.fetchone()
     
+    if user_id == 0:
+        logging.warning("Attempted to notify user 0 (System User). Skipping.")
+        return
+
     if not user_data:
         logging.warning(f"Attempted to notify non-existent user {user_id}")
         return

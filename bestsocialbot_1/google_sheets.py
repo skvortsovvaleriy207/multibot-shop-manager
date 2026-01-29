@@ -5,6 +5,7 @@ import aiosqlite
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
 from collections import defaultdict
+from utils import retry_google_api
 
 UNIFIED_SHEET_URL = MAIN_SURVEY_SHEET_URL
 SHEET_MAIN = "Основная таблица"
@@ -26,6 +27,7 @@ def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
 
+@retry_google_api(retries=3, delay=5)
 def init_unified_sheet():
     try:
         client = get_google_sheets_client()
@@ -116,6 +118,7 @@ def _fetch_sheet_data_sync_generic(sheet_url, worksheet_name):
         raise e
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_with_google_sheets():
     try:
         # Запускаем блокирующую операцию в отдельном потоке
@@ -370,6 +373,7 @@ async def sync_with_google_sheets():
         return None
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_db_to_google_sheets():
     try:
         # CRITICAL: Сначала забираем свежие изменения из таблицы, чтобы не затереть их!
@@ -560,6 +564,7 @@ import aiosqlite
 from config import BESTHOME_SURVEY_SHEET_URL, CREDENTIALS_FILE
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_from_sheets_to_db() -> Dict[str, Any]:
     """
     Загружает данные из Google Sheets в базу данных текущего бота
@@ -792,6 +797,7 @@ def _safe_float(value) -> float:
     except (ValueError, TypeError):
         return 0.0
 
+@retry_google_api(retries=3, delay=5)
 async def sync_db_to_main_survey_sheet():
     try:
         client = get_google_sheets_client()

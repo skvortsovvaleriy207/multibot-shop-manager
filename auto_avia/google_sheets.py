@@ -5,6 +5,7 @@ import aiosqlite
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
 from collections import defaultdict
+from utils import retry_google_api
 
 UNIFIED_SHEET_URL = MAIN_SURVEY_SHEET_URL
 SHEET_MAIN = "Основная таблица"
@@ -26,6 +27,7 @@ def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
 
+@retry_google_api(retries=3, delay=5)
 def init_unified_sheet():
     try:
         client = get_google_sheets_client()
@@ -86,6 +88,7 @@ def init_unified_sheet():
         return False
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_with_google_sheets():
     try:
         client = get_google_sheets_client()
@@ -214,6 +217,7 @@ async def sync_with_google_sheets():
         return None
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_db_to_google_sheets():
     try:
         client = get_google_sheets_client()
@@ -314,6 +318,7 @@ import aiosqlite
 from config import BESTHOME_SURVEY_SHEET_URL, CREDENTIALS_FILE
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_from_sheets_to_db() -> Dict[str, Any]:
     """
     Загружает данные из Google Sheets в базу данных текущего бота
@@ -482,6 +487,7 @@ def _safe_float(value) -> float:
     except (ValueError, TypeError):
         return 0.0
 
+@retry_google_api(retries=3, delay=5)
 async def sync_db_to_main_survey_sheet():
     try:
         client = get_google_sheets_client()
@@ -572,6 +578,7 @@ async def sync_db_to_main_survey_sheet():
         return False
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_sheets_to_db():
     try:
         client = get_google_sheets_client()
@@ -628,6 +635,7 @@ async def sync_sheets_to_db():
         return False
 
 
+@retry_google_api(retries=3, delay=5)
 async def sync_order_requests_to_sheets():
     """Синхронизация заявок с Google Sheets с учетом разных типов заявок"""
     try:

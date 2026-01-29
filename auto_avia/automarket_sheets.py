@@ -3,10 +3,12 @@ import aiosqlite
 from datetime import datetime
 from config import CREDENTIALS_FILE, AUTO_PRODUCTS_SHEET_URL, AUTO_SERVICES_SHEET_URL, AUTO_ORDERS_SHEET_URL
 import asyncio
+from utils import retry_google_api
 
 def get_google_sheets_client():
     return gspread.service_account(filename=CREDENTIALS_FILE)
 
+@retry_google_api(retries=3, delay=5)
 async def sync_products_to_sheet():
     """Синхронизация товаров автотехники с Google Sheets"""
     try:
@@ -92,6 +94,7 @@ async def sync_products_to_sheet():
         print(f"Ошибка синхронизации товаров: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_services_to_sheet():
     """Синхронизация автоуслуг с Google Sheets"""
     try:
@@ -167,6 +170,7 @@ async def sync_services_to_sheet():
         print(f"Ошибка синхронизации услуг: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_orders_to_sheet():
     """Синхронизация заказов с Google Sheets"""
     try:
@@ -262,6 +266,7 @@ async def export_all_automarket_data():
     
     return success_count == 3
 
+@retry_google_api(retries=3, delay=5)
 async def sync_products_from_sheet():
     """Синхронизация товаров из Google Sheets в БД"""
     try:
@@ -301,6 +306,7 @@ async def sync_products_from_sheet():
         print(f"Ошибка синхронизации товаров из Google Sheets: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_services_from_sheet():
     """Синхронизация услуг из Google Sheets в БД"""
     try:
@@ -340,6 +346,7 @@ async def sync_services_from_sheet():
         print(f"Ошибка синхронизации услуг из Google Sheets: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_orders_from_sheet():
     """Синхронизация статусов заказов из Google Sheets в БД"""
     try:

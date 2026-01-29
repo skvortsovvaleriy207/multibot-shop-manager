@@ -375,7 +375,10 @@ import asyncio
 from aiogram import Bot
 from datetime import datetime
 from notifications import send_user_notification
+import random
 async def periodic_sync():
+    # Random initial delay to prevent thundering herd issues
+    await asyncio.sleep(random.uniform(10, 60))
     while True:
         try:
             await asyncio.sleep(5)  # Задержка перед синхронизацией

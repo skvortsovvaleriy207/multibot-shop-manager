@@ -4,10 +4,12 @@ from datetime import datetime
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
 import logging
+from utils import retry_google_api
 
 def get_google_sheets_client():
     return gspread.service_account(filename=CREDENTIALS_FILE)
 
+@retry_google_api(retries=3, delay=5)
 async def sync_partners_tech_to_sheet():
     """Синхронизация партнеров по автотехнике с Google Sheets"""
     try:
@@ -98,6 +100,7 @@ async def sync_partners_tech_to_sheet():
         print(f"Ошибка синхронизации партнеров по автотехнике: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_partners_services_to_sheet():
     """Синхронизация партнеров по автоуслугам с Google Sheets"""
     try:
@@ -160,6 +163,7 @@ async def sync_partners_services_to_sheet():
         print(f"Ошибка синхронизации партнеров по автоуслугам: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_investors_to_sheet():
     """Синхронизация инвесторов с Google Sheets"""
     try:
@@ -222,6 +226,7 @@ async def sync_investors_to_sheet():
         print(f"Ошибка синхронизации инвесторов: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_users_from_sheets():
     """Синхронизация данных пользователей из Google Sheets"""
     try:
@@ -273,6 +278,7 @@ async def sync_partners_from_sheets():
         print(f"Ошибка синхронизации партнеров: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_partners_tech_from_sheet():
     """Синхронизация партнеров по автотехнике из Google Sheets"""
     try:
@@ -305,6 +311,7 @@ async def sync_partners_tech_from_sheet():
         print(f"Ошибка синхронизации партнеров по автотехнике: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_partners_services_from_sheet():
     """Синхронизация партнеров по автоуслугам из Google Sheets"""
     try:
@@ -337,6 +344,7 @@ async def sync_partners_services_from_sheet():
         print(f"Ошибка синхронизации партнеров по автоуслугам: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_investors_from_sheet():
     """Синхронизация инвесторов из Google Sheets"""
     try:
@@ -418,6 +426,7 @@ async def sync_partner_data_to_cards():
         logging.error(f"Ошибка выгрузки партнерских данных: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_tech_partners_to_product_cards():
     """Выгрузка данных партнеров по автотехнике в карточки товаров"""
     try:
@@ -453,6 +462,7 @@ async def sync_tech_partners_to_product_cards():
         print(f"Ошибка выгрузки партнеров автотехники: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_service_partners_to_service_cards():
     """Выгрузка данных партнеров по автоуслугам в карточки услуг"""
     try:
@@ -488,6 +498,7 @@ async def sync_service_partners_to_service_cards():
         print(f"Ошибка выгрузки партнеров автоуслуг: {e}")
         return False
 
+@retry_google_api(retries=3, delay=5)
 async def sync_investor_data_to_profiles():
     """Выгрузка данных инвесторов в профили согласно ТЗ п.5"""
     try:

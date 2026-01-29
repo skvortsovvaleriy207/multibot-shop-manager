@@ -5,6 +5,7 @@ import aiosqlite
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
 from collections import defaultdict
+from utils import retry_google_api
 
 UNIFIED_SHEET_URL = MAIN_SURVEY_SHEET_URL
 SHEET_MAIN = "Основная таблица"
@@ -27,6 +28,7 @@ def get_main_survey_sheet_url():
     return MAIN_SURVEY_SHEET_URL
 
 
+@retry_google_api(retries=3, delay=5)
 def init_unified_sheet():
     try:
         client = get_google_sheets_client()
@@ -571,6 +573,7 @@ import aiosqlite
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL, BESTHOME_SURVEY_SHEET_URL
 
 
+@retry_google_api(retries=3, delay=5)
 def _fetch_sheet_data_sync():
     """Синхронная функция для получения данных из Google Sheets (запускается в отдельном потоке)"""
     try:
@@ -602,8 +605,8 @@ async def sync_from_sheets_to_db() -> Dict[str, Any]:
         # Запускаем блокирующую функцию получения данных в отдельном потоке с таймаутом
         try:
             all_data = await asyncio.wait_for(
-                asyncio.to_thread(_fetch_sheet_data_sync),
-                timeout=20.0  # Таймаут 20 секунд
+                _fetch_sheet_data_sync(),
+                timeout=60.0  # Increased timeout for retries
             )
         except asyncio.TimeoutError:
             logging.error("Timeout checking implementation details for google sheets sync")

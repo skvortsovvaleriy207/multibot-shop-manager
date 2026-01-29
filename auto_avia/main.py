@@ -155,6 +155,7 @@ from google_sheets import sync_with_google_sheets, sync_requests_from_sheets_to_
 import asyncio
 from aiogram import Bot
 from datetime import datetime
+import random
 async def send_user_notification(bot: Bot, user_id: int, changes: dict):
     async with aiosqlite.connect("bot_database.db") as db:
         cursor = await db.execute("""
@@ -165,6 +166,9 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict):
             FROM users 
             WHERE user_id = ?
         """, (user_id,))
+        if user_id == 0:
+            logging.warning("Popitka otpravit uvedomlenie polzovatelyu 0 (System). Skipped.")
+            return
         user_data = await cursor.fetchone()
     if not user_data:
         return
@@ -195,6 +199,7 @@ async def send_user_notification(bot: Bot, user_id: int, changes: dict):
     except Exception as e:
         logging.error(f"Failed to send notification to user {user_id}: {e}")
 async def periodic_sync():
+    await asyncio.sleep(random.uniform(10, 60))
     while True:
         try:
             await asyncio.sleep(5)  # Задержка перед синхронизацией
