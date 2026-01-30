@@ -112,6 +112,16 @@ async def save_global_user(user_id: int, username: str, full_name: str, survey_d
         )
         await db.commit()
 
+async def get_global_user_info(user_id: int) -> dict:
+    """Retrieves basic user info (username, full_name) from global_users."""
+    async with aiosqlite.connect(GLOBAL_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT * FROM global_users WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
 async def save_legal_document(key: str, content: str):
     """Saves a legal document to the global database."""
     async with aiosqlite.connect(GLOBAL_DB_PATH) as db:

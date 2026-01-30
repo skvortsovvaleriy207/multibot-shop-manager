@@ -486,8 +486,15 @@ async def main():
     
 
     
+    
     # SYNC: Загружаем изменения из Google Sheets в БД
     print("[SYNC] Загрузка изменений из Google Sheets...")
+    
+    # Random delay to prevent API quota exceeded when all bots start at once
+    delay = random.uniform(5, 20)
+    print(f"[SYNC] Random startup delay: {delay:.2f}s")
+    await asyncio.sleep(delay)
+
     try:
         #await sync_requests_from_sheets_to_db()
         print(f"[OK] Загружено изменений для заявок")

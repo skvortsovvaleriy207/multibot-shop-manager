@@ -250,12 +250,12 @@ async def export_all_automarket_data():
     """Мгновенная выгрузка всех данных автомагазина"""
     print("Начинаем выгрузку данных автомагазина...")
     
-    results = await asyncio.gather(
-        sync_products_to_sheet(),
-        sync_services_to_sheet(), 
-        sync_orders_to_sheet(),
-        return_exceptions=True
-    )
+    # Serialized execution to avoid API Quota Limits
+    # results = await asyncio.gather(...) - REPLACED
+    r1 = await sync_products_to_sheet()
+    r2 = await sync_services_to_sheet()
+    r3 = await sync_orders_to_sheet()
+    results = [r1, r2, r3]
     
     success_count = sum(1 for result in results if result is True)
     print(f"Выгрузка завершена: {success_count}/3 таблиц обновлено")
@@ -397,12 +397,11 @@ async def notify_order_status_change(user_id: int, seller_id: int, order_id: int
 
 async def sync_all_from_sheets():
     """Синхронизация всех данных из Google Sheets в БД"""
-    results = await asyncio.gather(
-        sync_products_from_sheet(),
-        sync_services_from_sheet(),
-        sync_orders_from_sheet(),
-        return_exceptions=True
-    )
+    # Serialized execution
+    r1 = await sync_products_from_sheet()
+    r2 = await sync_services_from_sheet()
+    r3 = await sync_orders_from_sheet()
+    results = [r1, r2, r3]
     success_count = sum(1 for result in results if result is True)
     print(f"Синхронизация из Google Sheets: {success_count}/3 таблиц обновлено")
     return success_count >= 2

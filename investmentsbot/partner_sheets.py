@@ -377,12 +377,13 @@ async def export_all_partner_data():
     """Мгновенная выгрузка партнерских данных"""
     print("Начинаем выгрузку партнерских данных...")
     
-    results = await asyncio.gather(
-        sync_partners_tech_to_sheet(),
-        sync_partners_services_to_sheet(),
-        sync_investors_to_sheet(),
-        return_exceptions=True
-    )
+    # Serialized execution to avoid API Quota Limits
+    # results = await asyncio.gather(...) - REPLACED
+    
+    r1 = await sync_partners_tech_to_sheet()
+    r2 = await sync_partners_services_to_sheet()
+    r3 = await sync_investors_to_sheet()
+    results = [r1, r2, r3]
     
     success_count = sum(1 for result in results if result is True)
     print(f"Выгрузка партнерских данных завершена: {success_count}/3 операций выполнено")

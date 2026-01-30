@@ -49,6 +49,18 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
 
+  ourwonderfulbot:
+    build: .
+    command: python ourwonderfulbot/main.py
+    restart: always
+    volumes:
+      - ./ourwonderfulbot/bot_database.db:/app/ourwonderfulbot/bot_database.db
+      - ./ourwonderfulbot/.env:/app/ourwonderfulbot/.env
+      - ./shared_storage:/app/shared_storage
+      - ./credentials.json:/app/credentials.json
+    environment:
+      - PYTHONUNBUFFERED=1
+
 # Note: No redis service included as no usage was found in codebase.
 # If needed, add:
 #   redis:

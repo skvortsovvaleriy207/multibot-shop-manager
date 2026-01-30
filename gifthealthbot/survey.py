@@ -955,14 +955,41 @@ async def nature_links(callback: CallbackQuery):
                 "https://t.me/+x_qEjMskwVoyOGRi")
 
 async def sync_local_to_global(user_id: int):
-    """Backfills existing local user data to Global DB."""
+    """
+    Syncs user data between Local DB and Global DB.
+    1. If user in Global DB and Local user invalid -> Import from Global
+    2. If user in Global DB and Local user valid -> Register subscription
+    3. If user ONLY in Local DB and valid -> Export to Global
+    """
     print(f"DEBUG: sync_local_to_global called for {user_id}")
     try:
+        from shared_storage.global_db import get_global_user_info
+        
         # Check if already in global DB
-        global_data = await get_global_user_survey(user_id)
-        if global_data:
-            print(f"DEBUG: User {user_id} found in Global DB, registering subscription")
-            # Maybe just update subscription?
+        global_survey = await get_global_user_survey(user_id)
+        
+        if global_survey:
+            # User exists globally. Check local status.
+            async with aiosqlite.connect("bot_database.db") as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute("SELECT has_completed_survey FROM users WHERE user_id = ?", (user_id,))
+                local_user = await cursor.fetchone()
+                
+                # If local user missing or incomplete, we IMPORT
+                if not local_user or not local_user['has_completed_survey']:
+                    print(f"DEBUG: Local user {user_id} is incomplete/missing but exists globally. Importing...")
+                    
+                    # Get basic info
+                    global_info = await get_global_user_info(user_id)
+                    username = global_info['username'] if global_info else ""
+                    # extracting first/last name from full name is tricky, so we leave empty or try split
+                    # For import_global_user, we need these.
+                    # We can try to use survey data q4 if needed, but import_global_user handles it.
+                    
+                    await import_global_user(user_id, username, "", "") 
+                    return
+
+            print(f"DEBUG: User {user_id} found in Global DB and Local DB is valid. Registering subscription")
             await register_user_subscription(user_id, BOT_FOLDER_NAME)
             return
 

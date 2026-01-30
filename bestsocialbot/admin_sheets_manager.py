@@ -255,12 +255,12 @@ async def load_admin_data_from_sheets():
     """Периодическая загрузка административных данных из Google Sheets"""
     print("Начинаем загрузку административных данных...")
     
-    results = await asyncio.gather(
-        sync_categories_from_sheet(),
-        sync_user_bonuses_from_sheet(),
-        sync_reviews_from_sheet(),
-        return_exceptions=True
-    )
+    # Serialized execution
+    # results = await asyncio.gather(...) - REPLACED
+    r1 = await sync_categories_from_sheet()
+    r2 = await sync_user_bonuses_from_sheet()
+    r3 = await sync_reviews_from_sheet()
+    results = [r1, r2, r3]
     
     success_count = sum(1 for result in results if result is True)
     print(f"Загрузка завершена: {success_count}/3 таблиц")
@@ -272,12 +272,11 @@ async def export_admin_data_to_sheets():
     """Мгновенная выгрузка административных данных"""
     print("Начинаем выгрузку административных данных...")
     
-    results = await asyncio.gather(
-        sync_categories_to_sheet(),
-        sync_user_bonuses_to_sheet(),
-        sync_reviews_to_sheet(),
-        return_exceptions=True
-    )
+    # Serialized execution
+    r1 = await sync_categories_to_sheet()
+    r2 = await sync_user_bonuses_to_sheet()
+    r3 = await sync_reviews_to_sheet()
+    results = [r1, r2, r3]
     
     success_count = sum(1 for result in results if result is True)
     print(f"Выгрузка завершена: {success_count}/3 таблиц")
