@@ -54,8 +54,7 @@ services:
     command: python ourwonderfulbot/main.py
     restart: always
     volumes:
-      - ./ourwonderfulbot/bot_database.db:/app/ourwonderfulbot/bot_database.db
-      - ./ourwonderfulbot/.env:/app/ourwonderfulbot/.env
+      - ./ourwonderfulbot:/app/ourwonderfulbot
       - ./shared_storage:/app/shared_storage
       - ./credentials.json:/app/credentials.json
     environment:
