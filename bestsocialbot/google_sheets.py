@@ -1053,6 +1053,7 @@ async def sync_order_requests_to_sheets():
                         WHEN r.item_type = 'product' THEN 'Товар'
                         WHEN r.item_type = 'offer' THEN 'Предложение'
                         WHEN r.item_type = 'cart_order' THEN 'Заказ из корзины'
+                        WHEN r.item_type = 'service' THEN 'Услуга'
                         ELSE r.item_type
                     END as order_type,
                     COALESCE(r.id, '') as item_id,
@@ -1072,7 +1073,7 @@ async def sync_order_requests_to_sheets():
                     COALESCE(r.additional_info, '') as notes
                 FROM order_requests r
                 LEFT JOIN users u ON r.user_id = u.user_id
-                WHERE r.item_type IN ('product', 'offer', 'cart_order')
+                WHERE r.item_type IN ('product', 'offer', 'cart_order', 'service')
                 ORDER BY r.id ASC
             """)
             product_requests = await cursor.fetchall()

@@ -32,6 +32,35 @@ async def has_active_process(user_id: int) -> bool:
             
     return False
 
+async def get_active_process_details(user_id: int) -> str:
+    """
+    Returns details about the active process for the user.
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        try:
+            cursor = await db.execute("""
+                SELECT item_type, created_at, status FROM order_requests 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активная заявка: {row[0]} от {row[1]} (Статус: {row[2]})"
+        except Exception:
+            pass
+
+        try:
+            cursor = await db.execute("""
+                SELECT order_type, order_date, status FROM orders 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активный заказ: {row[0]} от {row[1]} (Статус: {row[2]})"
+        except Exception:
+            pass
+
+    return "Неизвестный процесс"
+
 async def check_blocked_user(event):
     """
     Checks if the user is blocked. 

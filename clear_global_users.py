@@ -40,7 +40,7 @@ async def clear_users():
 
 if __name__ == "__main__":
     confirm = input(f"⚠️  WARNING: This will delete ALL user data from {DB_PATH}.\nType 'yes' to continue: ")
-    if confirm.lower() == 'yes':
+    if confirm.strip().lower() in ['yes', 'y']:
         asyncio.run(clear_users())
     else:
         print("Cancelled.")

@@ -231,13 +231,19 @@ async def start_survey(callback: CallbackQuery, state: FSMContext):
                 "Регистрация завершена. Добро пожаловать!",
                 reply_markup=builder.as_markup()
              )
-             await callback.answer()
+             try:
+                 await callback.answer()
+             except Exception:
+                 pass
              return
 
     except Exception as e:
         if "limit" in str(e).lower():
              await callback.message.answer("❌ Вы не можете подписаться на этого бота, так как достигли лимита подписок (максимум 3 бота).")
-             await callback.answer()
+             try:
+                 await callback.answer()
+             except Exception:
+                 pass
              return
         print(f"Global DB Error in start_survey: {e}")
         import traceback
@@ -556,7 +562,10 @@ async def get_legal_privacy(callback: CallbackQuery):
         await callback.message.answer_document(file, caption="📜 Политика конфиденциальности")
     else:
         await callback.answer("Документ не найден", show_alert=True)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "get_legal_terms")
 async def get_legal_terms(callback: CallbackQuery):
@@ -566,7 +575,10 @@ async def get_legal_terms(callback: CallbackQuery):
         await callback.message.answer_document(file, caption="📜 Пользовательское соглашение")
     else:
         await callback.answer("Документ не найден", show_alert=True)
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "confirm_legal")
 async def confirm_legal(callback: CallbackQuery):
@@ -746,7 +758,10 @@ async def end_surrey(callback: CallbackQuery):
             text="Выберите в меню и нажмите кнопку по вашей главной проблеме для перехода в свое целевое сообщество⏬",
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 
 
@@ -780,7 +795,10 @@ async def links(callback: CallbackQuery, name_bot, url_bot, url_chanel, url_grou
             text=text,
             reply_markup=builder.as_markup()
         )
-    await callback.answer()
+    try:
+        await callback.answer()
+    except Exception:
+        pass
 
 @dp.callback_query(F.data == "besthome_links")
 async def besthome_links(callback: CallbackQuery):

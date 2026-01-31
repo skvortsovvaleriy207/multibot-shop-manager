@@ -8,12 +8,10 @@ services:
     build: .
     container_name: bestsocialbot
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - BOT_NAME=bestsocialbot
-      - BOT_TOKEN=${MAIN_BOT_TOKEN}
     volumes:
-      - wond_data:/data
       - .:/app
-
-volumes:
-  wond_data:
+      - ../shared_storage:/shared_storage

@@ -725,3 +725,22 @@ async def read_message(callback: CallbackQuery):
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
+
+@dp.callback_query(F.data.startswith("delete_message_"))
+async def delete_message_handler(callback: CallbackQuery):
+    """Удалить сообщение"""
+    if await check_blocked_user(callback):
+        return
+
+    message_id = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+
+    async with aiosqlite.connect("bot_database.db") as db:
+        await db.execute("DELETE FROM messages WHERE id = ? AND recipient_id = ?", (message_id, user_id))
+        await db.commit()
+
+    await callback.answer("✅ Сообщение удалено", show_alert=True)
+    
+    # Возвращаемся к списку входящих
+    from messages_system import messages_inbox
+    await messages_inbox(callback)

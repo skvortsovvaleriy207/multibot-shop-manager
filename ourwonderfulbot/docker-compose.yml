@@ -1,19 +1,17 @@
 services:
-  bestsocialbot:
+  ourwonderfulbot:
     deploy:
       resources:
         limits:
           cpus: '0.33'
           memory: '256M'
     build: .
-    container_name: bestsocialbot
+    container_name: ourwonderfulbot
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - BOT_NAME=bestsocialbot
-      - BOT_TOKEN=${MAIN_BOT_TOKEN}
+      - BOT_NAME=ourwonderfulbot
     volumes:
-      - wond_data:/data
       - .:/app
-
-volumes:
-  wond_data:
+      - ../shared_storage:/shared_storage

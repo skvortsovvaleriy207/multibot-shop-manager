@@ -182,15 +182,17 @@ async def product_card_form_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
 
-    from utils import has_active_process
-    if await has_active_process(user_id):
-        # await callback.message.answer(
-        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-        #     "Пожалуйста, дождитесь выполнения текущей задачи."
-        # )
-        await callback.answer("❌ Есть активная заявка", show_alert=True)
-        return
+    from config import ADMIN_ID
+    if user_id != ADMIN_ID:
+        from utils import has_active_process
+        if await has_active_process(user_id):
+            # await callback.message.answer(
+            #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            #     "Пожалуйста, дождитесь выполнения текущей задачи."
+            # )
+            await callback.answer("❌ Есть активная заявка", show_alert=True)
+            return
 
     # Проверяем, передана ли категория
     preset_category = None
@@ -1726,15 +1728,17 @@ async def service_card_form_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
 
-    from utils import has_active_process
-    if await has_active_process(user_id):
-        # await callback.message.answer(
-        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-        #     "Пожалуйста, дождитесь выполнения текущей задачи."
-        # )
-        await callback.answer("❌ Есть активная заявка", show_alert=True)
-        return
+    from config import ADMIN_ID
+    if user_id != ADMIN_ID:
+        from utils import has_active_process
+        if await has_active_process(user_id):
+            # await callback.message.answer(
+            #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            #     "Пожалуйста, дождитесь выполнения текущей задачи."
+            # )
+            await callback.answer("❌ Есть активная заявка", show_alert=True)
+            return
 
     # Проверяем, передана ли категория
     preset_category = None
@@ -3199,15 +3203,17 @@ async def offer_card_form_start(callback: CallbackQuery, state: FSMContext):
         await callback.answer("❌ Превышен лимит: максимум 3 заявки в сутки", show_alert=True)
         return
 
-    from utils import has_active_process
-    if await has_active_process(user_id):
-        # await callback.message.answer(
-        #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-        #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-        #     "Пожалуйста, дождитесь выполнения текущей задачи."
-        # )
-        await callback.answer("❌ Есть активная заявка", show_alert=True)
-        return
+    from config import ADMIN_ID
+    if user_id != ADMIN_ID:
+        from utils import has_active_process
+        if await has_active_process(user_id):
+            # await callback.message.answer(
+            #     "⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+            #     "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+            #     "Пожалуйста, дождитесь выполнения текущей задачи."
+            # )
+            await callback.answer("❌ Есть активная заявка", show_alert=True)
+            return
 
     # Проверяем, передана ли категория
     preset_category = None

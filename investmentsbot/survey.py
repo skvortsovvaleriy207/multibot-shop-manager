@@ -260,7 +260,10 @@ async def check_bad_words(message: Message, state: FSMContext) -> bool:
     filter_instance = IsBadWord()
     is_bad = await filter_instance(message)
     if is_bad:
-        await message.delete()
+        try:
+            await message.delete()
+        except Exception:
+            pass
         await message.answer("❌ Использование нецензурной лексики запрещено в нашем сообществе!")
         return True
     return False
@@ -273,7 +276,10 @@ async def check_bad_words(message: Message, state: FSMContext) -> bool:
 
 @dp.message(IsBadWord(), SurveyStates.Q3)
 async def process_q3_badword(message: Message, state: FSMContext):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     await message.answer("❌ Использование нецензурной лексики запрещено в нашем сообществе!")
     return
 
@@ -406,7 +412,10 @@ async def process_q14(message: Message, state: FSMContext):
 
 @dp.message(IsBadWord(), SurveyStates.Q15)
 async def process_q15_badword(message: Message, state: FSMContext):
-    await message.delete()
+    try:
+        await message.delete()
+    except Exception:
+        pass
     await message.answer("❌ Использование нецензурной лексики запрещено в нашем сообществе!")
     return
 

@@ -632,21 +632,23 @@ async def cart_order_checkout(callback: CallbackQuery):
     """Оформление заказа из корзины"""
     user_id = callback.from_user.id
 
-    from utils import has_active_process
-    if await has_active_process(user_id):
-        # Получаем детали активного процесса
-        from utils import get_active_process_details
-        reason = await get_active_process_details(user_id)
-        
-        await callback.message.edit_text(
-            f"⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
-            f"Причина: {reason}\n\n"
-            "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
-            "Пожалуйста, дождитесь выполнения или отмените его в личном кабинете.",
-            reply_markup=InlineKeyboardBuilder().add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="cart_order")).as_markup()
-        )
-        await callback.answer("❌ Есть активная заявка", show_alert=True)
-        return
+    from config import ADMIN_ID
+    if user_id != ADMIN_ID:
+        from utils import has_active_process
+        if await has_active_process(user_id):
+            # Получаем детали активного процесса
+            from utils import get_active_process_details
+            reason = await get_active_process_details(user_id)
+            
+            await callback.message.edit_text(
+                f"⚠️ **У вас уже есть активная заявка или заказ.**\n\n"
+                f"Причина: {reason}\n\n"
+                "Вы не можете оформлять новые заявки/заказы, пока не будет завершен предыдущий процесс.\n"
+                "Пожалуйста, дождитесь выполнения или отмените его в личном кабинете.",
+                reply_markup=InlineKeyboardBuilder().add(types.InlineKeyboardButton(text="◀️ Назад", callback_data="cart_order")).as_markup()
+            )
+            await callback.answer("❌ Есть активная заявка", show_alert=True)
+            return
 
     # Проверяем, есть ли товары в корзине
     async with aiosqlite.connect("bot_database.db") as db:

@@ -65,3 +65,64 @@ def retry_google_api(retries: int = 5, delay: float = 5.0, backoff: float = 2.0)
                      raise e
         return wrapper
     return decorator
+
+import aiosqlite
+
+async def has_active_process(user_id: int) -> bool:
+    """
+    Checks if the user has any active order requests or orders.
+    Active means status is not 'completed', 'cancelled', or 'rejected'.
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Check order_requests
+        try:
+            cursor = await db.execute("""
+                SELECT 1 FROM order_requests 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            if await cursor.fetchone():
+                return True
+        except Exception:
+            pass # Table might not exist or other error
+            
+        # Check orders
+        try:
+            cursor = await db.execute("""
+                SELECT 1 FROM orders 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            if await cursor.fetchone():
+                return True
+        except Exception:
+            pass
+
+    return False
+
+async def get_active_process_details(user_id: int) -> str:
+    """
+    Returns details about the active process for the user.
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        try:
+            cursor = await db.execute("""
+                SELECT item_type, created_at, status FROM order_requests 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активная заявка: {row[0]} от {row[1]} (Статус: {row[2]})"
+        except Exception:
+            pass
+
+        try:
+            cursor = await db.execute("""
+                SELECT order_type, order_date, status FROM orders 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активный заказ: {row[0]} от {row[1]} (Статус: {row[2]})"
+        except Exception:
+            pass
+
+    return "Неизвестный процесс"

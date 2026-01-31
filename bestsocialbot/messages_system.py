@@ -725,3 +725,38 @@ async def read_message(callback: CallbackQuery):
 
     await callback.message.edit_text(text, reply_markup=builder.as_markup())
     await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("delete_message_"))
+async def delete_message(callback: CallbackQuery):
+    """Удалить сообщение"""
+    if await check_blocked_user(callback):
+        return
+
+    try:
+        message_id = int(callback.data.split("_")[2])
+        user_id = callback.from_user.id
+
+        async with aiosqlite.connect("bot_database.db") as db:
+            # Проверяем, принадлежит ли сообщение пользователю (как получателю или отправителю)
+            cursor = await db.execute("""
+                SELECT id FROM messages 
+                WHERE id = ? AND (recipient_id = ? OR sender_id = ?)
+            """, (message_id, user_id, user_id))
+            
+            if not await cursor.fetchone():
+                await callback.answer("Сообщение не найдено или доступ запрещен", show_alert=True)
+                return
+
+            # Удаляем сообщение
+            await db.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+            await db.commit()
+
+        await callback.answer("✅ Сообщение удалено", show_alert=True)
+        
+        # Возвращаемся во входящие
+        await messages_inbox(callback)
+
+    except Exception as e:
+        print(f"Ошибка удаления сообщения: {e}")
+        await callback.answer("❌ Ошибка при удалении", show_alert=True)

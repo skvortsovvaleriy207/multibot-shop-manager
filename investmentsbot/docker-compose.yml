@@ -8,12 +8,10 @@ services:
     build: .
     container_name: investmentsbot
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - BOT_NAME=investmentsbot
-      - BOT_TOKEN=${MAIN_BOT_TOKEN}
     volumes:
-      - investmentsbot_data:/data
       - .:/app
-
-volumes:
-  investmentsbot_data:
+      - ../shared_storage:/shared_storage

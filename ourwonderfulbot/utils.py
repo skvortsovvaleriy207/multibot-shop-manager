@@ -4,8 +4,72 @@ import random
 import gspread
 from functools import wraps
 
+import aiosqlite
 from aiogram.types import Message, CallbackQuery
 from db import check_account_status
+
+async def has_active_process(user_id: int) -> bool:
+    """
+    Checks if the user has any active order requests or orders.
+    Active means status is not 'completed', 'cancelled', or 'rejected'.
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Check order_requests
+        try:
+            cursor = await db.execute("""
+                SELECT 1 FROM order_requests 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            if await cursor.fetchone():
+                return True
+        except Exception:
+            pass # Table might not exist or other error
+            
+        # Check orders
+        try:
+            cursor = await db.execute("""
+                SELECT 1 FROM orders 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+            """, (user_id,))
+            if await cursor.fetchone():
+                return True
+        except Exception:
+            pass
+
+    return False
+
+async def get_active_process_details(user_id: int) -> str:
+    """
+    Returns details about the active process (order request or order).
+    """
+    async with aiosqlite.connect("bot_database.db") as db:
+        # Check order_requests
+        try:
+            cursor = await db.execute("""
+                SELECT id, status, item_type FROM order_requests 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+                LIMIT 1
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активная заявка #{row[0]} (Статус: {row[1]})"
+        except Exception:
+            pass
+            
+        # Check orders
+        try:
+            cursor = await db.execute("""
+                SELECT id, status FROM orders 
+                WHERE user_id = ? AND status NOT IN ('completed', 'cancelled', 'rejected')
+                LIMIT 1
+            """, (user_id,))
+            row = await cursor.fetchone()
+            if row:
+                return f"Активный заказ #{row[0]} (Статус: {row[1]})"
+        except Exception:
+            pass
+
+    return "Неизвестный активный процесс"
 
 async def check_blocked_user(event):
     """
@@ -14,9 +78,13 @@ async def check_blocked_user(event):
     """
     user_id = event.from_user.id
     # check_account_status returns True if allowed ("Р"), False otherwise
-    is_allowed = await check_account_status(user_id)
+    # OLD LOGIC: if not allowed => blocked. 
+    # NEW LOGIC: check explicitly if blocked ("О")
     
-    if not is_allowed:
+    from db import is_user_blocked
+    is_blocked = await is_user_blocked(user_id)
+    
+    if is_blocked:
         if isinstance(event, CallbackQuery):
             await event.answer("Ваш аккаунт заблокирован или не найден.", show_alert=True)
         else:
