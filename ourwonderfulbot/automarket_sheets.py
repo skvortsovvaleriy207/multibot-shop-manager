@@ -415,13 +415,13 @@ async def sync_all_from_sheets():
 
 # Функция для периодической синхронизации (вызывается из main.py)
 async def scheduled_automarket_sync():
-    """Периодическая загрузка товаров/услуг из Google Sheets в 17:00 МСК"""
-    from datetime import datetime
+    """Периодическая загрузка товаров/услуг из Google Sheets в 18:00 МСК"""
+    from datetime import datetime, timedelta
     while True:
         try:
-            # Ждем до 17:00 МСК
+            # Ждем до 18:00 МСК
             now = datetime.now()
-            target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
+            target_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
             
             if now > target_time:
                 target_time += timedelta(days=1)

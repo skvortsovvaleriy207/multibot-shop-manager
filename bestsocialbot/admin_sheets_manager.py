@@ -309,13 +309,13 @@ async def instant_export_review(review_id: int):
         print(f"❌ Ошибка выгрузки отзыва: {e}")
 
 async def scheduled_admin_tables_sync():
-    """Периодическая загрузка административных данных в 17:00 МСК"""
-    from datetime import datetime
+    """Периодическая загрузка административных данных в 18:00 МСК"""
+    from datetime import datetime, timedelta
     while True:
         try:
-            # Ждем до 17:00 МСК
+            # Ждем до 18:00 МСК
             now = datetime.now()
-            target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
+            target_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
             
             if now > target_time:
                 target_time += timedelta(days=1)
@@ -323,7 +323,7 @@ async def scheduled_admin_tables_sync():
             wait_seconds = (target_time - now).total_seconds()
             await asyncio.sleep(wait_seconds)
             
-            # Загрузка административных данных в 17:00
+            # Загрузка административных данных в 18:00
             await load_admin_data_from_sheets()
             
         except Exception as e:

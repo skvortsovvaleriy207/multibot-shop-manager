@@ -85,7 +85,7 @@ def init_unified_sheet():
              ["Дата и статус заказа", "ID заказчика", "№ в Основной таблице", "Категория услуги", "Наименование услуги",
               "Объем услуги", "Данные поставщика", "№, дата соглашения", "Оплата заказчиком",
               "№, дата документа выполнения", "Иная информация, отзывы", "Статус услуги/поставщика", "Примечание"]),
-            (SHEET_REQUESTS, 29,
+            (SHEET_REQUESTS, 31,
              ["ID заявки", "Дата создания", "ID пользователя", "Username", "Операция", "Тип заявки", "Категория",
               "Класс товара", "Тип товара", "Вид товара", "Название", "Назначение", "Имя", "Дата создания товара",
               "Состояние", "Спецификации", "Преимущества", "Доп. информация", "Изображения", "Цена", "Наличие",
@@ -102,7 +102,16 @@ def init_unified_sheet():
                 sheet = spreadsheet.worksheet(sheet_name)
             except:
                 sheet = spreadsheet.add_worksheet(title=sheet_name, rows=1000, cols=cols)
-            sheet.update(f'A1:{chr(64 + cols)}1', [headers])
+            # Helper to convert column number to letter (e.g., 1->A, 28->AB)
+            def col_to_letter(n):
+                string = ""
+                while n > 0:
+                    n, remainder = divmod(n - 1, 26)
+                    string = chr(65 + remainder) + string
+                return string
+            
+            last_col_letter = col_to_letter(cols)
+            sheet.update(f'A1:{last_col_letter}1', [headers])
 
         return True
     except Exception as e:

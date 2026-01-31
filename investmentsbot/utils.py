@@ -14,9 +14,13 @@ async def check_blocked_user(event):
     """
     user_id = event.from_user.id
     # check_account_status returns True if allowed ("Р"), False otherwise
-    is_allowed = await check_account_status(user_id)
+    # OLD LOGIC: if not allowed => blocked. 
+    # NEW LOGIC: check explicitly if blocked ("О")
     
-    if not is_allowed:
+    from db import is_user_blocked
+    is_blocked = await is_user_blocked(user_id)
+    
+    if is_blocked:
         if isinstance(event, CallbackQuery):
             await event.answer("Ваш аккаунт заблокирован или не найден.", show_alert=True)
         else:

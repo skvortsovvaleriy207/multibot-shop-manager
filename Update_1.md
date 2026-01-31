@@ -30,7 +30,6 @@
 - [x] `besthomebot`: Updated.
 - [x] `gifthealthbot`: Updated.
 - [x] `investmentsbot`: Updated.
-- [x] `auto_avia`: Updated (Added Global DB logic).
 - [x] `ourwonderfulbot`: Updated (Fixed sync direction and unpacking).
 
 ## 4. Verification Steps

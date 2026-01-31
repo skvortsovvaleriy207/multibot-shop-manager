@@ -531,12 +531,12 @@ async def sync_investor_data_to_profiles():
 
 # Функция для периодической синхронизации (каждый день в 17:00)
 async def scheduled_partner_sync():
-    """Запланированная выгрузка партнерских данных в 17:00 МСК согласно ТЗ"""
+    """Запланированная выгрузка партнерских данных в 18:00 МСК согласно ТЗ"""
     while True:
         try:
-            # Ждем до 17:00 МСК
+            # Ждем до 18:00 МСК
             now = datetime.now()
-            target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
+            target_time = now.replace(hour=18, minute=0, second=0, microsecond=0)
             
             if now > target_time:
                 target_time += timedelta(days=1)

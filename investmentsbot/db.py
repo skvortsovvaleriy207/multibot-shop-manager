@@ -631,3 +631,10 @@ async def check_account_status(user_id: int) -> bool:
         cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
         status = await cursor.fetchone()
         return status and status[0] == "Р" 
+
+async def is_user_blocked(user_id: int) -> bool:
+    """Checks if the user is explicitly blocked (status 'О')"""
+    async with aiosqlite.connect("bot_database.db") as db:
+        cursor = await db.execute("SELECT account_status FROM users WHERE user_id = ?", (user_id,))
+        status = await cursor.fetchone()
+        return status and status[0] == "О" 
