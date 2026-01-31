@@ -10,6 +10,7 @@ async def init_db():
             await db.execute("PRAGMA synchronous=NORMAL")
             await db.commit()
             
+            print("DB: Creating users table...")
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
@@ -60,6 +61,9 @@ async def init_db():
                 print("Added column requests_text to users table")
             except Exception:
                 pass # Колонка уже существует
+
+            await db.commit() # Commit after users table creation
+
 
             # Проверка и добавление колонки user_status если её нет (миграция)
             try:

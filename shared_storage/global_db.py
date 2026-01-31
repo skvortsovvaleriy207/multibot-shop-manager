@@ -82,7 +82,9 @@ async def get_global_user_survey(user_id: int) -> dict:
         row = await cursor.fetchone()
         if row and row[0]:
             try:
-                return json.loads(row[0])
+                data = json.loads(row[0])
+                # print(f"DEBUG: GLOBAL_DB get_global_user_survey({user_id}) -> Keys: {list(data.keys()) if data else 'None'}")
+                return data
             except json.JSONDecodeError:
                 logging.error(f"Error decoding survey data for user {user_id}")
                 return None
@@ -90,6 +92,7 @@ async def get_global_user_survey(user_id: int) -> dict:
 
 async def save_global_user(user_id: int, username: str, full_name: str, survey_data: dict):
     """Saves user info and survey data to the global database."""
+    print(f"DEBUG: GLOBAL_DB save_global_user({user_id}) -> SurveyData Keys: {list(survey_data.keys()) if survey_data else 'None'}")
     async with aiosqlite.connect(GLOBAL_DB_PATH) as db:
         # 1. Save Base User Info
         cursor = await db.execute("SELECT user_id FROM global_users WHERE user_id = ?", (user_id,))

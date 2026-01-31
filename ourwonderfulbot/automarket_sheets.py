@@ -1,6 +1,6 @@
 import gspread
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import CREDENTIALS_FILE, AUTO_PRODUCTS_SHEET_URL, AUTO_SERVICES_SHEET_URL, AUTO_ORDERS_SHEET_URL
 import asyncio
 from utils import retry_google_api
@@ -424,7 +424,7 @@ async def scheduled_automarket_sync():
             target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
             
             if now > target_time:
-                target_time = target_time.replace(day=target_time.day + 1)
+                target_time += timedelta(days=1)
             
             wait_seconds = (target_time - now).total_seconds()
             await asyncio.sleep(wait_seconds)

@@ -173,15 +173,16 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 # Копируем данные из глобальной БД в локальную
                 from survey import save_user_data_to_db
                 
-                # Prepare data dict (similar to state data)
-                user_data_for_db = {
-                    'username': survey_data.get('username'),
-                    'full_name': survey_data.get('full_name'),
-                }
+                # Global DB returns the flat survey data dict directly
+                user_data_for_db = survey_data.copy()
                 
-                # Merge survey_data json into flat structure if needed by save_user_data_to_db
-                if 'survey_data' in survey_data and isinstance(survey_data['survey_data'], dict):
-                    user_data_for_db.update(survey_data['survey_data'])
+                # Ensure username/fullname are preserved or taken from message if missing
+                if 'username' not in user_data_for_db:
+                    user_data_for_db['username'] = message.from_user.username or ""
+                if 'full_name' not in user_data_for_db:
+                    user_data_for_db['full_name'] = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+                
+                print(f"DEBUG: Prepare user_data_for_db keys: {list(user_data_for_db.keys())}")
                 
                 # Save to local DB
                 await save_user_data_to_db(user_id, user_data_for_db)
@@ -190,9 +191,10 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 current_bot_folder = os.path.basename(os.path.dirname(__file__))
                 register_user_subscription(user_id, current_bot_folder)
                 
-                # Sync to Google Sheets for this bot
-                from google_sheets import sync_with_google_sheets
-                await sync_with_google_sheets()
+                # Sync to Google Sheets for this bot (PUSH data)
+                from google_sheets import sync_db_to_google_sheets
+                print("DEBUG: Pushing imported user to Google Sheets...")
+                await sync_db_to_google_sheets()
                 
                 await message.answer(f"✅ Вы успешно авторизованы! Ваши данные загружены из профиля сообщества.")
                 
@@ -427,7 +429,13 @@ async def main():
     # Запуск ежедневной синхронизации в 17:00 МСК
     asyncio.create_task(start_daily_scheduler())
     
-
+    # Инициализация таблицы Google Sheets
+    try:
+        from google_sheets import init_unified_sheet
+        await init_unified_sheet()
+        print("[INIT] Google Sheets initialized")
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize Google Sheets: {e}")
     
     
     # SYNC: Загружаем изменения из Google Sheets в БД

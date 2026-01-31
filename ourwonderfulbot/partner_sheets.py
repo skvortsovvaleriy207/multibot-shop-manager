@@ -1,6 +1,6 @@
 import gspread
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import CREDENTIALS_FILE, MAIN_SURVEY_SHEET_URL
 import asyncio
 import logging
@@ -539,7 +539,7 @@ async def scheduled_partner_sync():
             target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
             
             if now > target_time:
-                target_time = target_time.replace(day=target_time.day + 1)
+                target_time += timedelta(days=1)
             
             wait_seconds = (target_time - now).total_seconds()
             await asyncio.sleep(wait_seconds)

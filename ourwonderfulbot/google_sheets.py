@@ -460,6 +460,9 @@ async def sync_db_to_google_sheets():
                 ORDER BY MAX(ub.updated_at) DESC
             """)
             users = await cursor.fetchall()
+            logging.info(f"SYNC: Found {len(users)} users in DB to sync to Google Sheets.")
+            if not users:
+                logging.warning("SYNC: No users found in DB!")
 
         headers = [
             "0. Дата опроса/подписки",

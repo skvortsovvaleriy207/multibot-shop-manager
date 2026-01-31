@@ -7,7 +7,7 @@ import gspread
 import aiosqlite
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import CREDENTIALS_FILE
 
 def get_google_sheets_client():
@@ -318,7 +318,7 @@ async def scheduled_admin_tables_sync():
             target_time = now.replace(hour=17, minute=0, second=0, microsecond=0)
             
             if now > target_time:
-                target_time = target_time.replace(day=target_time.day + 1)
+                target_time += timedelta(days=1)
             
             wait_seconds = (target_time - now).total_seconds()
             await asyncio.sleep(wait_seconds)

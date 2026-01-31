@@ -408,21 +408,21 @@ async def sync_db_to_google_sheets():
         # Получаем данные из базы данных
         async with aiosqlite.connect("bot_database.db") as db:
             cursor = await db.execute("""
-                SELECT DISTINCT
+                SELECT
                     u.survey_date,
                     u.created_at,
-                    sa3.answer_text as username,
-                    sa4.answer_text as full_name,
-                    sa6.answer_text as location,
-                    sa7.answer_text as email,
-                    sa9.answer_text as employment,
-                    sa10.answer_text as financial_problem,
-                    sa11.answer_text as social_problem,
-                    sa12.answer_text as ecological_problem,
-                    sa13.answer_text as passive_subscriber,
-                    sa14.answer_text as active_partner,
-                    sa15.answer_text as investor_trader,
-                    sa16.answer_text as business_proposal,
+                    u.username,
+                    u.full_name,
+                    u.location,
+                    u.email,
+                    u.employment,
+                    u.financial_problem,
+                    u.social_problem,
+                    u.ecological_problem,
+                    u.passive_subscriber,
+                    u.active_partner,
+                    u.investor_trader,
+                    u.business_proposal,
                     ub.bonus_total,
                     ub.bonus_adjustment,
                     ub.current_balance,
@@ -436,28 +436,12 @@ async def sync_db_to_google_sheets():
                     u.requisites,
                     u.business,
                     u.account_status,
-                    u.account_status, -- Duplicate for 27th column if needed or just status
                     u.user_status
                 FROM users u
                 LEFT JOIN user_bonuses ub ON u.user_id = ub.user_id
-                LEFT JOIN survey_answers sa1 ON u.user_id = sa1.user_id AND sa1.question_id = 1
-                LEFT JOIN survey_answers sa3 ON u.user_id = sa3.user_id AND sa3.question_id = 3
-                LEFT JOIN survey_answers sa4 ON u.user_id = sa4.user_id AND sa4.question_id = 4
-                LEFT JOIN survey_answers sa5 ON u.user_id = sa5.user_id AND sa5.question_id = 5
-                LEFT JOIN survey_answers sa6 ON u.user_id = sa6.user_id AND sa6.question_id = 6
-                LEFT JOIN survey_answers sa7 ON u.user_id = sa7.user_id AND sa7.question_id = 7
-                LEFT JOIN survey_answers sa8 ON u.user_id = sa8.user_id AND sa8.question_id = 8
-                LEFT JOIN survey_answers sa9 ON u.user_id = sa9.user_id AND sa9.question_id = 9
-                LEFT JOIN survey_answers sa10 ON u.user_id = sa10.user_id AND sa10.question_id = 10
-                LEFT JOIN survey_answers sa11 ON u.user_id = sa11.user_id AND sa11.question_id = 11
-                LEFT JOIN survey_answers sa12 ON u.user_id = sa12.user_id AND sa12.question_id = 12
-                LEFT JOIN survey_answers sa13 ON u.user_id = sa13.user_id AND sa13.question_id = 13
-                LEFT JOIN survey_answers sa14 ON u.user_id = sa14.user_id AND sa14.question_id = 14
-                LEFT JOIN survey_answers sa15 ON u.user_id = sa15.user_id AND sa15.question_id = 15
-                LEFT JOIN survey_answers sa16 ON u.user_id = sa16.user_id AND sa16.question_id = 16
                 WHERE u.user_id != 0
                 GROUP BY u.user_id
-                ORDER BY MAX(ub.updated_at) DESC
+                ORDER BY u.created_at DESC
             """)
             users = await cursor.fetchall()
 
@@ -526,33 +510,33 @@ async def sync_db_to_google_sheets():
 
             row_data = [
                 formatted_date, # 0. Дата опроса/подписки
-                str(user[2]).lstrip('@'), # 1. Username
-                user[3], # 2. Full Name + Age
-                user[4], # 3. Location
-                user[5], # 4. Email
-                user[6], # 5. Employment
-                user[7], # 6. Financial Problem
-                user[8], # 7. Social Problem
-                user[9], # 8. Ecological Problem
-                user[10], # 9. Passive
-                user[11], # 10. Active
-                user[12], # 11. Investor
-                user[13], # 12. Proposal
-                user[14], # 13. Bonus Total
-                user[15], # 14. Bonus Adjustment
-                user[16], # 15. Current Balance
-                user[17], # 16. Notes (16)
-                user[18], # 17. Referral Count (17)
-                user[19], # 18. Referral Payment (18)
-                user[20], # 19. ID (19)
-                user[21], # 20. Requests (20)
+                str(user[2] or "").lstrip('@'), # 1. Username
+                user[3] or "", # 2. Full Name + Age
+                user[4] or "", # 3. Location
+                user[5] or "", # 4. Email
+                user[6] or "", # 5. Employment
+                user[7] or "", # 6. Financial Problem
+                user[8] or "", # 7. Social Problem
+                user[9] or "", # 8. Ecological Problem
+                user[10] or "", # 9. Passive
+                user[11] or "", # 10. Active
+                user[12] or "", # 11. Investor
+                user[13] or "", # 12. Proposal
+                user[14] or 0, # 13. Bonus Total
+                user[15] or 0, # 14. Bonus Adjustment
+                user[16] or 0, # 15. Current Balance
+                user[17] or "", # 16. Notes (16)
+                user[18] or 0, # 17. Referral Count (17)
+                user[19] or "", # 18. Referral Payment (18)
+                user[20] or "", # 19. ID (19)
+                user[21] or "", # 20. Requests (20)
                 p_count,  # 21. Purchase Count (21)
                 p_sum,    # 22. Purchase Sum (22)
                 s_sum,    # 23. Sales Sum (23)
-                user[24], # 24. Requisites -> Other info (24)
-                user[25], # 25. Business (25)
-                user[27], # 26. User Status (26)
-                user[26]  # 27. Account Status (27)
+                user[24] or "", # 24. Requisites -> Other info (24)
+                user[25] or "", # 25. Business (25)
+                user[27] or "", # 26. User Status (26)
+                user[26] or ""  # 27. Account Status (27)
             ]
             data.append(row_data)
 
@@ -926,7 +910,7 @@ async def sync_db_to_main_survey_sheet():
                 LEFT JOIN survey_answers sa16 ON u.user_id = sa16.user_id AND sa16.question_id = 16
                 WHERE u.user_id != 0
                 GROUP BY u.user_id
-                ORDER BY MAX(ub.updated_at) DESC
+                ORDER BY u.created_at DESC
             """)
             users = await cursor.fetchall()
 

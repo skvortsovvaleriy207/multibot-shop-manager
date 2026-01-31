@@ -4,7 +4,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import pytz
 
 async def start_daily_scheduler():
@@ -21,7 +21,7 @@ async def start_daily_scheduler():
             
             # Если уже прошло 17:00, планируем на следующий день
             if now >= target_time:
-                target_time = target_time.replace(day=target_time.day + 1)
+                target_time += timedelta(days=1)
             
             # Вычисляем время ожидания
             wait_seconds = (target_time - now).total_seconds()

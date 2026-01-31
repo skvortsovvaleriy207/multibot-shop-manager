@@ -163,36 +163,34 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 # Проверка лимита подписок (Critical Fix)
                 current_bot_folder = os.path.basename(os.path.dirname(__file__))
                 sub_count = await get_user_subscription_count(user_id)
-                is_subbed = await is_user_subscribed(user_id, current_bot_folder)
-
-                if sub_count >= 3 and not is_subbed:
-                    print(f"DEBUG: Subscription limit reached for user {user_id} (Count: {sub_count})")
-                    await message.answer("❌ Вы не можете подписаться на этого бота, так как достигли лимита подписок (максимум 3 бота).")
-                    return
-
+                # Helper to check local sub status not defined here, relying on register check or just proceeding
+                
                 # Копируем данные из глобальной БД в локальную
                 from survey import save_user_data_to_db
                 
-                # Prepare data dict (similar to state data)
-                user_data_for_db = {
-                    'username': survey_data.get('username'),
-                    'full_name': survey_data.get('full_name'),
-                }
+                # Global DB returns the flat survey data dict directly
+                user_data_for_db = survey_data.copy()
                 
-                # Merge survey_data json into flat structure if needed by save_user_data_to_db
-                if 'survey_data' in survey_data and isinstance(survey_data['survey_data'], dict):
-                    user_data_for_db.update(survey_data['survey_data'])
+                # Ensure username/fullname are preserved or taken from message if missing
+                if 'username' not in user_data_for_db:
+                    user_data_for_db['username'] = username
+                if 'full_name' not in user_data_for_db:
+                    user_data_for_db['full_name'] = f"{curr_first} {curr_last}".strip()
+
+                print(f"DEBUG: Prepare user_data_for_db keys: {list(user_data_for_db.keys())}")
                 
                 # Save to local DB
                 await save_user_data_to_db(user_id, user_data_for_db)
                 
                 # Register subscription in Global DB
                 current_bot_folder = os.path.basename(os.path.dirname(__file__))
-                register_user_subscription(user_id, current_bot_folder)
+                await register_user_subscription(user_id, current_bot_folder)
                 
-                # Sync to Google Sheets for this bot
-                from google_sheets import sync_with_google_sheets
-                await sync_with_google_sheets()
+                # Sync to Google Sheets for this bot (PUSH data)
+                # Changed from sync_with_google_sheets (pull) to sync_db_to_google_sheets (push)
+                from google_sheets import sync_db_to_google_sheets
+                print("DEBUG: Pushing imported user to Google Sheets...")
+                await sync_db_to_google_sheets()
                 
                 await message.answer(f"✅ Вы успешно авторизованы! Ваши данные загружены из профиля сообщества.")
                 
@@ -232,6 +230,11 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
                 user_exists = True # Treating as existing
                 # Optional: Send welcome message?
                 await message.answer("✅ Ваш профиль успешно загружен!")
+                
+                # Also push to Google Sheets here to be safe
+                from google_sheets import sync_db_to_google_sheets
+                asyncio.create_task(sync_db_to_google_sheets())
+                
         except Exception as e:
             print(f"DEBUG: Failed to import from global DB: {e}")
 
@@ -404,6 +407,14 @@ async def main():
     from db import init_db
     await init_db()
     
+    # Initialize Google Sheets structure
+    try:
+        from google_sheets import init_unified_sheet
+        init_unified_sheet()
+        print("[INIT] Google Sheets initialized")
+    except Exception as e:
+        logging.error(f"Error initializing sheets: {e}")
+
     # Initialize Global DB
     await init_global_db()
 

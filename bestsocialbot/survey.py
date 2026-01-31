@@ -451,6 +451,13 @@ async def process_q16(message: Message, state: FSMContext):
     except Exception:
         pass
 
+    data = await state.get_data()
+    # Check if critical data is present to avoid saving empty/corrupted sessions
+    if not data or not any(k.startswith("q") for k in data.keys()):
+        await message.answer("⚠️ Ошибка: Сессия устарела или данные были утеряны. Пожалуйста, начните опрос заново с команды /start.")
+        await state.clear()
+        return
+
     async with aiosqlite.connect("bot_database.db") as db:
         # Обновляем информацию о прохождении опроса
         await db.execute(

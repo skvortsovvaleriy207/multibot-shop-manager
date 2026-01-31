@@ -502,6 +502,7 @@ async def process_q16(message: Message, state: FSMContext):
             (user_id, bonus_total, bonus_total, datetime.now().isoformat())
         )
         await db.commit()
+        print(f"DEBUG: Survey data saved for user {user_id}. Bonus: {bonus_total}")
 
     # --- SAVE TO GLOBAL DB ---
     try:
@@ -517,6 +518,7 @@ async def process_q16(message: Message, state: FSMContext):
             data # Saving all state data (q3, q4, etc.)
         )
         await register_user_subscription(user_id, BOT_FOLDER_NAME)
+        print(f"DEBUG: Global DB save successful for {user_id}")
     except Exception as global_e:
         print(f"Error saving to global DB: {global_e}")
     # -------------------------
@@ -537,6 +539,7 @@ async def process_q16(message: Message, state: FSMContext):
         print(f"Ошибка отправки уведомления о профиле: {e}")
 
     from google_sheets import sync_db_to_google_sheets
+    print("DEBUG: Triggering sync_db_to_google_sheets task...")
     asyncio.create_task(sync_db_to_google_sheets())
 
     await message.answer(
